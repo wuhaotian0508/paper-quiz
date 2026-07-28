@@ -29,12 +29,16 @@ describe("POST /api/generate-quiz", () => {
     process.env.OPENAI_API_KEY = "test-key";
     const response = await POST(requestWith(new FormData()));
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: "Please upload a PDF or provide a lecture transcript." });
+    await expect(response.json()).resolves.toEqual({
+      error: "Please upload a PDF or provide a lecture transcript.",
+    });
   });
 
   it("rejects a non-PDF upload in English", async () => {
     process.env.OPENAI_API_KEY = "test-key";
-    const response = await POST(requestWith(validForm(new File(["hello"], "notes.txt", { type: "text/plain" }))));
+    const response = await POST(
+      requestWith(validForm(new File(["hello"], "notes.txt", { type: "text/plain" }))),
+    );
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Only PDF files are supported." });
   });
@@ -42,16 +46,41 @@ describe("POST /api/generate-quiz", () => {
   it("rejects unsupported settings before calling the model", async () => {
     process.env.OPENAI_API_KEY = "test-key";
     const form = validForm();
+    form.delete("questions");
     form.set("count", "7");
     const response = await POST(requestWith(form));
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Question count is invalid" });
   });
 
+  it("accepts a mixed question configuration whose total is not a legacy preset", async () => {
+    process.env.OPENAI_API_KEY = "";
+    const form = validForm();
+    form.set("count", "9");
+    form.set(
+      "questions",
+      JSON.stringify([
+        { type: "multiple_choice", count: 5 },
+        { type: "fill_blank", count: 3 },
+        { type: "short_answer", count: 1 },
+      ]),
+    );
+
+    const response = await POST(requestWith(form));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "The server has not been configured with an OpenAI API key.",
+    });
+  });
+
   it("rejects malformed question configurations before calling the model", async () => {
     process.env.OPENAI_API_KEY = "test-key";
     const form = validForm();
-    form.set("questions", JSON.stringify([{ type: "custom", count: 1, label: "Calculation", instructions: "" }]));
+    form.set(
+      "questions",
+      JSON.stringify([{ type: "custom", count: 1, label: "Calculation", instructions: "" }]),
+    );
     const response = await POST(requestWith(form));
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Question configuration is invalid" });

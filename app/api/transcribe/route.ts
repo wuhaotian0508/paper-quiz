@@ -2,6 +2,8 @@ import OpenAI from "openai";
 import { getOpenAIClientOptions } from "@/lib/openai-config";
 import { getTranscriptionModel, transcribeAudio, validateAudioFile } from "@/lib/transcription";
 
+export const maxDuration = 60;
+
 function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
 }
@@ -32,7 +34,10 @@ export async function POST(request: Request) {
     );
     return Response.json({ transcript });
   } catch (error) {
-    console.error("Audio transcription failed", error instanceof Error ? error.message : "unknown error");
+    console.error(
+      "Audio transcription failed",
+      error instanceof Error ? error.message : "unknown error",
+    );
     return jsonError("Audio transcription failed. Please try again later.", 502);
   }
 }

@@ -1,33 +1,12 @@
 import { describe, expect, it } from "vitest";
-import {
-  calculateScore,
-  parseSettings,
-  parseQuestionConfiguration,
-  type Quiz,
-} from "./quiz";
-
-const quiz: Quiz = {
-  title: "Practice Quiz",
-  summary: "Test knowledge points",
-  questions: [
-    {
-      id: "q1",
-      type: "multiple_choice",
-      prompt: "Which option is correct?",
-      options: [
-        { id: "a", text: "Option A" },
-        { id: "b", text: "Option B" },
-        { id: "c", text: "Option C" },
-        { id: "d", text: "Option D" },
-      ],
-      correctOptionId: "b",
-      explanation: "Option B matches the question.",
-      sourceNote: "Page 1",
-    },
-  ],
-};
+import { normalizeAnswer, parseSettings, parseQuestionConfiguration } from "./quiz";
 
 describe("parseSettings", () => {
+  it("normalizes fill-blank answers for matching", () => {
+    expect(normalizeAnswer("  Retrieval-Augmented  Generation ")).toBe(
+      "retrieval augmented generation",
+    );
+  });
   it("parses supported count and difficulty", () => {
     expect(parseSettings("5", "basic")).toEqual({
       count: 5,
@@ -42,25 +21,24 @@ describe("parseSettings", () => {
 
 describe("parseQuestionConfiguration", () => {
   it("accepts fixed and custom question quantities", () => {
-    expect(parseQuestionConfiguration(JSON.stringify([
-      { type: "multiple_choice", count: 2 },
-      { type: "custom", count: 1, label: "Calculation", instructions: "Show each step." },
-    ]))).toEqual([
+    expect(
+      parseQuestionConfiguration(
+        JSON.stringify([
+          { type: "multiple_choice", count: 2 },
+          { type: "custom", count: 1, label: "Calculation", instructions: "Show each step." },
+        ]),
+      ),
+    ).toEqual([
       { type: "multiple_choice", count: 2 },
       { type: "custom", count: 1, label: "Calculation", instructions: "Show each step." },
     ]);
   });
 
   it("rejects custom question types without requirements", () => {
-    expect(() => parseQuestionConfiguration(JSON.stringify([
-      { type: "custom", count: 1, label: "Calculation", instructions: "" },
-    ]))).toThrow("Question configuration is invalid");
-  });
-});
-
-describe("calculateScore", () => {
-  it("counts correct answers against the quiz", () => {
-    expect(calculateScore(quiz, { q1: "b" })).toEqual({ correct: 1, total: 1 });
-    expect(calculateScore(quiz, { q1: "a" })).toEqual({ correct: 0, total: 1 });
+    expect(() =>
+      parseQuestionConfiguration(
+        JSON.stringify([{ type: "custom", count: 1, label: "Calculation", instructions: "" }]),
+      ),
+    ).toThrow("Question configuration is invalid");
   });
 });

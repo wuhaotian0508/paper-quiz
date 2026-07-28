@@ -1,6 +1,8 @@
 import type { Quiz } from "./quiz";
 
-export type QuizResponse = Quiz | { error?: string };
+/** `sourceFileId` is null when the source was a transcript, or when the provider has no Files endpoint. */
+export type GeneratedQuiz = Quiz & { sourceFileId?: string | null };
+export type QuizResponse = GeneratedQuiz | { error?: string };
 
 export async function readQuizResponse(response: Response): Promise<QuizResponse> {
   const body = await response.text();
@@ -12,11 +14,15 @@ export async function readQuizResponse(response: Response): Promise<QuizResponse
     const isHtml = contentType.includes("text/html") || /^\s*</.test(body);
 
     if (!response.ok && isHtml) {
-      throw new Error(`The server returned an HTML error page (HTTP ${response.status}). Please try again.`);
+      throw new Error(
+        `The server returned an HTML error page (HTTP ${response.status}). Please try again.`,
+      );
     }
     if (!response.ok) {
       throw new Error(`The server returned an error (HTTP ${response.status}). Please try again.`);
     }
-    throw new Error("The server returned data in an unexpected format. Please refresh and try again.");
+    throw new Error(
+      "The server returned data in an unexpected format. Please refresh and try again.",
+    );
   }
 }

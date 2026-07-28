@@ -3,8 +3,8 @@ import { collectResponseText } from "./openai-stream";
 
 async function* events() {
   yield { type: "response.created" };
-  yield { type: "response.output_text.delta", delta: "{\"title\":" };
-  yield { type: "response.output_text.delta", delta: "\"小测\"}" };
+  yield { type: "response.output_text.delta", delta: '{"title":' };
+  yield { type: "response.output_text.delta", delta: '"小测"}' };
   yield { type: "response.completed" };
 }
 

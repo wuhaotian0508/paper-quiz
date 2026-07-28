@@ -15,6 +15,9 @@ dev-server*.log
 tsconfig.tsbuildinfo
 outputs/
 work/
+.superpowers/
+tmp/
+output/
 
 # Course-report artifacts are not required to run the application.
 UGBA 117 AI Project.md

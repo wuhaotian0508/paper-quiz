@@ -15,11 +15,7 @@ type TranscriptionEnv = { OPENAI_TRANSCRIBE_MODEL?: string };
 type TranscriptionClient = {
   audio: {
     transcriptions: {
-      create: (input: {
-        file: File;
-        model: string;
-        prompt: string;
-      }) => Promise<{ text: string }>;
+      create: (input: { file: File; model: string; prompt: string }) => Promise<{ text: string }>;
     };
   };
 };
@@ -36,8 +32,9 @@ export function validateAudioFile(file: File): { valid: true } | { valid: false;
 }
 
 export function getTranscriptionModel(env?: TranscriptionEnv) {
-  const configured = env?.OPENAI_TRANSCRIBE_MODEL
-    ?? (process.env as Record<string, string | undefined>)["OPENAI_TRANSCRIBE_MODEL"];
+  const configured =
+    env?.OPENAI_TRANSCRIBE_MODEL ??
+    (process.env as Record<string, string | undefined>)["OPENAI_TRANSCRIBE_MODEL"];
   return configured || "gpt-4o-mini-transcribe";
 }
 
@@ -45,7 +42,8 @@ export async function transcribeAudio(client: TranscriptionClient, file: File, m
   const response = await client.audio.transcriptions.create({
     file,
     model,
-    prompt: "This is a university lecture. Preserve technical terms, names, acronyms, equations, and important vocabulary.",
+    prompt:
+      "This is a university lecture. Preserve technical terms, names, acronyms, equations, and important vocabulary.",
   });
   const transcript = response.text.trim();
   if (!transcript) throw new Error("The transcription service returned no text.");

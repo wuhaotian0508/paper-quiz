@@ -25,7 +25,8 @@ export const WrittenQuestionSchema = BaseQuestionSchema.extend({
   type: z.enum(["short_answer", "custom"]),
   referenceAnswer: z.string().min(1),
   gradingCriteria: z.array(z.string().min(1)).min(1),
-  customLabel: z.string().min(1).optional(),
+  // Structured Outputs requires every field to be present; non-custom questions use null.
+  customLabel: z.string().min(1).nullable(),
 });
 export const QuestionSchema = z.discriminatedUnion("type", [
   MultipleChoiceQuestionSchema,
@@ -42,8 +43,16 @@ export type Question = z.infer<typeof QuestionSchema>;
 export type Quiz = z.infer<typeof QuizSchema>;
 
 export const QuestionConfigurationSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.enum(["multiple_choice", "fill_blank", "short_answer"]), count: z.number().int().min(0).max(15) }),
-  z.object({ type: z.literal("custom"), count: z.number().int().min(1).max(15), label: z.string().trim().min(1).max(80), instructions: z.string().trim().min(1).max(500) }),
+  z.object({
+    type: z.enum(["multiple_choice", "fill_blank", "short_answer"]),
+    count: z.number().int().min(0).max(15),
+  }),
+  z.object({
+    type: z.literal("custom"),
+    count: z.number().int().min(1).max(15),
+    label: z.string().trim().min(1).max(80),
+    instructions: z.string().trim().min(1).max(500),
+  }),
 ]);
 export type QuestionConfiguration = z.infer<typeof QuestionConfigurationSchema>;
 
@@ -55,10 +64,22 @@ export const GradeResultSchema = z.object({
 });
 export type GradeResult = z.infer<typeof GradeResultSchema>;
 
+export function normalizeAnswer(value: string): string {
+  return value
+    .toLocaleLowerCase()
+    .replace(/[\u2010-\u2015-]/g, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 const allowedCounts = [5, 10, 15] as const;
 export type QuestionCount = (typeof allowedCounts)[number];
 
-export function parseSettings(countValue: string, difficultyValue: string): { count: QuestionCount; difficulty: Difficulty } {
+export function parseSettings(
+  countValue: string,
+  difficultyValue: string,
+): { count: QuestionCount; difficulty: Difficulty } {
   const count = Number(countValue);
   if (!allowedCounts.includes(count as QuestionCount)) throw new Error("Question count is invalid");
   const difficulty = DifficultySchema.safeParse(difficultyValue);
@@ -75,11 +96,4 @@ export function parseQuestionConfiguration(value: string): QuestionConfiguration
   } catch {
     throw new Error("Question configuration is invalid");
   }
-}
-
-export function calculateScore(quiz: Quiz, answers: Record<string, string>): { correct: number; total: number } {
-  const correct = quiz.questions.reduce((total, question) => (
-    question.type === "multiple_choice" && answers[question.id] === question.correctOptionId ? total + 1 : total
-  ), 0);
-  return { correct, total: quiz.questions.length };
 }

@@ -3,12 +3,19 @@ import { buildQuizInstructions } from "./quiz-prompt";
 
 describe("buildQuizInstructions", () => {
   it("requires every generated quiz field to be in English", () => {
-    const instructions = buildQuizInstructions({ questions: [{ type: "multiple_choice", count: 5 }], difficulty: "basic" });
+    const instructions = buildQuizInstructions({
+      questions: [{ type: "multiple_choice", count: 5 }],
+      difficulty: "basic",
+    });
 
-    expect(instructions).toContain("Generate exactly: 5 multiple choice question(s). Use basic difficulty.");
+    expect(instructions).toContain(
+      "Generate exactly: 5 multiple choice question(s). Use basic difficulty.",
+    );
     expect(instructions).toContain("provided study material");
     expect(instructions).not.toContain("uploaded PDF");
     expect(instructions).toContain("Write every user-visible field in English");
-    expect(instructions).toContain("title, summary, prompt, option text, explanation, and sourceNote");
+    expect(instructions).toContain(
+      "title, summary, prompt, option text, explanation, and sourceNote",
+    );
   });
 });

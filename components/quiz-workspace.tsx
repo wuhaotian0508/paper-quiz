@@ -1,58 +1,474 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { type Difficulty, type GradeResult, type Question, type QuestionConfiguration, type Quiz } from "@/lib/quiz";
-import { readQuizResponse } from "@/lib/quiz-response";
-import { addMistake, MISTAKE_BOOK_KEY, readMistakes, type MistakeBookEntry } from "@/lib/mistake-book";
+import { useEffect, useState } from "react";
+import {
+  normalizeAnswer,
+  type Difficulty,
+  type GradeResult,
+  type Question,
+  type QuestionConfiguration,
+  type Quiz,
+} from "@/lib/quiz";
+import { readQuizResponse, type GeneratedQuiz } from "@/lib/quiz-response";
+import {
+  addMistake,
+  MISTAKE_BOOK_KEY,
+  readMistakes,
+  type MistakeBookEntry,
+} from "@/lib/mistake-book";
+import {
+  addSession,
+  boundSource,
+  EMPTY_SOURCE,
+  hasSource,
+  readSessions,
+  STUDY_HISTORY_KEY,
+  type PersistedSource,
+  type StudySession,
+} from "@/lib/study-history";
+import { ProgressDashboard } from "@/components/progress-dashboard";
+import { ReadOnlyReview } from "@/components/read-only-review";
+import { MistakeBookView } from "@/components/mistake-book-view";
+import { HistoryView } from "@/components/history-view";
+import { LoadingView } from "@/components/loading-view";
+import { ResultsView } from "@/components/results-view";
+import { TranscriptReviewView } from "@/components/transcript-review-view";
+import { UploadView, fixedTypes, type CustomDraft } from "@/components/upload-view";
+import { QuizView, type ChatMessage } from "@/components/quiz-view";
+import { safeStorageSet } from "@/lib/request-validation";
+import { postForm } from "@/lib/api-client";
+import { isAudio, isPdf, MAX_STUDY_FILE_BYTES } from "@/lib/study-file";
 
-type View = "upload" | "transcribing" | "reviewing" | "generating" | "quiz" | "results" | "mistakes";
-type ChatMessage = { role: "user" | "assistant"; content: string };
-type CustomDraft = { key: string; label: string; instructions: string; count: number };
-const audioExtensions = new Set(["mp3", "mp4", "mpeg", "mpga", "m4a", "wav", "webm"]);
-const fixedTypes = [
-  ["multiple_choice", "Multiple-choice questions"], ["fill_blank", "Fill-blank questions"], ["short_answer", "Short-answer questions"],
-] as const;
-const difficultyCopy: Record<Difficulty, string> = { basic: "Core review", mixed: "Mixed practice", challenging: "Challenge mode" };
-const isPdf = (value: File) => value.type === "application/pdf" || value.name.toLowerCase().endsWith(".pdf");
-const isAudio = (value: File) => value.type.startsWith("audio/") || value.type === "video/mp4" || audioExtensions.has(value.name.toLowerCase().split(".").pop() || "");
-const formatBytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+type View =
+  | "upload"
+  | "transcribing"
+  | "reviewing"
+  | "generating"
+  | "quiz"
+  | "results"
+  | "mistakes"
+  | "history"
+  | "progress"
+  | "session-review";
 
 export function QuizWorkspace() {
-  const [view, setView] = useState<View>("upload"); const [file, setFile] = useState<File | null>(null); const [transcript, setTranscript] = useState("");
-  const [difficulty, setDifficulty] = useState<Difficulty>("mixed"); const [counts, setCounts] = useState<Record<string, number>>({ multiple_choice: 5, fill_blank: 0, short_answer: 0 });
-  const [custom, setCustom] = useState<CustomDraft[]>([]); const [quiz, setQuiz] = useState<Quiz | null>(null); const [index, setIndex] = useState(0);
-  const [answer, setAnswer] = useState(""); const [answers, setAnswers] = useState<Record<string, string>>({}); const [grades, setGrades] = useState<Record<string, GradeResult>>({});
-  const [submitted, setSubmitted] = useState(false); const [loading, setLoading] = useState(false); const [error, setError] = useState(""); const [mistakes, setMistakes] = useState<MistakeBookEntry[]>([]);
-  const [chat, setChat] = useState<ChatMessage[]>([]); const [chatInput, setChatInput] = useState(""); const [chatting, setChatting] = useState(false); const inputRef = useRef<HTMLInputElement>(null);
+  const [view, setView] = useState<View>("upload");
+  const [file, setFile] = useState<File | null>(null);
+  const [transcript, setTranscript] = useState("");
+  /** Provider file id for the uploaded PDF, so grading never re-sends the document. */
+  const [sourceFileId, setSourceFileId] = useState<string | null>(null);
+  const [difficulty, setDifficulty] = useState<Difficulty>("mixed");
+  const [counts, setCounts] = useState<Record<string, number>>({
+    multiple_choice: 5,
+    fill_blank: 0,
+    short_answer: 0,
+  });
+  const [custom, setCustom] = useState<CustomDraft[]>([]);
+  const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [index, setIndex] = useState(0);
+  const [answer, setAnswer] = useState("");
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [grades, setGrades] = useState<Record<string, GradeResult>>({});
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [mistakes, setMistakes] = useState<MistakeBookEntry[]>([]);
+  const [sessions, setSessions] = useState<StudySession[]>([]);
+  const [sessionId, setSessionId] = useState("");
+  const [reviewSession, setReviewSession] = useState<StudySession | null>(null);
+  const [chat, setChat] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatting, setChatting] = useState(false);
 
-  useEffect(() => { setMistakes(readMistakes(window.localStorage.getItem(MISTAKE_BOOK_KEY))); }, []);
   useEffect(() => {
-    const openFromHash = () => { if (window.location.hash === "#mistake-book") setView("mistakes"); };
-    window.addEventListener("hashchange", openFromHash); openFromHash();
+    setMistakes(readMistakes(window.localStorage.getItem(MISTAKE_BOOK_KEY)));
+    setSessions(readSessions(window.localStorage.getItem(STUDY_HISTORY_KEY)));
+  }, []);
+  useEffect(() => {
+    const openFromHash = () => {
+      if (window.location.hash === "#mistake-book") setView("mistakes");
+      if (window.location.hash === "#progress") setView("progress");
+    };
+    window.addEventListener("hashchange", openFromHash);
+    openFromHash();
     return () => window.removeEventListener("hashchange", openFromHash);
   }, []);
+
   const current = quiz?.questions[index];
+  /** What grading and tutor chat send as study material, whether live or restored. */
+  const source: PersistedSource = boundSource({ fileId: sourceFileId, transcript });
+  const sourceAvailable = hasSource(source) || Boolean(file);
+
+  const attachSource = (form: FormData) => {
+    if (sourceFileId) form.set("fileId", sourceFileId);
+    else if (transcript) form.set("transcript", transcript);
+    else if (file) form.set("file", file);
+  };
+
   const saveMistake = (question: Question, userAnswer: string, grade: GradeResult) => {
     if (grade.status === "correct") return;
-    setMistakes((previous) => { const next = addMistake(previous, question, userAnswer, grade); window.localStorage.setItem(MISTAKE_BOOK_KEY, JSON.stringify(next)); return next; });
+    setMistakes((previous) => {
+      const next = addMistake(previous, question, userAnswer, grade, source);
+      safeStorageSet(MISTAKE_BOOK_KEY, JSON.stringify(next));
+      return next;
+    });
   };
-  const acceptFile = (next?: File) => { if (!next) return; if (!isPdf(next) && !isAudio(next)) return setError("Choose a PDF, MP3, M4A, WAV, WebM, or MP4 study file."); if (next.size > 20 * 1024 * 1024) return setError("Study files must be 20 MB or smaller."); setError(""); setFile(next); };
-  const config = (): QuestionConfiguration[] => [
-    ...fixedTypes.map(([type]) => ({ type, count: counts[type] || 0 } as QuestionConfiguration)).filter((item) => item.count > 0),
-    ...custom.filter((item) => item.count > 0).map((item) => ({ type: "custom" as const, count: item.count, label: item.label.trim(), instructions: item.instructions.trim() })),
-  ];
-  const generateQuiz = async () => { const questions = config(); if ((!file && !transcript.trim()) || !questions.length) return; if (questions.some((item) => item.type === "custom" && (!item.label || !item.instructions))) return setError("Give every custom question type a name and requirements."); setError(""); setLoading(true); setView("generating"); const form = new FormData(); if (transcript.trim()) form.set("transcript", transcript.trim()); else if (file) form.set("file", file); form.set("questions", JSON.stringify(questions)); form.set("difficulty", difficulty); form.set("count", String(questions.reduce((sum, item) => sum + item.count, 0))); try { const response = await fetch("/api/generate-quiz", { method: "POST", body: form }); const data = await readQuizResponse(response); if (!response.ok) throw new Error("error" in data ? data.error : "Quiz generation failed."); setQuiz(data as Quiz); setIndex(0); setAnswers({}); setGrades({}); setAnswer(""); setSubmitted(false); setChat([]); setView("quiz"); } catch (cause) { setError(cause instanceof Error ? cause.message : "Quiz generation failed."); setView("upload"); } finally { setLoading(false); } };
-  const transcribe = async () => { if (!file) return; setView("transcribing"); try { const form = new FormData(); form.set("file", file); const response = await fetch("/api/transcribe", { method: "POST", body: form }); const data = await response.json() as { transcript?: string; error?: string }; if (!response.ok || !data.transcript) throw new Error(data.error || "Audio transcription failed."); setTranscript(data.transcript); setView("reviewing"); } catch (cause) { setError(cause instanceof Error ? cause.message : "Audio transcription failed."); setView("upload"); } };
-  const submit = async () => { if (!current || !answer.trim()) return; setError(""); if (current.type === "multiple_choice") { const grade: GradeResult = answer === current.correctOptionId ? { status: "correct", score: 1, feedback: current.explanation, missingPoints: [] } : { status: "incorrect", score: 0, feedback: current.explanation, missingPoints: [] }; setAnswers((old) => ({ ...old, [current.id]: answer })); setGrades((old) => ({ ...old, [current.id]: grade })); saveMistake(current, answer, grade); setSubmitted(true); return; } setLoading(true); try { const form = new FormData(); form.set("question", JSON.stringify(current)); form.set("answer", answer); if (transcript) form.set("transcript", transcript); else if (file) form.set("file", file); const response = await fetch("/api/grade-answer", { method: "POST", body: form }); const grade = await response.json() as GradeResult & { error?: string }; if (!response.ok) throw new Error(grade.error || "Answer grading failed."); setAnswers((old) => ({ ...old, [current.id]: answer })); setGrades((old) => ({ ...old, [current.id]: grade })); saveMistake(current, answer, grade); setSubmitted(true); } catch (cause) { setError(cause instanceof Error ? cause.message : "Answer grading failed."); } finally { setLoading(false); } };
-  const next = () => { if (!quiz) return; if (index === quiz.questions.length - 1) return setView("results"); setIndex((value) => value + 1); setAnswer(""); setSubmitted(false); setChat([]); };
-  const ask = async () => { if (!current || !chatInput.trim()) return; const message = chatInput.trim(); const history = [...chat, { role: "user" as const, content: message }]; setChat(history); setChatInput(""); setChatting(true); try { const form = new FormData(); form.set("question", JSON.stringify(current)); form.set("message", message); form.set("history", JSON.stringify(chat)); if (transcript) form.set("transcript", transcript); else if (file) form.set("file", file); const response = await fetch("/api/question-chat", { method: "POST", body: form }); const data = await response.json() as { reply?: string; error?: string }; if (!response.ok || !data.reply) throw new Error(data.error || "Tutor chat failed."); setChat((items) => [...items, { role: "assistant", content: data.reply! }]); } catch (cause) { setError(cause instanceof Error ? cause.message : "Tutor chat failed."); } finally { setChatting(false); } };
-  const reset = () => { setView("upload"); setFile(null); setTranscript(""); setQuiz(null); setAnswer(""); setAnswers({}); setGrades({}); setSubmitted(false); setChat([]); setError(""); };
-  const openMistake = (entry: MistakeBookEntry) => { setQuiz({ title: "Mistake book review", summary: "", questions: [entry.question] }); setIndex(0); setAnswer(""); setAnswers({}); setGrades({}); setSubmitted(false); setChat([]); setView("quiz"); };
 
-  if (view === "transcribing" || view === "generating") return <section className="generation-card"><div className="eyebrow">{view === "transcribing" ? "Transcribing your lecture" : "Preparing your personal quiz"}</div><div className="loader-orbit"><span /><span /><span /></div><h1>{view === "transcribing" ? "Turning spoken ideas into review material." : "Writing your focused practice set."}</h1><p className="muted-copy">This takes a moment. Your study material stays in this active learning flow.</p></section>;
-  if (view === "reviewing") return <section className="transcript-card"><div className="eyebrow">Transcript review</div><h1>Check the lecture notes before building your quiz.</h1><label className="transcript-field">Lecture transcript<textarea aria-label="Lecture transcript" value={transcript} onChange={(event) => setTranscript(event.target.value)} rows={15} /></label><div className="quiz-actions"><button className="text-button" onClick={reset}>Choose another study file</button><button className="primary-button" disabled={!transcript.trim()} onClick={generateQuiz}>Generate quiz from transcript</button></div></section>;
-  if (view === "mistakes") return <section className="results-card" id="mistake-book"><div className="eyebrow">Persistent mistake book</div><h1>Return to the questions that need another look.</h1>{mistakes.length ? <div className="review-list">{mistakes.map((entry) => <div className="review-row is-wrong" key={entry.id}><span className="review-number">{entry.question.type.replaceAll("_", " ")}</span><span>{entry.question.prompt}</span><button className="text-button" onClick={() => openMistake(entry)}>Practice</button><button className="text-button" onClick={() => setMistakes((items) => { const nextItems = items.filter((item) => item.id !== entry.id); window.localStorage.setItem(MISTAKE_BOOK_KEY, JSON.stringify(nextItems)); return nextItems; })}>Remove</button></div>)}</div> : <p className="muted-copy">No saved mistakes yet. Missed and partially correct answers appear here automatically.</p>}<div className="quiz-actions"><button className="text-button" onClick={reset}>Back to upload</button>{mistakes.length > 0 && <button className="text-button" onClick={() => { window.localStorage.removeItem(MISTAKE_BOOK_KEY); setMistakes([]); }}>Clear all</button>}</div></section>;
-  if (view === "quiz" && current && quiz) { const grade = grades[current.id]; const label = current.type === "custom" ? current.customLabel || "Custom question" : current.type.replaceAll("_", " "); return <section className="quiz-shell"><div className="workspace-toolbar"><button className="text-button" onClick={() => setView("mistakes")}>Mistake book ({mistakes.length})</button></div><div className="quiz-topline"><span className="eyebrow">{quiz.title} Â· {label}</span><span className="quiz-count">{index + 1} / {quiz.questions.length}</span></div><div className="progress-track"><span style={{ width: `${((index + (submitted ? 1 : 0)) / quiz.questions.length) * 100}%` }} /></div><div className="question-card"><div className="question-kicker">QUESTION {String(index + 1).padStart(2, "0")}</div><h1>{current.prompt}</h1>{current.type === "multiple_choice" ? <div className="option-list">{current.options.map((option) => <button key={option.id} disabled={submitted} className={`answer-option ${answer === option.id ? "is-selected" : ""} ${submitted && option.id === current.correctOptionId ? "is-correct" : ""} ${submitted && answer === option.id && option.id !== current.correctOptionId ? "is-wrong" : ""}`} onClick={() => setAnswer(option.id)}><span className="option-letter">{option.id.toUpperCase()}</span><span>{option.text}</span></button>)}</div> : <textarea className="written-answer" aria-label="Your answer" disabled={submitted} value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="Write your answer here..." rows={current.type === "fill_blank" ? 3 : 7} />}{error && <div className="error-message">{error}</div>}{submitted && grade && <div className={`explanation ${grade.status === "correct" ? "is-correct" : "is-wrong"}`}><div className="explanation-title">{grade.status === "correct" ? "Correct" : grade.status === "partial" ? "Partly correct" : "Review this reasoning"} Â· {Math.round(grade.score * 100)}%</div><p>{grade.feedback}</p>{grade.missingPoints.length > 0 && <p>Still to include: {grade.missingPoints.join(", ")}</p>}{current.type !== "multiple_choice" && <p><strong>Reference answer:</strong> {current.referenceAnswer}</p>}<span className="source-note">Source: {current.sourceNote}</span></div>}{submitted && <div className="chat-box"><strong>Ask about this question</strong><p>Ask for an explanation, comparison, or a worked step. Replies stay grounded in your lecture.</p>{chat.map((message, messageIndex) => <div className={`chat-message ${message.role}`} key={messageIndex}>{message.content}</div>)}<div className="chat-compose"><input aria-label="Ask a follow-up question" value={chatInput} onChange={(event) => setChatInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void ask(); }} placeholder="What is still unclear?" /><button className="primary-button" disabled={chatting || !chatInput.trim()} onClick={() => void ask()}>{chatting ? "Thinking..." : "Ask"}</button></div></div>}</div><div className="quiz-actions"><button className="text-button" onClick={reset}>Exit this quiz</button>{!submitted ? <button className="primary-button" disabled={!answer.trim() || loading} onClick={() => void submit()}>{loading ? "Grading..." : "Submit answer"}</button> : <button className="primary-button" onClick={next}>{index === quiz.questions.length - 1 ? "View results" : "Next question"}</button>}</div></section>; }
-  if (view === "results" && quiz) { const correct = Object.values(grades).filter((grade) => grade.status === "correct").length; return <section className="results-card"><div className="eyebrow">Practice complete</div><div className="score-ring"><strong>{Math.round((correct / quiz.questions.length) * 100)}</strong><span>pts</span></div><h1>Missed questions are now waiting in your mistake book.</h1><p className="muted-copy">Correct {correct} / {quiz.questions.length}</p><div className="quiz-actions"><button className="text-button" onClick={() => setView("mistakes")}>Open mistake book ({mistakes.length})</button><button className="primary-button" onClick={reset}>Upload another lecture</button></div></section>; }
-  return <section className="upload-layout"><div className="hero-copy"><div className="eyebrow">PDF + AUDIO â†’ QUIZ LAB</div><h1>Turn a lecture into a quiz, <em>then start practicing.</em></h1><p>Choose the question formats you need, then build grounded practice from your PDF or lecture recording.</p><button className="text-button" onClick={() => setView("mistakes")}>Open mistake book ({mistakes.length})</button></div><div className="upload-panel"><label className="drop-zone"><input ref={inputRef} aria-label="Choose a PDF or lecture recording" type="file" accept="application/pdf,.pdf,audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/webm,video/mp4,.mp3,.m4a,.wav,.webm,.mp4" onChange={(event) => acceptFile(event.target.files?.[0])} /><span className="upload-icon">â†‘</span>{file ? <><strong>{file.name}</strong><span>{formatBytes(file.size)} Â· Ready to generate</span></> : <><strong>Drop in a PDF or lecture recording</strong><span>MP3, M4A, WAV, WebM, or MP4 - up to 20 MB</span></>}</label>{error && <div className="error-message">{error}</div>}<div className="settings-block"><div className="setting-heading"><span>Question mix</span><small>Questions, answers, and explanations are generated in English.</small></div><div className="type-grid">{fixedTypes.map(([type, label]) => <label key={type}>{label}<input aria-label={label} min="0" max="15" type="number" value={counts[type]} onChange={(event) => setCounts((old) => ({ ...old, [type]: Number(event.target.value) }))} /></label>)}</div>{custom.map((item) => <div className="custom-row" key={item.key}><input aria-label="Custom question type name" value={item.label} placeholder="Question type name" onChange={(event) => setCustom((items) => items.map((value) => value.key === item.key ? { ...value, label: event.target.value } : value))} /><input aria-label="Custom question requirements" value={item.instructions} placeholder="Requirements" onChange={(event) => setCustom((items) => items.map((value) => value.key === item.key ? { ...value, instructions: event.target.value } : value))} /><input aria-label="Custom question count" min="1" max="15" type="number" value={item.count} onChange={(event) => setCustom((items) => items.map((value) => value.key === item.key ? { ...value, count: Number(event.target.value) } : value))} /><button className="text-button" onClick={() => setCustom((items) => items.filter((value) => value.key !== item.key))}>Remove</button></div>)}<button className="text-button" onClick={() => setCustom((items) => [...items, { key: crypto.randomUUID(), label: "", instructions: "", count: 1 }])}>Add custom question type</button><div className="segmented-control difficulty-control">{(Object.keys(difficultyCopy) as Difficulty[]).map((item) => <button key={item} className={difficulty === item ? "is-active" : ""} onClick={() => setDifficulty(item)}>{difficultyCopy[item]}</button>)}</div></div><button className="primary-button generate-button" disabled={!file || loading} onClick={() => { if (file && isAudio(file)) void transcribe(); else void generateQuiz(); }}>{file && isAudio(file) ? "Transcribe recording" : "Generate quiz"}</button><p className="privacy-note">Your PDF or recording is used for this active learning flow and is not stored by the site.</p></div></section>;
+  const recordGrade = (question: Question, userAnswer: string, grade: GradeResult) => {
+    setAnswers((old) => ({ ...old, [question.id]: userAnswer }));
+    setGrades((old) => ({ ...old, [question.id]: grade }));
+    saveMistake(question, userAnswer, grade);
+    setSubmitted(true);
+  };
+
+  const acceptFile = (next?: File) => {
+    if (!next) return;
+    if (!isPdf(next) && !isAudio(next))
+      return setError("Choose a PDF, MP3, M4A, WAV, WebM, or MP4 study file.");
+    if (next.size > MAX_STUDY_FILE_BYTES) return setError("Study files must be 20 MB or smaller.");
+    setError("");
+    setSourceFileId(null);
+    setFile(next);
+  };
+
+  const config = (): QuestionConfiguration[] => [
+    ...fixedTypes
+      .map(([type]) => ({ type, count: counts[type] || 0 }) as QuestionConfiguration)
+      .filter((item) => item.count > 0),
+    ...custom
+      .filter((item) => item.count > 0)
+      .map((item) => ({
+        type: "custom" as const,
+        count: item.count,
+        label: item.label.trim(),
+        instructions: item.instructions.trim(),
+      })),
+  ];
+
+  const generateQuiz = async () => {
+    const questions = config();
+    const total = questions.reduce((sum, item) => sum + item.count, 0);
+    if (!file && !transcript.trim())
+      return setError("Choose a study file or review a transcript first.");
+    if (!questions.length || total < 1) return setError("Choose at least one question.");
+    if (total > 15) return setError("Choose 15 questions or fewer.");
+    if (questions.some((item) => item.type === "custom" && (!item.label || !item.instructions)))
+      return setError("Give every custom question type a name and requirements.");
+    setError("");
+    setLoading(true);
+    setView("generating");
+    const form = new FormData();
+    if (transcript.trim()) form.set("transcript", transcript.trim());
+    else if (file) form.set("file", file);
+    form.set("questions", JSON.stringify(questions));
+    form.set("difficulty", difficulty);
+    form.set("count", String(total));
+    try {
+      const response = await postForm("/api/generate-quiz", form, {
+        timeoutMessage:
+          "Quiz generation ran past the 60 second limit. Try fewer questions or a shorter lecture.",
+      });
+      const data = await readQuizResponse(response);
+      if (!response.ok) throw new Error("error" in data ? data.error : "Quiz generation failed.");
+      const generated = data as GeneratedQuiz;
+      setSourceFileId(generated.sourceFileId ?? null);
+      setQuiz({
+        title: generated.title,
+        summary: generated.summary,
+        questions: generated.questions,
+      });
+      setSessionId(crypto.randomUUID());
+      setIndex(0);
+      setAnswers({});
+      setGrades({});
+      setAnswer("");
+      setSubmitted(false);
+      setChat([]);
+      setView("quiz");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Quiz generation failed.");
+      setView("upload");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const transcribe = async () => {
+    if (!file) return;
+    setView("transcribing");
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      const response = await postForm("/api/transcribe", form, {
+        timeoutMessage:
+          "Transcription ran past the 60 second limit. Try a shorter or smaller recording.",
+      });
+      const data = (await response.json()) as { transcript?: string; error?: string };
+      if (!response.ok || !data.transcript)
+        throw new Error(data.error || "Audio transcription failed.");
+      setTranscript(data.transcript);
+      setView("reviewing");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Audio transcription failed.");
+      setView("upload");
+    }
+  };
+
+  const submit = async () => {
+    if (!current || !answer.trim()) return;
+    setError("");
+    if (current.type === "multiple_choice") {
+      const isCorrect = answer === current.correctOptionId;
+      return recordGrade(current, answer, {
+        status: isCorrect ? "correct" : "incorrect",
+        score: isCorrect ? 1 : 0,
+        feedback: current.explanation,
+        missingPoints: [],
+      });
+    }
+    // Fill-blank is checked against the accepted answers locally: no API call, and it
+    // keeps working when the source material is no longer loaded.
+    if (current.type === "fill_blank") {
+      const isCorrect = current.acceptedAnswers.some(
+        (accepted) => normalizeAnswer(accepted) === normalizeAnswer(answer),
+      );
+      return recordGrade(current, answer, {
+        status: isCorrect ? "correct" : "incorrect",
+        score: isCorrect ? 1 : 0,
+        feedback: current.explanation,
+        missingPoints: isCorrect ? [] : [current.referenceAnswer],
+      });
+    }
+    if (!sourceAvailable)
+      return setError("Upload the same study file again before grading this written question.");
+    setLoading(true);
+    try {
+      const form = new FormData();
+      form.set("question", JSON.stringify(current));
+      form.set("answer", answer);
+      attachSource(form);
+      const response = await postForm("/api/grade-answer", form, {
+        timeoutMessage: "Grading ran past the 60 second limit. Please try again.",
+      });
+      const grade = (await response.json()) as GradeResult & { error?: string };
+      if (!response.ok) throw new Error(grade.error || "Answer grading failed.");
+      recordGrade(current, answer, grade);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Answer grading failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const persistSession = (nextQuiz = quiz, nextAnswers = answers, nextGrades = grades) => {
+    if (!nextQuiz || !sessionId) return;
+    setSessions((old) => {
+      const previous = old.find((item) => item.id === sessionId);
+      const chatByQuestion = current
+        ? { ...(previous?.chat || {}), [current.id]: chat }
+        : previous?.chat || {};
+      const updated = addSession(old, {
+        id: sessionId,
+        title: nextQuiz.title,
+        createdAt: previous?.createdAt || new Date().toISOString(),
+        questions: nextQuiz.questions,
+        answers: nextAnswers,
+        grades: nextGrades,
+        chat: chatByQuestion,
+        source,
+      });
+      safeStorageSet(STUDY_HISTORY_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const next = () => {
+    if (!quiz) return;
+    persistSession();
+    if (index === quiz.questions.length - 1) return setView("results");
+    setIndex((value) => value + 1);
+    setAnswer("");
+    setSubmitted(false);
+    setChat([]);
+  };
+
+  const ask = async () => {
+    if (!current || !chatInput.trim()) return;
+    const message = chatInput.trim();
+    setChat((items) => [...items, { role: "user", content: message }]);
+    setChatInput("");
+    setChatting(true);
+    try {
+      const form = new FormData();
+      form.set("question", JSON.stringify(current));
+      form.set("message", message);
+      form.set("history", JSON.stringify(chat));
+      attachSource(form);
+      const response = await postForm("/api/question-chat", form, {
+        timeoutMessage: "The tutor ran past the 60 second limit. Please try a shorter question.",
+      });
+      const data = (await response.json()) as { reply?: string; error?: string };
+      if (!response.ok || !data.reply) throw new Error(data.error || "Tutor chat failed.");
+      setChat((items) => [...items, { role: "assistant", content: data.reply! }]);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Tutor chat failed.");
+    } finally {
+      setChatting(false);
+    }
+  };
+
+  /** Opens a standalone review quiz that is never written back over a saved session. */
+  const startReviewQuiz = (title: string, questions: Question[], restored: PersistedSource) => {
+    setQuiz({ title, summary: "", questions });
+    setSessionId("");
+    setFile(null);
+    setSourceFileId(restored.fileId);
+    setTranscript(restored.transcript);
+    setIndex(0);
+    setAnswer("");
+    setAnswers({});
+    setGrades({});
+    setSubmitted(false);
+    setChat([]);
+    setError("");
+    setView("quiz");
+  };
+
+  const practiceMistakes = (entries = mistakes) => {
+    if (!entries.length) return;
+    startReviewQuiz(
+      "Mistake book review",
+      entries.map((item) => item.question),
+      entries.find((item) => hasSource(item.source))?.source || EMPTY_SOURCE,
+    );
+  };
+
+  const openSession = (session: StudySession) => {
+    const first = session.questions[0];
+    setQuiz({ title: session.title, summary: "", questions: session.questions });
+    setSessionId(session.id);
+    setFile(null);
+    setSourceFileId(session.source.fileId);
+    setTranscript(session.source.transcript);
+    setAnswers(session.answers);
+    setGrades(session.grades);
+    setIndex(0);
+    setAnswer(first ? session.answers[first.id] || "" : "");
+    setChat(first ? session.chat[first.id] || [] : []);
+    setSubmitted(Boolean(first && session.grades[first.id]));
+    setError("");
+    setView("quiz");
+  };
+
+  const reset = () => {
+    setView("upload");
+    setFile(null);
+    setTranscript("");
+    setSourceFileId(null);
+    setQuiz(null);
+    setSessionId("");
+    setAnswer("");
+    setAnswers({});
+    setGrades({});
+    setSubmitted(false);
+    setChat([]);
+    setError("");
+  };
+
+  if (view === "transcribing" || view === "generating") return <LoadingView mode={view} />;
+  if (view === "reviewing")
+    return (
+      <TranscriptReviewView
+        transcript={transcript}
+        onChange={setTranscript}
+        onBack={reset}
+        onGenerate={() => void generateQuiz()}
+      />
+    );
+  if (view === "progress")
+    return (
+      <ProgressDashboard
+        sessions={sessions}
+        onBack={reset}
+        onOpen={(session) => {
+          setReviewSession(session);
+          setView("session-review");
+        }}
+      />
+    );
+  if (view === "session-review" && reviewSession)
+    return <ReadOnlyReview session={reviewSession} onBack={() => setView("progress")} />;
+  if (view === "history")
+    return <HistoryView sessions={sessions} onBack={reset} onOpen={openSession} />;
+  if (view === "mistakes")
+    return (
+      <MistakeBookView
+        entries={mistakes}
+        onBack={reset}
+        onPractice={practiceMistakes}
+        onChange={(next) => {
+          setMistakes(next);
+          safeStorageSet(MISTAKE_BOOK_KEY, JSON.stringify(next));
+        }}
+      />
+    );
+  if (view === "quiz" && current && quiz)
+    return (
+      <QuizView
+        quiz={quiz}
+        current={current}
+        index={index}
+        answer={answer}
+        submitted={submitted}
+        grade={grades[current.id]}
+        loading={loading}
+        error={error}
+        chat={chat}
+        chatInput={chatInput}
+        chatting={chatting}
+        mistakeCount={mistakes.length}
+        hasSourceMaterial={sourceAvailable}
+        onAnswerChange={setAnswer}
+        onChatInputChange={setChatInput}
+        onAsk={() => void ask()}
+        onSubmit={() => void submit()}
+        onNext={next}
+        onExit={reset}
+        onOpenMistakes={() => setView("mistakes")}
+      />
+    );
+  if (view === "results" && quiz)
+    return (
+      <ResultsView
+        quiz={quiz}
+        grades={grades}
+        mistakeCount={mistakes.length}
+        onOpenMistakes={() => setView("mistakes")}
+        onRestart={reset}
+      />
+    );
+
+  return (
+    <UploadView
+      file={file}
+      error={error}
+      counts={counts}
+      custom={custom}
+      difficulty={difficulty}
+      loading={loading}
+      mistakeCount={mistakes.length}
+      sessionCount={sessions.length}
+      onAcceptFile={acceptFile}
+      onCountsChange={setCounts}
+      onCustomChange={setCustom}
+      onDifficultyChange={setDifficulty}
+      onOpenMistakes={() => setView("mistakes")}
+      onOpenProgress={() => setView("progress")}
+      onOpenHistory={() => setView("history")}
+      onStart={() => {
+        if (file && isAudio(file)) void transcribe();
+        else void generateQuiz();
+      }}
+    />
+  );
 }

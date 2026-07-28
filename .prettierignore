@@ -1,0 +1,13 @@
+.next
+.netlify
+.vercel
+.worktrees
+node_modules
+coverage
+output
+outputs
+tmp
+work
+.superpowers
+.env*
+docs/superpowers

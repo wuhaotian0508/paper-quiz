@@ -19,7 +19,9 @@ describe("POST /api/transcribe", () => {
     const response = await POST(requestWith(new FormData()));
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: "Please select a lecture recording first." });
+    await expect(response.json()).resolves.toEqual({
+      error: "Please select a lecture recording first.",
+    });
   });
 
   it("rejects unsupported audio uploads", async () => {
@@ -30,7 +32,9 @@ describe("POST /api/transcribe", () => {
     const response = await POST(requestWith(form));
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: "Choose an MP3, M4A, WAV, WebM, or MP4 lecture recording." });
+    await expect(response.json()).resolves.toEqual({
+      error: "Choose an MP3, M4A, WAV, WebM, or MP4 lecture recording.",
+    });
   });
 
   it("reports missing server configuration without sending the upload", async () => {
@@ -41,6 +45,8 @@ describe("POST /api/transcribe", () => {
     const response = await POST(requestWith(form));
 
     expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({ error: "The server has not been configured with an OpenAI API key." });
+    await expect(response.json()).resolves.toEqual({
+      error: "The server has not been configured with an OpenAI API key.",
+    });
   });
 });

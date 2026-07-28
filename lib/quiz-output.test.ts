@@ -4,13 +4,34 @@ import { parseQuizOutput } from "./quiz-output";
 describe("parseQuizOutput", () => {
   it("accepts discriminated fill-blank and written questions", () => {
     const output = JSON.stringify({
-      title: "Review", summary: "Mixed practice", questions: [
-        { id: "q1", type: "fill_blank", prompt: "RAG means ___", acceptedAnswers: ["retrieval augmented generation"], referenceAnswer: "Retrieval-augmented generation", explanation: "The acronym expands this way.", sourceNote: "Page 1" },
-        { id: "q2", type: "short_answer", prompt: "Explain RAG.", referenceAnswer: "Retrieve context before generation.", gradingCriteria: ["mentions retrieval", "mentions generation"], explanation: "It grounds a model with retrieved context.", sourceNote: "Page 2" },
+      title: "Review",
+      summary: "Mixed practice",
+      questions: [
+        {
+          id: "q1",
+          type: "fill_blank",
+          prompt: "RAG means ___",
+          acceptedAnswers: ["retrieval augmented generation"],
+          referenceAnswer: "Retrieval-augmented generation",
+          explanation: "The acronym expands this way.",
+          sourceNote: "Page 1",
+        },
+        {
+          id: "q2",
+          type: "short_answer",
+          customLabel: null,
+          prompt: "Explain RAG.",
+          referenceAnswer: "Retrieve context before generation.",
+          gradingCriteria: ["mentions retrieval", "mentions generation"],
+          explanation: "It grounds a model with retrieved context.",
+          sourceNote: "Page 2",
+        },
       ],
     });
 
-    expect(parseQuizOutput(output, "lecture.pdf").questions.map((question) => question.type)).toEqual(["fill_blank", "short_answer"]);
+    expect(
+      parseQuizOutput(output, "lecture.pdf").questions.map((question) => question.type),
+    ).toEqual(["fill_blank", "short_answer"]);
   });
 
   it("normalizes a fenced CRS question array with English fallback copy", () => {

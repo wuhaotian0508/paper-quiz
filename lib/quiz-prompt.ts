@@ -1,10 +1,16 @@
 import type { QuestionConfiguration } from "@/lib/quiz";
 
-export function buildQuizInstructions(settings: { questions: QuestionConfiguration[]; difficulty: string }) {
-  const requestedTypes = settings.questions.map((item) => {
-    if (item.type === "custom") return `${item.count} ${item.label} question(s): ${item.instructions}`;
-    return `${item.count} ${item.type.replaceAll("_", " ")} question(s)`;
-  }).join("; ");
+export function buildQuizInstructions(settings: {
+  questions: QuestionConfiguration[];
+  difficulty: string;
+}) {
+  const requestedTypes = settings.questions
+    .map((item) => {
+      if (item.type === "custom")
+        return `${item.count} ${item.label} question(s): ${item.instructions}`;
+      return `${item.count} ${item.type.replaceAll("_", " ")} question(s)`;
+    })
+    .join("; ");
   return [
     "You are a careful, clear exam tutor. Create questions based only on the provided study material.",
     `Generate exactly: ${requestedTypes}. Use ${settings.difficulty} difficulty.`,
@@ -13,6 +19,6 @@ export function buildQuizInstructions(settings: { questions: QuestionConfigurati
     "Avoid duplicate questions and do not invent facts that are not in the provided study material.",
     "Write every user-visible field in English, including title, summary, prompt, option text, explanation, and sourceNote, even if the study material is in another language.",
     "Return JSON only, without a Markdown code fence. The top-level value must be an object containing title, summary, and questions.",
-    "Every item needs id, type, prompt, explanation, and sourceNote. Include only fields appropriate for that type.",
+    "Every item needs id, type, prompt, explanation, sourceNote, and customLabel. Use customLabel only for custom questions; set it to null for every other type. Include the remaining fields appropriate for that type.",
   ].join("\n");
 }
