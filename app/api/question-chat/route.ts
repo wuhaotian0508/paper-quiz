@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { getOpenAIClientOptions, getOpenAIModel } from "@/lib/openai-config";
 import { QuestionSchema } from "@/lib/quiz";
-import { collectResponseText } from "@/lib/openai-stream";
+import { collectResponse } from "@/lib/openai-stream";
 import {
   MAX_MESSAGE_CHARS,
   MAX_QUESTION_CHARS,
@@ -10,8 +10,11 @@ import {
   readBoundedText,
   validatePdfFile,
 } from "@/lib/request-validation";
-import { requestRateLimit } from "@/lib/rate-limit";
-import { buildSourceFileParts, parseSourceFileId } from "@/lib/source-reference";
+import {
+  buildSourceFileParts,
+  parseSourceFileId,
+  parseSourceFileIds,
+} from "@/lib/source-reference";
 
 function error(message: string, status: number) {
   return Response.json({ error: message }, { status });
@@ -20,24 +23,27 @@ export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {
-    const rate = await requestRateLimit(request);
-    if (!rate.allowed)
-      return Response.json(
-        { error: "Too many requests. Please try again shortly." },
-        { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
-      );
     const form = await request.formData();
     const message = readBoundedText(form.get("message"), MAX_MESSAGE_CHARS);
     const transcript = readBoundedText(form.get("transcript"), MAX_TRANSCRIPT_CHARS) || "";
     const rawQuestion = readBoundedText(form.get("question"), MAX_QUESTION_CHARS) || "";
     const rawHistory = String(form.get("history") ?? "[]");
-    const file = form.get("file");
+    const directFiles = form.getAll("files").filter((value): value is File => value instanceof File);
+    const legacyFile = form.get("file");
+    const files = directFiles.length
+      ? directFiles
+      : legacyFile instanceof File
+        ? [legacyFile]
+        : [];
     const fileId = parseSourceFileId(form.get("fileId"));
+    const fileIds = parseSourceFileIds(form.get("fileIds")) || [];
     if (form.has("fileId") && !fileId)
+      return error("The study material reference is invalid.", 400);
+    if (form.has("fileIds") && !fileIds.length)
       return error("The study material reference is invalid.", 400);
     if (form.has("transcript") && transcript === "")
       return error("Lecture transcript is too long or invalid.", 400);
-    if (!message || !rawQuestion || (!transcript && !fileId && !(file instanceof File)))
+    if (!message || !rawQuestion || (!transcript && !fileId && !fileIds.length && !files.length))
       return error("Please provide a question, message, and study material.", 400);
     let parsedQuestion: unknown;
     try {
@@ -49,7 +55,7 @@ export async function POST(request: Request) {
     if (!question.success) return error("The current question is invalid.", 400);
     const historyResult = parseChatHistory(rawHistory);
     if (!historyResult.ok) return error(historyResult.error, 400);
-    if (!fileId && file instanceof File) {
+    for (const file of files) {
       const validation = validatePdfFile(file);
       if (!validation.valid) return error(validation.error, 400);
     }
@@ -67,7 +73,7 @@ export async function POST(request: Request) {
           ...(transcript ? [`LECTURE TRANSCRIPT: ${transcript}`] : []),
         ].join("\n\n"),
       },
-      ...(await buildSourceFileParts({ fileId, file: file instanceof File ? file : null })),
+      ...(await buildSourceFileParts({ fileId, fileIds, files })),
     ];
     const stream = await new OpenAI(options).responses.create({
       model: getOpenAIModel(),
@@ -75,7 +81,12 @@ export async function POST(request: Request) {
       max_output_tokens: 1200,
       input: [{ role: "user", content }],
     });
-    const reply = await collectResponseText(stream);
+    const { text: reply, stoppedEarlyBecause } = await collectResponse(stream);
+    if (stoppedEarlyBecause === "max_output_tokens" && reply) {
+      // A cut-off explanation is still useful, unlike cut-off JSON.
+      const notice = "[Reply was cut short at the length limit.]";
+      return Response.json({ reply: [reply, notice].join("\n\n") });
+    }
     if (!reply) return error("The tutor did not return a response. Please try again.", 502);
     return Response.json({ reply });
   } catch (cause) {

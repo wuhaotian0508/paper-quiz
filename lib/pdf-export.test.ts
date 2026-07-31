@@ -3,6 +3,8 @@ import { jsPDF } from "jspdf";
 import {
   createQuizPdf,
   getMistakePdfBlocks,
+  getMaterialReviewPdfBlocks,
+  getExamReviewPdfBlocks,
   getPdfHeaderTitleLines,
   getProgressPdfBlocks,
   getQuestionTypeBadgeLines,
@@ -13,6 +15,8 @@ import {
 import type { MistakeBookEntry } from "./mistake-book";
 import { EMPTY_SOURCE, type StudySession } from "./study-history";
 import type { Quiz } from "./quiz";
+import type { MaterialReviewSheet } from "./material-review-sheet";
+import type { ExamReviewSheet } from "./exam-review";
 
 const sampleQuiz: Quiz = {
   title: "Forces and motion",
@@ -94,6 +98,56 @@ describe("quiz PDF export contract", () => {
 
     expect(getMistakePdfBlocks(mistakes)[0]).toBe("PAPER QUIZ AI / MISTAKE BOOK");
     expect(getReviewPdfBlocks(session)[0]).toBe("PAPER QUIZ AI / GRADED REVIEW");
+  });
+
+  it("exports a material review sheet with its snapshot, weaknesses, and coverage", () => {
+    const sheet: MaterialReviewSheet = {
+      materialId: "strategy::1000",
+      title: "Strategy.pdf Review Sheet",
+      questionCount: 4,
+      mistakeCount: 1,
+      sessionCount: 2,
+      weaknesses: [
+        {
+          id: "m1",
+          prompt: "What creates a durable advantage?",
+          keyAnswer: "Switching costs",
+          remember: "They retain customers.",
+          sourceNote: "Page 24 - Seven Powers",
+        },
+      ],
+      coverage: [{ sourceNote: "Page 24 - Seven Powers", questionCount: 4 }],
+    };
+
+    const content = getMaterialReviewPdfBlocks(sheet).join("\n");
+
+    expect(content).toContain("PAPER QUIZ AI / MATERIAL REVIEW SHEET");
+    expect(content).toContain("Strategy.pdf Review Sheet");
+    expect(content).toContain("Saved questions: 4");
+    expect(content).toContain("What creates a durable advantage?");
+    expect(content).toContain("Coverage: Page 24 - Seven Powers (4 questions)");
+  });
+
+  it("exports an exam review with ideas, common confusions, and source notes", () => {
+    const sheet: ExamReviewSheet = {
+      title: "RAG Exam Review",
+      topics: [
+        {
+          topic: "Retrieval",
+          keyIdeas: ["Retrieve context before generation."],
+          formulaOrProcedure: "Retrieve, rank, generate.",
+          commonConfusion: "Retrieval supplements the model; it does not retrain it.",
+          sourceNote: "Lecture 1, pipeline",
+        },
+      ],
+    };
+
+    const content = getExamReviewPdfBlocks(sheet).join("\n");
+
+    expect(content).toContain("PAPER QUIZ AI / EXAM REVIEW");
+    expect(content).toContain("Key ideas: Retrieve context before generation.");
+    expect(content).toContain("Common confusion: Retrieval supplements the model");
+    expect(content).toContain("Source: Lecture 1, pipeline");
   });
 
   it("gives the progress report a Paper Quiz template header and session cards", () => {

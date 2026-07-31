@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { downloadMistakesPdf } from "@/lib/pdf-export";
 import type { MistakeBookEntry } from "@/lib/mistake-book";
+import { correctAnswerText } from "@/lib/quiz";
 
 type Filter = "all" | "multiple_choice" | "fill_blank" | "short_answer" | "custom";
 type Props = {
@@ -10,6 +11,7 @@ type Props = {
   onBack: () => void;
   onChange: (entries: MistakeBookEntry[]) => void;
   onPractice: (entries: MistakeBookEntry[]) => void;
+  onReview?: () => void;
 };
 const labels: Record<Filter, string> = {
   all: "All",
@@ -19,16 +21,9 @@ const labels: Record<Filter, string> = {
   custom: "Custom",
 };
 
-function answerText(entry: MistakeBookEntry) {
-  const question = entry.question;
-  if (question.type !== "multiple_choice") return question.referenceAnswer;
-  return (
-    question.options.find((option) => option.id === question.correctOptionId)?.text ||
-    question.correctOptionId.toUpperCase()
-  );
-}
+const answerText = (entry: MistakeBookEntry) => correctAnswerText(entry.question);
 
-export function MistakeBookView({ entries, onBack, onChange, onPractice }: Props) {
+export function MistakeBookView({ entries, onBack, onChange, onPractice, onReview }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<string[]>([]);
@@ -68,6 +63,11 @@ export function MistakeBookView({ entries, onBack, onChange, onPractice }: Props
           >
             Export PDF
           </button>
+          {onReview ? (
+            <button className="text-button framed-button" disabled={!entries.length} onClick={onReview}>
+              Build review sheet
+            </button>
+          ) : null}
         </div>
       </header>
       <div className="mistake-toolbar">

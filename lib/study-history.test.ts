@@ -25,6 +25,25 @@ describe("study history", () => {
     ]);
   });
   it("ignores corrupt saved sessions", () => expect(readSessions("bad json")).toEqual([]));
+  it("preserves an optional update timestamp so offline edits win later sync merges", () => {
+    expect(
+      readSessions(
+        JSON.stringify([
+          {
+            id: "s1",
+            title: "Lecture",
+            createdAt: "2026-07-21T10:00:00.000Z",
+            updatedAt: "2026-07-22T10:00:00.000Z",
+            questions: [],
+            answers: {},
+            grades: {},
+            chat: {},
+            source: EMPTY_SOURCE,
+          },
+        ]),
+      )[0],
+    ).toMatchObject({ updatedAt: "2026-07-22T10:00:00.000Z" });
+  });
   it("groups sessions by local calendar day and calculates graded accuracy", () => {
     const session: StudySession = {
       id: "s1",

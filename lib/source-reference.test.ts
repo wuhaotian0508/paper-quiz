@@ -3,8 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildSourceFileParts,
   parseSourceFileId,
+  parseSourceFileIds,
   SOURCE_FILE_TTL_SECONDS,
   uploadSourceFile,
+  uploadSourceFiles,
 } from "@/lib/source-reference";
 
 const pdf = (name = "lecture.pdf", size = 32) =>
@@ -24,6 +26,21 @@ describe("parseSourceFileId", () => {
 
   it("rejects ids long enough to be a smuggled payload", () => {
     expect(parseSourceFileId(`file-${"a".repeat(200)}`)).toBeNull();
+  });
+});
+
+describe("parseSourceFileIds", () => {
+  it("accepts a bounded list of provider file ids", () => {
+    expect(parseSourceFileIds('["file-lecture1", "file-lecture2"]')).toEqual([
+      "file-lecture1",
+      "file-lecture2",
+    ]);
+  });
+
+  it("rejects a malformed or empty list", () => {
+    expect(parseSourceFileIds("not json")).toBeNull();
+    expect(parseSourceFileIds("[]")).toBeNull();
+    expect(parseSourceFileIds('["file-lecture1", "not-a-file-id"]')).toBeNull();
   });
 });
 
@@ -51,7 +68,38 @@ describe("uploadSourceFile", () => {
   });
 });
 
+describe("uploadSourceFiles", () => {
+  it("uploads every selected PDF and preserves its matching source id", async () => {
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce({ id: "file-lecture1" })
+      .mockResolvedValueOnce({ id: "file-lecture2" });
+
+    await expect(uploadSourceFiles({ files: { create } }, [pdf("lecture1.pdf"), pdf("lecture2.pdf")])).resolves.toEqual([
+      "file-lecture1",
+      "file-lecture2",
+    ]);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create.mock.calls.map(([input]) => input.file.name)).toEqual([
+      "lecture1.pdf",
+      "lecture2.pdf",
+    ]);
+  });
+});
+
 describe("buildSourceFileParts", () => {
+  it("references every selected PDF by its stored provider id", async () => {
+    await expect(
+      buildSourceFileParts({
+        fileIds: ["file-lecture1", "file-lecture2"],
+        files: [pdf("lecture1.pdf"), pdf("lecture2.pdf")],
+      }),
+    ).resolves.toEqual([
+      { type: "input_file", file_id: "file-lecture1" },
+      { type: "input_file", file_id: "file-lecture2" },
+    ]);
+  });
+
   it("references a stored file by id without re-sending bytes", async () => {
     expect(await buildSourceFileParts({ fileId: "file-abc123", file: pdf() })).toEqual([
       { type: "input_file", file_id: "file-abc123" },
@@ -69,9 +117,11 @@ describe("buildSourceFileParts", () => {
     expect(await buildSourceFileParts({ fileId: null, file: null })).toEqual([]);
   });
 
-  it("never emits a part with a null payload when the file is oversized", async () => {
+  it("does not impose the former 20 MB limit when a provider id is unavailable", async () => {
     const oversized = pdf("huge.pdf", 1);
     Object.defineProperty(oversized, "size", { value: 21 * 1024 * 1024 });
-    expect(await buildSourceFileParts({ fileId: null, file: oversized })).toEqual([]);
+    const parts = await buildSourceFileParts({ fileId: null, file: oversized });
+    expect(parts).toHaveLength(1);
+    expect(parts[0]).toMatchObject({ type: "input_file", filename: "huge.pdf" });
   });
 });

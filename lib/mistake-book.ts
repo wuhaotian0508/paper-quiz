@@ -1,4 +1,4 @@
-import type { GradeResult, Question } from "@/lib/quiz";
+import { questionKey, type GradeResult, type Question } from "@/lib/quiz";
 import { boundSource, EMPTY_SOURCE, type PersistedSource } from "@/lib/study-history";
 
 export type MistakeBookEntry = {
@@ -15,11 +15,19 @@ export type MistakeBookEntry = {
   source: PersistedSource;
 };
 
+/**
+ * Keyed on question content, not `question.id`: every quiz numbers from q1, so keying on
+ * the id made each new quiz's first mistake evict the previous one. Two quizzes that
+ * genuinely ask the same thing still collapse into one entry.
+ */
+export const mistakeKey = questionKey;
+
 export function readMistakes(value: string | null): MistakeBookEntry[] {
   if (!value) return [];
   try {
     const parsed: unknown = JSON.parse(value);
     if (!Array.isArray(parsed)) return [];
+    const seen = new Set<string>();
     return (
       parsed
         .filter((entry): entry is MistakeBookEntry =>
@@ -33,10 +41,14 @@ export function readMistakes(value: string | null): MistakeBookEntry[] {
           ),
         )
         // Entries written before source tracking existed load without a source.
+        // Ids are recomputed so books saved under the old per-quiz ids keep deduping.
         .map((entry) => ({
           ...entry,
-          source: entry.source ? boundSource(entry.source) : EMPTY_SOURCE,
+          id: mistakeKey(entry.question),
+          source: boundSource(entry.source),
         }))
+        // Newest first on disk, so the first occurrence of a key is the one to keep.
+        .filter((entry) => !seen.has(entry.id) && seen.add(entry.id))
     );
   } catch {
     return [];
@@ -51,9 +63,10 @@ export function addMistake(
   source: PersistedSource = EMPTY_SOURCE,
 ): MistakeBookEntry[] {
   if (grade.status === "correct") return entries;
+  const id = mistakeKey(question);
   const entry: MistakeBookEntry = {
     version: 1,
-    id: question.id,
+    id,
     question,
     answer,
     status: grade.status,
@@ -63,7 +76,7 @@ export function addMistake(
     updatedAt: new Date().toISOString(),
     source: boundSource(source),
   };
-  return [entry, ...entries.filter((existing) => existing.id !== question.id)];
+  return [entry, ...entries.filter((existing) => existing.id !== id)];
 }
 
 export const MISTAKE_BOOK_KEY = "paper-plane-quiz-mistakes-v1";

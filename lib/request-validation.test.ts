@@ -16,9 +16,16 @@ describe("request validation", () => {
     });
   });
 
-  it("validates PDF type and size before reading it", () => {
+  it("validates PDF type without imposing an application size limit", () => {
     expect(
       validatePdfFile(new File(["pdf"], "lecture.pdf", { type: "application/pdf" })).valid,
+    ).toBe(true);
+    expect(
+      validatePdfFile(
+        new File([new Uint8Array(20 * 1024 * 1024 + 1)], "large.pdf", {
+          type: "application/pdf",
+        }),
+      ).valid,
     ).toBe(true);
     expect(validatePdfFile(new File(["text"], "lecture.txt", { type: "text/plain" })).valid).toBe(
       false,

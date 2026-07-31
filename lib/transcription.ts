@@ -1,4 +1,3 @@
-const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
 const SUPPORTED_EXTENSIONS = new Set(["mp3", "mp4", "mpeg", "mpga", "m4a", "wav", "webm"]);
 const SUPPORTED_TYPES = new Set([
   "audio/mpeg",
@@ -24,9 +23,6 @@ export function validateAudioFile(file: File): { valid: true } | { valid: false;
   const extension = file.name.toLowerCase().split(".").pop();
   if (!extension || (!SUPPORTED_TYPES.has(file.type) && !SUPPORTED_EXTENSIONS.has(extension))) {
     return { valid: false, error: "Choose an MP3, M4A, WAV, WebM, or MP4 lecture recording." };
-  }
-  if (file.size > MAX_AUDIO_BYTES) {
-    return { valid: false, error: "Audio files must be 20 MB or smaller." };
   }
   return { valid: true };
 }

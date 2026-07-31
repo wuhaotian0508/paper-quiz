@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   normalizeAnswer,
   type Difficulty,
@@ -21,23 +21,33 @@ import {
   boundSource,
   EMPTY_SOURCE,
   hasSource,
+  materialFromFile,
   readSessions,
   STUDY_HISTORY_KEY,
   type PersistedSource,
   type StudySession,
 } from "@/lib/study-history";
+import { findStudyMaterial, groupStudyMaterials } from "@/lib/study-material";
 import { ProgressDashboard } from "@/components/progress-dashboard";
 import { ReadOnlyReview } from "@/components/read-only-review";
 import { MistakeBookView } from "@/components/mistake-book-view";
 import { HistoryView } from "@/components/history-view";
+import { MaterialDetailView } from "@/components/material-detail-view";
 import { LoadingView } from "@/components/loading-view";
 import { ResultsView } from "@/components/results-view";
 import { TranscriptReviewView } from "@/components/transcript-review-view";
 import { UploadView, fixedTypes, type CustomDraft } from "@/components/upload-view";
 import { QuizView, type ChatMessage } from "@/components/quiz-view";
+import { HelpCenter } from "@/components/help-center";
+import { ReviewSheetView } from "@/components/review-sheet-view";
 import { safeStorageSet } from "@/lib/request-validation";
 import { postForm } from "@/lib/api-client";
-import { isAudio, isPdf, MAX_STUDY_FILE_BYTES } from "@/lib/study-file";
+import { isAudio, isPdf } from "@/lib/study-file";
+import { attachStudyFile, attachStudyFiles } from "@/lib/study-upload";
+import { useStudySync } from "@/hooks/use-study-sync";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { createSharedChallenge } from "@/lib/shared-challenge-client";
+import { getChallengeShareUrl } from "@/lib/shared-challenge";
 
 type View =
   | "upload"
@@ -49,14 +59,21 @@ type View =
   | "mistakes"
   | "history"
   | "progress"
-  | "session-review";
+  | "session-review"
+  | "material-detail"
+  | "help"
+  | "review-sheet";
 
 export function QuizWorkspace() {
   const [view, setView] = useState<View>("upload");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [transcript, setTranscript] = useState("");
   /** Provider file id for the uploaded PDF, so grading never re-sends the document. */
   const [sourceFileId, setSourceFileId] = useState<string | null>(null);
+  const [sourceFileIds, setSourceFileIds] = useState<string[]>([]);
+  /** Which uploaded file this practice belongs to, so questions and mistakes group per PDF. */
+  const [material, setMaterial] = useState({ materialId: "", materialName: "" });
+  const [openMaterialId, setOpenMaterialId] = useState<string | null>(null);
   const [difficulty, setDifficulty] = useState<Difficulty>("mixed");
   const [counts, setCounts] = useState<Record<string, number>>({
     multiple_choice: 5,
@@ -72,6 +89,7 @@ export function QuizWorkspace() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [shareStatus, setShareStatus] = useState("");
   const [mistakes, setMistakes] = useState<MistakeBookEntry[]>([]);
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [sessionId, setSessionId] = useState("");
@@ -79,15 +97,23 @@ export function QuizWorkspace() {
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatting, setChatting] = useState(false);
+  const [storageReady, setStorageReady] = useState(false);
 
   useEffect(() => {
     setMistakes(readMistakes(window.localStorage.getItem(MISTAKE_BOOK_KEY)));
     setSessions(readSessions(window.localStorage.getItem(STUDY_HISTORY_KEY)));
+    setStorageReady(true);
   }, []);
   useEffect(() => {
     const openFromHash = () => {
+      if (window.location.hash === "#dashboard" || window.location.hash === "#quiz-lab")
+        setView("upload");
       if (window.location.hash === "#mistake-book") setView("mistakes");
       if (window.location.hash === "#progress") setView("progress");
+      if (window.location.hash === "#history") setView("history");
+      // Older shared links used #materials before PDF groups became the History view.
+      if (window.location.hash === "#materials") setView("history");
+      if (window.location.hash === "#help") setView("help");
     };
     window.addEventListener("hashchange", openFromHash);
     openFromHash();
@@ -96,13 +122,49 @@ export function QuizWorkspace() {
 
   const current = quiz?.questions[index];
   /** What grading and tutor chat send as study material, whether live or restored. */
-  const source: PersistedSource = boundSource({ fileId: sourceFileId, transcript });
-  const sourceAvailable = hasSource(source) || Boolean(file);
+  const source: PersistedSource = boundSource({
+    fileId: sourceFileId,
+    fileIds: sourceFileIds,
+    transcript,
+    ...material,
+  });
+  const sourceAvailable = hasSource(source) || files.length > 0;
+  const materials = useMemo(() => groupStudyMaterials(sessions, mistakes), [sessions, mistakes]);
+  const hydrateStudyState = useCallback(
+    ({
+      sessions: mergedSessions,
+      mistakes: mergedMistakes,
+    }: {
+      sessions: StudySession[];
+      mistakes: MistakeBookEntry[];
+    }) => {
+      setSessions(mergedSessions);
+      setMistakes(mergedMistakes);
+      safeStorageSet(STUDY_HISTORY_KEY, JSON.stringify(mergedSessions));
+      safeStorageSet(MISTAKE_BOOK_KEY, JSON.stringify(mergedMistakes));
+    },
+    [],
+  );
+  const {
+    user,
+    status: syncStatus,
+    requestMistakeDeletion,
+  } = useStudySync({
+    ready: storageReady,
+    sessions,
+    mistakes,
+    onHydrate: hydrateStudyState,
+  });
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("paper-quiz-sync-status", { detail: syncStatus }));
+  }, [syncStatus]);
 
   const attachSource = (form: FormData) => {
-    if (sourceFileId) form.set("fileId", sourceFileId);
+    if (sourceFileIds.length > 1) form.set("fileIds", JSON.stringify(sourceFileIds));
+    else if (sourceFileId) form.set("fileId", sourceFileId);
     else if (transcript) form.set("transcript", transcript);
-    else if (file) form.set("file", file);
+    else if (files.length > 1) files.forEach((file) => form.append("files", file));
+    else if (files[0]) form.set("file", files[0]);
   };
 
   const saveMistake = (question: Question, userAnswer: string, grade: GradeResult) => {
@@ -121,14 +183,20 @@ export function QuizWorkspace() {
     setSubmitted(true);
   };
 
-  const acceptFile = (next?: File) => {
-    if (!next) return;
-    if (!isPdf(next) && !isAudio(next))
+  const acceptFiles = (next?: FileList | File[]) => {
+    const selected = Array.from(next || []);
+    if (!selected.length) return;
+    const hasRecording = selected.some(isAudio);
+    if (
+      selected.some((file) => !isPdf(file) && !isAudio(file)) ||
+      (hasRecording && (selected.length !== 1 || !isAudio(selected[0])))
+    )
       return setError("Choose a PDF, MP3, M4A, WAV, WebM, or MP4 study file.");
-    if (next.size > MAX_STUDY_FILE_BYTES) return setError("Study files must be 20 MB or smaller.");
     setError("");
     setSourceFileId(null);
-    setFile(next);
+    setSourceFileIds([]);
+    setMaterial(materialFromFile(selected[0]));
+    setFiles(selected);
   };
 
   const config = (): QuestionConfiguration[] => [
@@ -148,7 +216,7 @@ export function QuizWorkspace() {
   const generateQuiz = async () => {
     const questions = config();
     const total = questions.reduce((sum, item) => sum + item.count, 0);
-    if (!file && !transcript.trim())
+    if (!files.length && !transcript.trim())
       return setError("Choose a study file or review a transcript first.");
     if (!questions.length || total < 1) return setError("Choose at least one question.");
     if (total > 15) return setError("Choose 15 questions or fewer.");
@@ -157,13 +225,13 @@ export function QuizWorkspace() {
     setError("");
     setLoading(true);
     setView("generating");
-    const form = new FormData();
-    if (transcript.trim()) form.set("transcript", transcript.trim());
-    else if (file) form.set("file", file);
-    form.set("questions", JSON.stringify(questions));
-    form.set("difficulty", difficulty);
-    form.set("count", String(total));
     try {
+      const form = new FormData();
+      if (transcript.trim()) form.set("transcript", transcript.trim());
+      else if (files.length) await attachStudyFiles(form, files);
+      form.set("questions", JSON.stringify(questions));
+      form.set("difficulty", difficulty);
+      form.set("count", String(total));
       const response = await postForm("/api/generate-quiz", form, {
         timeoutMessage:
           "Quiz generation ran past the 60 second limit. Try fewer questions or a shorter lecture.",
@@ -171,7 +239,14 @@ export function QuizWorkspace() {
       const data = await readQuizResponse(response);
       if (!response.ok) throw new Error("error" in data ? data.error : "Quiz generation failed.");
       const generated = data as GeneratedQuiz;
-      setSourceFileId(generated.sourceFileId ?? null);
+      const rawSourceFileIds = generated.sourceFileIds || [];
+      const generatedSourceFileIds =
+        rawSourceFileIds.length === files.length &&
+        rawSourceFileIds.every((id): id is string => typeof id === "string")
+          ? rawSourceFileIds
+          : [];
+      setSourceFileIds(generatedSourceFileIds);
+      setSourceFileId(generatedSourceFileIds[0] ?? generated.sourceFileId ?? null);
       setQuiz({
         title: generated.title,
         summary: generated.summary,
@@ -184,6 +259,7 @@ export function QuizWorkspace() {
       setAnswer("");
       setSubmitted(false);
       setChat([]);
+      setShareStatus("");
       setView("quiz");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Quiz generation failed.");
@@ -194,11 +270,12 @@ export function QuizWorkspace() {
   };
 
   const transcribe = async () => {
+    const file = files[0];
     if (!file) return;
     setView("transcribing");
     try {
       const form = new FormData();
-      form.set("file", file);
+      await attachStudyFile(form, file);
       const response = await postForm("/api/transcribe", form, {
         timeoutMessage:
           "Transcription ran past the 60 second limit. Try a shorter or smaller recording.",
@@ -271,6 +348,7 @@ export function QuizWorkspace() {
         id: sessionId,
         title: nextQuiz.title,
         createdAt: previous?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         questions: nextQuiz.questions,
         answers: nextAnswers,
         grades: nextGrades,
@@ -321,9 +399,14 @@ export function QuizWorkspace() {
   const startReviewQuiz = (title: string, questions: Question[], restored: PersistedSource) => {
     setQuiz({ title, summary: "", questions });
     setSessionId("");
-    setFile(null);
+    setFiles([]);
     setSourceFileId(restored.fileId);
+    setSourceFileIds(restored.fileIds || (restored.fileId ? [restored.fileId] : []));
     setTranscript(restored.transcript);
+    setMaterial({
+      materialId: restored.materialId,
+      materialName: restored.materialName,
+    });
     setIndex(0);
     setAnswer("");
     setAnswers({});
@@ -338,7 +421,9 @@ export function QuizWorkspace() {
     if (!entries.length) return;
     startReviewQuiz(
       "Mistake book review",
-      entries.map((item) => item.question),
+      // Entries come from different quizzes that each numbered questions from q1, so the
+      // per-entry key becomes the question id here to keep answers and grades separate.
+      entries.map((item) => ({ ...item.question, id: item.id })),
       entries.find((item) => hasSource(item.source))?.source || EMPTY_SOURCE,
     );
   };
@@ -347,9 +432,16 @@ export function QuizWorkspace() {
     const first = session.questions[0];
     setQuiz({ title: session.title, summary: "", questions: session.questions });
     setSessionId(session.id);
-    setFile(null);
+    setFiles([]);
     setSourceFileId(session.source.fileId);
+    setSourceFileIds(
+      session.source.fileIds || (session.source.fileId ? [session.source.fileId] : []),
+    );
     setTranscript(session.source.transcript);
+    setMaterial({
+      materialId: session.source.materialId,
+      materialName: session.source.materialName,
+    });
     setAnswers(session.answers);
     setGrades(session.grades);
     setIndex(0);
@@ -362,9 +454,11 @@ export function QuizWorkspace() {
 
   const reset = () => {
     setView("upload");
-    setFile(null);
+    setFiles([]);
     setTranscript("");
     setSourceFileId(null);
+    setSourceFileIds([]);
+    setMaterial({ materialId: "", materialName: "" });
     setQuiz(null);
     setSessionId("");
     setAnswer("");
@@ -373,6 +467,32 @@ export function QuizWorkspace() {
     setSubmitted(false);
     setChat([]);
     setError("");
+    setShareStatus("");
+  };
+
+  const shareChallenge = async () => {
+    if (!quiz) return;
+    if (!user) {
+      setShareStatus("Sign in with Google or email before creating a share link.");
+      return;
+    }
+    setShareStatus("Creating a 7-day challenge link...");
+    try {
+      const created = await createSharedChallenge(getSupabaseBrowserClient(), quiz, {
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+      const url = getChallengeShareUrl(window.location.origin, created.slug);
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
+      setShareStatus(
+        "Challenge link copied. It expires in 7 days and shares questions, not your source file.",
+      );
+    } catch (cause) {
+      setShareStatus(
+        cause instanceof Error
+          ? cause.message
+          : "Challenge link could not be created. Please try again.",
+      );
+    }
   };
 
   if (view === "transcribing" || view === "generating") return <LoadingView mode={view} />;
@@ -398,17 +518,54 @@ export function QuizWorkspace() {
     );
   if (view === "session-review" && reviewSession)
     return <ReadOnlyReview session={reviewSession} onBack={() => setView("progress")} />;
+  if (view === "help") return <HelpCenter onBack={reset} />;
+  if (view === "review-sheet")
+    return (
+      <ReviewSheetView
+        entries={mistakes}
+        onBack={() => setView("mistakes")}
+        onPractice={practiceMistakes}
+      />
+    );
   if (view === "history")
-    return <HistoryView sessions={sessions} onBack={reset} onOpen={openSession} />;
+    return (
+      <HistoryView
+        materials={materials}
+        onBack={reset}
+        onOpen={(item) => {
+          setOpenMaterialId(item.id);
+          setView("material-detail");
+        }}
+      />
+    );
+  if (view === "material-detail") {
+    const open = openMaterialId === null ? undefined : findStudyMaterial(materials, openMaterialId);
+    // Its last mistake may have been cleared while the detail view was open.
+    if (!open) return <HistoryView materials={materials} onBack={reset} onOpen={() => {}} />;
+    return (
+      <MaterialDetailView
+        material={open}
+        onBack={() => setView("history")}
+        onPractice={practiceMistakes}
+        onOpenSession={openSession}
+      />
+    );
+  }
   if (view === "mistakes")
     return (
       <MistakeBookView
         entries={mistakes}
         onBack={reset}
         onPractice={practiceMistakes}
+        onReview={() => setView("review-sheet")}
         onChange={(next) => {
+          // This callback only represents a deliberate Mistake book clear/remove action.
+          const removedIds = mistakes
+            .filter((entry) => !next.some((nextEntry) => nextEntry.id === entry.id))
+            .map((entry) => entry.id);
           setMistakes(next);
           safeStorageSet(MISTAKE_BOOK_KEY, JSON.stringify(next));
+          if (removedIds.length) requestMistakeDeletion(removedIds);
         }}
       />
     );
@@ -443,32 +600,39 @@ export function QuizWorkspace() {
         quiz={quiz}
         grades={grades}
         mistakeCount={mistakes.length}
+        shareStatus={shareStatus}
+        onShare={() => void shareChallenge()}
         onOpenMistakes={() => setView("mistakes")}
         onRestart={reset}
       />
     );
 
   return (
-    <UploadView
-      file={file}
-      error={error}
-      counts={counts}
-      custom={custom}
-      difficulty={difficulty}
-      loading={loading}
-      mistakeCount={mistakes.length}
-      sessionCount={sessions.length}
-      onAcceptFile={acceptFile}
-      onCountsChange={setCounts}
-      onCustomChange={setCustom}
-      onDifficultyChange={setDifficulty}
-      onOpenMistakes={() => setView("mistakes")}
-      onOpenProgress={() => setView("progress")}
-      onOpenHistory={() => setView("history")}
-      onStart={() => {
-        if (file && isAudio(file)) void transcribe();
-        else void generateQuiz();
-      }}
-    />
+    <>
+      <UploadView
+        files={files}
+        error={error}
+        counts={counts}
+        custom={custom}
+        difficulty={difficulty}
+        loading={loading}
+        mistakeCount={mistakes.length}
+        sessionCount={sessions.length}
+        materialCount={materials.length}
+        sessions={sessions}
+        onAcceptFiles={acceptFiles}
+        onCountsChange={setCounts}
+        onCustomChange={setCustom}
+        onDifficultyChange={setDifficulty}
+        onOpenMistakes={() => setView("mistakes")}
+        onOpenProgress={() => setView("progress")}
+        onOpenHistory={() => setView("history")}
+        onOpenSession={openSession}
+        onStart={() => {
+          if (files.length === 1 && isAudio(files[0])) void transcribe();
+          else void generateQuiz();
+        }}
+      />
+    </>
   );
 }

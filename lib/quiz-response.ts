@@ -1,7 +1,10 @@
 import type { Quiz } from "./quiz";
 
-/** `sourceFileId` is null when the source was a transcript, or when the provider has no Files endpoint. */
-export type GeneratedQuiz = Quiz & { sourceFileId?: string | null };
+/** Source ids are null when the source was a transcript or the provider has no Files endpoint. */
+export type GeneratedQuiz = Quiz & {
+  sourceFileId?: string | null;
+  sourceFileIds?: (string | null)[];
+};
 export type QuizResponse = GeneratedQuiz | { error?: string };
 
 export async function readQuizResponse(response: Response): Promise<QuizResponse> {

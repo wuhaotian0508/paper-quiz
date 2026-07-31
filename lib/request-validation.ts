@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-export const MAX_PDF_BYTES = 20 * 1024 * 1024;
 export const MAX_TRANSCRIPT_CHARS = 120_000;
 export const MAX_ANSWER_CHARS = 12_000;
 export const MAX_MESSAGE_CHARS = 2_000;
@@ -40,14 +39,12 @@ export function validatePdfFile(file: File): { valid: true } | { valid: false; e
   if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
     return { valid: false, error: "Only PDF files are supported." };
   }
-  if (file.size > MAX_PDF_BYTES)
-    return { valid: false, error: "PDF files must be 20 MB or smaller." };
   return { valid: true };
 }
 
 export async function boundedFileData(
   file: File,
-  maxBytes = MAX_PDF_BYTES,
+  maxBytes = Number.POSITIVE_INFINITY,
 ): Promise<string | null> {
   if (file.size > maxBytes) return null;
   return Buffer.from(await file.arrayBuffer()).toString("base64");

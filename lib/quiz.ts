@@ -64,6 +64,39 @@ export const GradeResultSchema = z.object({
 });
 export type GradeResult = z.infer<typeof GradeResultSchema>;
 
+/**
+ * Identifies a question by what it asks. The model numbers questions per quiz, so
+ * `question.id` is only unique inside one quiz — anything that collects questions across
+ * quizzes (the mistake book, per-material views) has to key on content instead.
+ */
+export function questionKey(question: Pick<Question, "type" | "prompt">): string {
+  const normalizedPrompt = question.prompt
+    .trim()
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ");
+  const basis = `${question.type}::${normalizedPrompt}`;
+  let hash = 2166136261;
+  for (let index = 0; index < basis.length; index += 1) {
+    hash ^= basis.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `m-${(hash >>> 0).toString(36)}`;
+}
+
+export function correctAnswerText(question: Question): string {
+  if (question.type !== "multiple_choice") return question.referenceAnswer;
+  return (
+    question.options.find((option) => option.id === question.correctOptionId)?.text ||
+    question.correctOptionId.toUpperCase()
+  );
+}
+
+export function questionTypeLabel(question: Question): string {
+  if (question.type === "custom") return question.customLabel || "Custom";
+  return question.type.replaceAll("_", " ");
+}
+
 export function normalizeAnswer(value: string): string {
   return value
     .toLocaleLowerCase()

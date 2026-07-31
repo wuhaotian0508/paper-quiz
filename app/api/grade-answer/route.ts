@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { GradeResultSchema, QuestionSchema } from "@/lib/quiz";
 import { getOpenAIClientOptions, getOpenAIModel } from "@/lib/openai-config";
-import { collectResponseText } from "@/lib/openai-stream";
+import { collectResponse } from "@/lib/openai-stream";
 import {
   MAX_ANSWER_CHARS,
   MAX_QUESTION_CHARS,
@@ -10,8 +10,11 @@ import {
   readBoundedText,
   validatePdfFile,
 } from "@/lib/request-validation";
-import { requestRateLimit } from "@/lib/rate-limit";
-import { buildSourceFileParts, parseSourceFileId } from "@/lib/source-reference";
+import {
+  buildSourceFileParts,
+  parseSourceFileId,
+  parseSourceFileIds,
+} from "@/lib/source-reference";
 
 function error(message: string, status: number) {
   return Response.json({ error: message }, { status });
@@ -20,25 +23,28 @@ export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {
-    const rate = await requestRateLimit(request);
-    if (!rate.allowed)
-      return Response.json(
-        { error: "Too many requests. Please try again shortly." },
-        { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
-      );
     const form = await request.formData();
     const answer = readBoundedText(form.get("answer"), MAX_ANSWER_CHARS);
     const transcript = readBoundedText(form.get("transcript"), MAX_TRANSCRIPT_CHARS) || "";
-    const file = form.get("file");
+    const directFiles = form.getAll("files").filter((value): value is File => value instanceof File);
+    const legacyFile = form.get("file");
+    const files = directFiles.length
+      ? directFiles
+      : legacyFile instanceof File
+        ? [legacyFile]
+        : [];
     const fileId = parseSourceFileId(form.get("fileId"));
+    const fileIds = parseSourceFileIds(form.get("fileIds")) || [];
     const rawQuestion = readBoundedText(form.get("question"), MAX_QUESTION_CHARS) || "";
     if (form.has("fileId") && !fileId)
+      return error("The study material reference is invalid.", 400);
+    if (form.has("fileIds") && !fileIds.length)
       return error("The study material reference is invalid.", 400);
     if (
       !answer ||
       !rawQuestion ||
       (form.has("transcript") && transcript === "") ||
-      (!transcript && !fileId && !(file instanceof File))
+       (!transcript && !fileId && !fileIds.length && !files.length)
     )
       return error("Please provide an answer, question, and study material.", 400);
     let parsedQuestion: unknown;
@@ -52,13 +58,14 @@ export async function POST(request: Request) {
       return error("This question cannot be graded as a written answer.", 400);
     const options = getOpenAIClientOptions();
     if (!options) return error("The server has not been configured with an OpenAI API key.", 503);
-    if (!fileId && file instanceof File) {
+    for (const file of files) {
       const validation = validatePdfFile(file);
       if (!validation.valid) return error(validation.error, 400);
     }
     const sourceFileParts = await buildSourceFileParts({
       fileId,
-      file: file instanceof File ? file : null,
+      fileIds,
+      files,
     });
     const stream = await new OpenAI(options).responses.create({
       model: getOpenAIModel(),
@@ -84,7 +91,11 @@ export async function POST(request: Request) {
       ],
       text: { format: zodTextFormat(GradeResultSchema, "grade") },
     });
-    const output = await collectResponseText(stream);
+    const { text: output, stoppedEarlyBecause } = await collectResponse(stream);
+    if (stoppedEarlyBecause) {
+      console.error("Answer grading stopped early", { reason: stoppedEarlyBecause });
+      return error("Grading was cut off before it finished. Please try again.", 502);
+    }
     return Response.json(GradeResultSchema.parse(JSON.parse(output)));
   } catch (cause) {
     console.error(

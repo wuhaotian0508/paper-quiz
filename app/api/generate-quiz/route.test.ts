@@ -110,6 +110,36 @@ describe("POST /api/generate-quiz", () => {
     });
   });
 
+  it("accepts multiple PDFs as one combined quiz source before checking server configuration", async () => {
+    process.env.OPENAI_API_KEY = "";
+    const form = validForm();
+    form.delete("file");
+    form.append("files", new File(["%PDF-1.4"], "lecture-1.pdf", { type: "application/pdf" }));
+    form.append("files", new File(["%PDF-1.4"], "homework-1.pdf", { type: "application/pdf" }));
+
+    const response = await POST(requestWith(form));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "The server has not been configured with an OpenAI API key.",
+    });
+  });
+
+  it("rejects a transcript combined with PDF files", async () => {
+    process.env.OPENAI_API_KEY = "test-key";
+    const form = validForm();
+    form.delete("file");
+    form.append("files", new File(["%PDF-1.4"], "lecture-1.pdf", { type: "application/pdf" }));
+    form.set("transcript", "A reviewed lecture transcript.");
+
+    const response = await POST(requestWith(form));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Choose either PDFs or a lecture transcript, not both.",
+    });
+  });
+
   it("rejects an empty transcript when no PDF is provided", async () => {
     process.env.OPENAI_API_KEY = "test-key";
     const form = new FormData();

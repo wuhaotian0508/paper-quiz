@@ -1,42 +1,58 @@
 "use client";
 
-import type { StudySession } from "@/lib/study-history";
+import type { StudyMaterial } from "@/lib/study-material";
 
 export function HistoryView({
-  sessions,
+  materials,
   onBack,
   onOpen,
 }: {
-  sessions: StudySession[];
+  materials: StudyMaterial[];
   onBack: () => void;
-  onOpen: (session: StudySession) => void;
+  onOpen: (material: StudyMaterial) => void;
 }) {
   return (
     <section className="results-card">
-      <div className="eyebrow">Study history</div>
-      <h1>Your previous practice sets.</h1>
-      {sessions.length ? (
+      <div className="eyebrow">PDF history</div>
+      <h1>Your PDF question history.</h1>
+      {materials.length ? (
+        <p className="muted-copy">
+          Every PDF keeps its saved questions, mistakes, and practice sessions together.
+        </p>
+      ) : null}
+      {materials.length ? (
         <div className="review-list">
-          {sessions.map((session) => (
-            <div className="review-row" key={session.id}>
+          {materials.map((material) => (
+            <div className="review-row" key={material.id || "ungrouped"}>
               <span className="review-number">
-                {new Date(session.createdAt).toLocaleDateString()}
+                {material.lastPracticedAt
+                  ? new Date(material.lastPracticedAt).toLocaleDateString()
+                  : "-"}
               </span>
-              <span>{session.title}</span>
-              <button className="text-button" onClick={() => onOpen(session)}>
-                Open
+              <span>
+                <strong>{material.name}</strong>
+                <small>
+                  {material.questions.length} saved question
+                  {material.questions.length === 1 ? "" : "s"} - {material.mistakes.length} mistake
+                  {material.mistakes.length === 1 ? "" : "s"} - {material.sessions.length} practice
+                  set
+                  {material.sessions.length === 1 ? "" : "s"}
+                </small>
+              </span>
+              <button className="text-button" onClick={() => onOpen(material)}>
+                Open PDF
               </button>
             </div>
           ))}
         </div>
       ) : (
         <p className="muted-copy">
-          Generated quizzes will appear here after you complete or leave them.
+          Generate a quiz from a PDF or recording and its saved questions will appear here.
         </p>
       )}
       <div className="quiz-actions">
         <button className="text-button" onClick={onBack}>
-          Back to upload
+          Back to dashboard
         </button>
       </div>
     </section>

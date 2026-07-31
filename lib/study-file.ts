@@ -1,5 +1,3 @@
-export const MAX_STUDY_FILE_BYTES = 20 * 1024 * 1024;
-
 const audioExtensions = new Set(["mp3", "mp4", "mpeg", "mpga", "m4a", "wav", "webm"]);
 
 export const isPdf = (value: File) =>

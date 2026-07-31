@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getOpenAIClientOptions } from "./openai-config";
+import { getOpenAIClientOptions, getOpenAIModel } from "./openai-config";
 
 describe("getOpenAIClientOptions", () => {
   it("passes a configured base URL to the OpenAI client", () => {
@@ -18,5 +18,11 @@ describe("getOpenAIClientOptions", () => {
     expect(getOpenAIClientOptions({ OPENAI_API_KEY: "test-key" })).toEqual({
       apiKey: "test-key",
     });
+  });
+});
+
+describe("getOpenAIModel", () => {
+  it("defaults quiz generation to the GPT-5.6 Luna API model", () => {
+    expect(getOpenAIModel({ OPENAI_MODEL: "" })).toBe("gpt-5.6-luna");
   });
 });

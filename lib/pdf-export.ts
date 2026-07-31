@@ -2,6 +2,9 @@ import { jsPDF } from "jspdf";
 import type { MistakeBookEntry } from "@/lib/mistake-book";
 import type { GradeResult, Question, Quiz } from "@/lib/quiz";
 import { getSessionAccuracy, type StudySession } from "@/lib/study-history";
+import type { MaterialReviewSheet } from "@/lib/material-review-sheet";
+import type { WeaknessReviewSheet } from "@/lib/review-sheet";
+import type { ExamReviewSheet } from "@/lib/exam-review";
 
 export type QuizExportMode = "student" | "answer_key";
 
@@ -408,6 +411,62 @@ export function createSavedLearningPdf(blocks: string[]): jsPDF {
 
 export function downloadMistakesPdf(entries: MistakeBookEntry[]) {
   createSavedLearningPdf(getMistakePdfBlocks(entries)).save("mistake-book.pdf");
+}
+export function getWeaknessReviewPdfBlocks(sheet: WeaknessReviewSheet): string[] {
+  return [
+    "PAPER QUIZ AI / PERSONAL REVIEW SHEET",
+    ...sheet.items.map(
+      (item, index) =>
+        `${index + 1}. ${item.prompt}\nKey answer: ${item.keyAnswer}\nRemember: ${item.remember}\nNext: ${item.action}`,
+    ),
+  ];
+}
+export function downloadWeaknessReviewPdf(sheet: WeaknessReviewSheet) {
+  createSavedLearningPdf(getWeaknessReviewPdfBlocks(sheet)).save("personal-review-sheet.pdf");
+}
+export function getMaterialReviewPdfBlocks(sheet: MaterialReviewSheet): string[] {
+  const snapshot = `Saved questions: ${sheet.questionCount}\nSaved mistakes: ${sheet.mistakeCount}\nPractice sessions: ${sheet.sessionCount}`;
+  const weaknesses = sheet.weaknesses.length
+    ? sheet.weaknesses.map(
+        (item, index) =>
+          `Weakness ${index + 1}: ${item.prompt}\nKey answer: ${item.keyAnswer}\nRemember: ${item.remember}\nSource: ${item.sourceNote || "Source section not recorded"}`,
+      )
+    : ["Weaknesses\nNo saved mistakes for this material yet."];
+  const coverage = sheet.coverage.length
+    ? sheet.coverage.map(
+        (item) =>
+          `Coverage: ${item.sourceNote} (${item.questionCount} question${item.questionCount === 1 ? "" : "s"})`,
+      )
+    : ["Coverage\nNo saved questions for this material yet."];
+
+  return [
+    "PAPER QUIZ AI / MATERIAL REVIEW SHEET",
+    sheet.title,
+    snapshot,
+    ...weaknesses,
+    ...coverage,
+  ];
+}
+export function downloadMaterialReviewPdf(sheet: MaterialReviewSheet) {
+  createSavedLearningPdf(getMaterialReviewPdfBlocks(sheet)).save("material-review-sheet.pdf");
+}
+export function getExamReviewPdfBlocks(sheet: ExamReviewSheet): string[] {
+  return [
+    "PAPER QUIZ AI / EXAM REVIEW",
+    sheet.title,
+    ...sheet.topics.map((topic, index) =>
+      [
+        `${index + 1}. ${topic.topic}`,
+        `Key ideas: ${topic.keyIdeas.join(" ")}`,
+        ...(topic.formulaOrProcedure ? [`Formula or procedure: ${topic.formulaOrProcedure}`] : []),
+        `Common confusion: ${topic.commonConfusion}`,
+        `Source: ${topic.sourceNote}`,
+      ].join("\n"),
+    ),
+  ];
+}
+export function downloadExamReviewPdf(sheet: ExamReviewSheet) {
+  createSavedLearningPdf(getExamReviewPdfBlocks(sheet)).save("exam-review-sheet.pdf");
 }
 export function downloadReviewPdf(session: StudySession) {
   createSavedLearningPdf(getReviewPdfBlocks(session)).save("graded-quiz-review.pdf");

@@ -7,12 +7,16 @@ export function ResultsView({
   quiz,
   grades,
   mistakeCount,
+  shareStatus,
+  onShare,
   onOpenMistakes,
   onRestart,
 }: {
   quiz: Quiz;
   grades: Record<string, GradeResult>;
   mistakeCount: number;
+  shareStatus: string;
+  onShare: () => void;
   onOpenMistakes: () => void;
   onRestart: () => void;
 }) {
@@ -39,10 +43,14 @@ export function ResultsView({
         <button className="text-button" onClick={onOpenMistakes}>
           Open mistake book ({mistakeCount})
         </button>
+        <button className="text-button" onClick={onShare}>
+          Share challenge
+        </button>
         <button className="primary-button" onClick={onRestart}>
           Upload another lecture
         </button>
       </div>
+      {shareStatus ? <p className="share-status" role="status">{shareStatus}</p> : null}
     </section>
   );
 }

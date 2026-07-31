@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { getTranscriptionModel, transcribeAudio, validateAudioFile } from "./transcription";
 
 describe("validateAudioFile", () => {
-  it("accepts supported lecture audio under the product size limit", () => {
+  it("accepts supported lecture audio", () => {
     const audio = new File(["audio"], "lecture.m4a", { type: "audio/mp4" });
 
     expect(validateAudioFile(audio)).toEqual({ valid: true });
   });
 
-  it("rejects unsupported files and audio larger than 20 MB", () => {
+  it("rejects unsupported files without imposing an application size limit", () => {
     const text = new File(["notes"], "notes.txt", { type: "text/plain" });
     const large = new File([new Uint8Array(20 * 1024 * 1024 + 1)], "lecture.mp3", {
       type: "audio/mpeg",
@@ -18,10 +18,7 @@ describe("validateAudioFile", () => {
       valid: false,
       error: "Choose an MP3, M4A, WAV, WebM, or MP4 lecture recording.",
     });
-    expect(validateAudioFile(large)).toEqual({
-      valid: false,
-      error: "Audio files must be 20 MB or smaller.",
-    });
+    expect(validateAudioFile(large)).toEqual({ valid: true });
   });
 });
 

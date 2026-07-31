@@ -15,8 +15,8 @@
 :root[data-theme="dark"] {
   --paper: #171a22;
   --paper-deep: #222735;
-  --ink: #000000;
-  --muted: #333333;
+  --ink: #f4f1e8;
+  --muted: #b4b8c5;
   --line: #343949;
   --mint: #234438;
   --mint-deep: #5d9f7d;
@@ -2238,6 +2238,9 @@ h1 {
     radial-gradient(circle at 8% 10%, rgba(37, 75, 62, 0.55), transparent 25rem),
     radial-gradient(circle at 95% 85%, rgba(112, 91, 38, 0.38), transparent 22rem), var(--paper);
 }
+:root[data-theme="dark"] .progress-card {
+  background: rgba(36, 41, 54, 0.84);
+}
 :root[data-theme="dark"] .app-sidebar {
   background: rgba(23, 26, 34, 0.78);
 }
@@ -2265,6 +2268,12 @@ h1 {
 :root[data-theme="dark"] .sidebar-nav a:hover,
 :root[data-theme="dark"] .sidebar-nav a[aria-current="page"] {
   background: linear-gradient(135deg, rgba(112, 91, 38, 0.62), rgba(36, 41, 54, 0.5));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .progress-card {
+    background: rgba(36, 41, 54, 0.84);
+  }
 }
 
 @media (min-width: 1100px) {

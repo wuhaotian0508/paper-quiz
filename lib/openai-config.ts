@@ -3,7 +3,7 @@ type OpenAIEnv = Partial<Pick<NodeJS.ProcessEnv, "OPENAI_API_KEY" | "OPENAI_BASE
 export function getOpenAIModel(
   env: Pick<NodeJS.ProcessEnv, "OPENAI_MODEL"> = { OPENAI_MODEL: process.env.OPENAI_MODEL },
 ) {
-  return env.OPENAI_MODEL || "gpt-5.5";
+  return env.OPENAI_MODEL || "gpt-5.6-luna";
 }
 
 export function getOpenAIClientOptions(
