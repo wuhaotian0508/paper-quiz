@@ -28,6 +28,7 @@ type AuthMenuProps = {
   client?: AuthClient;
   unavailableReason?: string;
   authError?: boolean;
+  onSignedOut?: () => void;
 };
 
 type SyncStatus = "idle" | "syncing" | "synced" | "error";
@@ -39,7 +40,12 @@ const syncStatusLabels: Record<SyncStatus, string> = {
   error: "Sync error",
 };
 
-export function AuthMenu({ client, unavailableReason, authError = false }: AuthMenuProps) {
+export function AuthMenu({
+  client,
+  unavailableReason,
+  authError = false,
+  onSignedOut,
+}: AuthMenuProps) {
   const [authClient, setAuthClient] = useState<AuthClient | null>(client ?? null);
   const [configurationError, setConfigurationError] = useState(unavailableReason ?? "");
   const [email, setEmail] = useState("");
@@ -142,6 +148,11 @@ export function AuthMenu({ client, unavailableReason, authError = false }: AuthM
     setUserEmail(null);
     setIsOpen(false);
     setMessage("");
+    if (onSignedOut) {
+      onSignedOut();
+    } else {
+      window.location.assign("/login");
+    }
   }
 
   if (configurationError) {

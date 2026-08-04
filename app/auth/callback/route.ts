@@ -10,7 +10,7 @@ function trustedOrigin(request: NextRequest) {
 }
 
 function callbackErrorRedirect(request: NextRequest) {
-  return NextResponse.redirect(new URL("/?authError=callback", trustedOrigin(request)));
+  return NextResponse.redirect(new URL("/login?authError=callback", trustedOrigin(request)));
 }
 
 export async function GET(request: NextRequest) {

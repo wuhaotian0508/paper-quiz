@@ -45,7 +45,7 @@ it("redirects to an auth error when the callback cannot exchange a code", async 
   );
 
   expect(response.headers.get("location")).toBe(
-    "https://paper-quiz-ai-amber.vercel.app/?authError=callback",
+    "https://paper-quiz-ai-amber.vercel.app/login?authError=callback",
   );
 });
 
@@ -56,6 +56,6 @@ it("redirects to an auth error when the callback code is missing", async () => {
 
   expect(getSupabaseServerClient).not.toHaveBeenCalled();
   expect(response.headers.get("location")).toBe(
-    "https://paper-quiz-ai-amber.vercel.app/?authError=callback",
+    "https://paper-quiz-ai-amber.vercel.app/login?authError=callback",
   );
 });

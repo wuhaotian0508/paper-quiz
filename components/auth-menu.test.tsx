@@ -68,6 +68,20 @@ it("shows the signed-in email from the initial browser session", async () => {
   expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
 });
 
+it("redirects to the dedicated login page after signing out", async () => {
+  const client = createClient();
+  client.auth.getSession = vi.fn().mockResolvedValue({
+    data: { session: { user: { email: "student@example.com" } } },
+  });
+  const onSignedOut = vi.fn();
+  render(<AuthMenu client={client} onSignedOut={onSignedOut} />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+  await waitFor(() => expect(client.auth.signOut).toHaveBeenCalled());
+  expect(onSignedOut).toHaveBeenCalled();
+});
+
 it("shows sync status only after a user has signed in", async () => {
   const client = createClient();
   client.auth.getSession = vi.fn().mockResolvedValue({

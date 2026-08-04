@@ -1,6 +1,8 @@
 import { QuizWorkspace } from "@/components/quiz-workspace";
 import { ProductHelpChat } from "@/components/product-help-chat";
 import { DashboardNavigation } from "@/components/dashboard-navigation";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
 type HomeProps = {
   searchParams?: Promise<{ authError?: string }>;
@@ -8,6 +10,12 @@ type HomeProps = {
 
 export default async function Home({ searchParams }: HomeProps) {
   const { authError } = (await searchParams) ?? {};
+  const supabase = await getSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
 
   return (
     <main className="app-shell">
