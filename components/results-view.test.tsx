@@ -23,7 +23,7 @@ const quiz = {
   ],
 };
 
-it("offers the finished quiz as a shareable challenge and reports the share status", () => {
+it("separates downloads from sharing and exposes the created URL", () => {
   const onShare = vi.fn();
   render(
     <ResultsView
@@ -31,13 +31,24 @@ it("offers the finished quiz as a shareable challenge and reports the share stat
       grades={{}}
       mistakeCount={0}
       shareStatus="Challenge link copied. It expires in 7 days."
+      shareUrl="https://paperquiz.test/challenge/share-123"
       onShare={onShare}
+      onCopyShare={vi.fn()}
+      onOpenShare={vi.fn()}
       onOpenMistakes={vi.fn()}
       onRestart={vi.fn()}
     />,
   );
 
-  fireEvent.click(screen.getByRole("button", { name: "Share challenge" }));
+  expect(screen.getByRole("heading", { name: "Downloads" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Share" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Create share link" }));
   expect(onShare).toHaveBeenCalledOnce();
   expect(screen.getByRole("status")).toHaveTextContent("Challenge link copied");
+  expect(screen.getByLabelText("Share link")).toHaveValue("https://paperquiz.test/challenge/share-123");
+  expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Open link" })).toHaveAttribute(
+    "href",
+    "https://paperquiz.test/challenge/share-123",
+  );
 });

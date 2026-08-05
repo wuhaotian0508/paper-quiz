@@ -25,6 +25,34 @@ it("exchanges an auth code before redirecting home", async () => {
   expect(response.headers.get("location")).toBe("https://paper-quiz-ai-amber.vercel.app/");
 });
 
+it("returns to a safe shared artifact after authentication", async () => {
+  const exchangeCodeForSession = vi.fn().mockResolvedValue({ error: null });
+  getSupabaseServerClient.mockResolvedValue({ auth: { exchangeCodeForSession } });
+
+  const response = await GET(
+    new NextRequest(
+      "https://paper-quiz-ai-amber.vercel.app/auth/callback?code=code-123&returnTo=%2Freview%2Freview-123",
+    ),
+  );
+
+  expect(response.headers.get("location")).toBe(
+    "https://paper-quiz-ai-amber.vercel.app/review/review-123",
+  );
+});
+
+it("does not follow an external return target", async () => {
+  const exchangeCodeForSession = vi.fn().mockResolvedValue({ error: null });
+  getSupabaseServerClient.mockResolvedValue({ auth: { exchangeCodeForSession } });
+
+  const response = await GET(
+    new NextRequest(
+      "https://paper-quiz-ai-amber.vercel.app/auth/callback?code=code-123&returnTo=https%3A%2F%2Fattacker.example",
+    ),
+  );
+
+  expect(response.headers.get("location")).toBe("https://paper-quiz-ai-amber.vercel.app/");
+});
+
 it("does not reflect an untrusted callback origin in its redirect", async () => {
   const exchangeCodeForSession = vi.fn().mockResolvedValue({ error: null });
   getSupabaseServerClient.mockResolvedValue({ auth: { exchangeCodeForSession } });

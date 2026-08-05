@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseChatHistory, readBoundedText, validatePdfFile } from "./request-validation";
+import {
+  parseChatHistory,
+  parseReviewMistakeContext,
+  readBoundedText,
+  validatePdfFile,
+} from "./request-validation";
 
 describe("request validation", () => {
   it("rejects malformed or oversized chat history", () => {
@@ -35,5 +40,40 @@ describe("request validation", () => {
   it("bounds form text", () => {
     expect(readBoundedText("  hello ", 10)).toBe("hello");
     expect(readBoundedText("x".repeat(11), 10)).toBeNull();
+  });
+
+  it("accepts only compact mistake context for a review", () => {
+    expect(
+      parseReviewMistakeContext(
+        JSON.stringify([
+          {
+            id: "mistake-1",
+            prompt: "What is retrieval?",
+            answer: "Training",
+            referenceAnswer: "Finding source context",
+            feedback: "Review the sequence.",
+            status: "incorrect",
+            sourceNote: "Page 2",
+          },
+        ]),
+      ),
+    ).toEqual({
+      ok: true,
+      value: [
+        {
+          id: "mistake-1",
+          prompt: "What is retrieval?",
+          answer: "Training",
+          referenceAnswer: "Finding source context",
+          feedback: "Review the sequence.",
+          status: "incorrect",
+          sourceNote: "Page 2",
+        },
+      ],
+    });
+    expect(parseReviewMistakeContext("not-json")).toEqual({
+      ok: false,
+      error: "Review mistakes are invalid.",
+    });
   });
 });

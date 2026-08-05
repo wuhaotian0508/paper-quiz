@@ -13,6 +13,10 @@ function callbackErrorRedirect(request: NextRequest) {
   return NextResponse.redirect(new URL("/login?authError=callback", trustedOrigin(request)));
 }
 
+function safeReturnTo(value: string | null) {
+  return value && value.startsWith("/") && !value.startsWith("//") ? value : "/";
+}
+
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   if (!code) return callbackErrorRedirect(request);
@@ -25,5 +29,7 @@ export async function GET(request: NextRequest) {
     return callbackErrorRedirect(request);
   }
 
-  return NextResponse.redirect(new URL("/", trustedOrigin(request)));
+  return NextResponse.redirect(
+    new URL(safeReturnTo(request.nextUrl.searchParams.get("returnTo")), trustedOrigin(request)),
+  );
 }

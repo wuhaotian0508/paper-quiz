@@ -10,6 +10,19 @@
   --coral-deep: #c95543;
   --yellow: #ffe7a4;
   --white: #ffffff;
+  /* Tinted surfaces. Every one of these needs a dark counterpart, or light text lands on a
+     light card: the mistake list rendered at a 1.05 contrast ratio before these were lifted
+     out of the component rules. */
+  --surface-soft: #fff4f1;
+  --surface-soft-line: #f0dcd5;
+  --toolbar-veil: rgba(255, 255, 255, 0.7);
+  --tint-coral-bg: #fff0ec;
+  --tint-coral-ink: #c95543;
+  --tint-mint-ink: #31785f;
+  --tint-blue-bg: #eaf0fd;
+  --tint-blue-ink: #3d6ccb;
+  --tint-violet-bg: #f2eafb;
+  --tint-violet-ink: #8756bd;
 }
 
 :root[data-theme="dark"] {
@@ -24,6 +37,16 @@
   --coral-deep: #ffac96;
   --yellow: #705b26;
   --white: #242936;
+  --surface-soft: #2a2f3d;
+  --surface-soft-line: #3b4152;
+  --toolbar-veil: rgba(36, 41, 54, 0.72);
+  --tint-coral-bg: #4a2b24;
+  --tint-coral-ink: #ffc4b3;
+  --tint-mint-ink: #8fd9b6;
+  --tint-blue-bg: #23304d;
+  --tint-blue-ink: #a8c4f5;
+  --tint-violet-bg: #342a47;
+  --tint-violet-ink: #d4b8f0;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -39,6 +62,16 @@
     --coral-deep: #ffac96;
     --yellow: #705b26;
     --white: #242936;
+    --surface-soft: #2a2f3d;
+    --surface-soft-line: #3b4152;
+    --toolbar-veil: rgba(36, 41, 54, 0.72);
+    --tint-coral-bg: #4a2b24;
+    --tint-coral-ink: #ffc4b3;
+    --tint-mint-ink: #8fd9b6;
+    --tint-blue-bg: #23304d;
+    --tint-blue-ink: #a8c4f5;
+    --tint-violet-bg: #342a47;
+    --tint-violet-ink: #d4b8f0;
   }
 }
 
@@ -1116,7 +1149,7 @@ h1 {
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--toolbar-veil);
 }
 .filter-pills {
   display: flex;
@@ -1168,9 +1201,9 @@ h1 {
   gap: 13px;
   align-items: start;
   padding: 17px;
-  border: 1px solid #f0dcd5;
+  border: 1px solid var(--surface-soft-line);
   border-radius: 15px;
-  background: #fff4f1;
+  background: var(--surface-soft);
 }
 .mistake-item.is-question {
   grid-template-columns: 150px minmax(0, 1fr);
@@ -2157,6 +2190,73 @@ h1 {
   opacity: 0.45;
   cursor: not-allowed;
 }
+.product-help-conversation {
+  display: grid;
+  gap: 12px;
+}
+.product-help-conversation form {
+  display: flex;
+  gap: 7px;
+}
+.product-help-conversation input {
+  min-width: 0;
+  flex: 1;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--paper);
+  font: 12px/1.2 inherit;
+}
+.product-help-conversation form button {
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 11px;
+  color: #fff;
+  background: var(--coral-deep);
+  cursor: pointer;
+  font-size: 11px;
+}
+.product-help-conversation form button:disabled,
+.product-help-conversation .product-help-suggestions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.product-help-pending {
+  margin-right: 20px;
+  padding: 9px 10px;
+  border-radius: 11px;
+  color: var(--muted);
+  background: var(--paper-deep);
+  font-size: 12px;
+}
+.product-help-error {
+  margin: 0;
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: #8a3b32;
+  background: #fff0ed;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.help-chat-page {
+  width: min(760px, 100%);
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 18px 46px rgba(38, 48, 65, 0.08);
+}
+.help-chat-page .product-help-messages {
+  min-height: 180px;
+  max-height: 460px;
+}
+.help-chat-page .product-help-conversation input {
+  padding: 12px;
+}
+.help-chat-page .product-help-conversation form button {
+  padding-inline: 16px;
+}
 .sr-only {
   position: absolute;
   width: 1px;
@@ -2264,9 +2364,9 @@ h1 {
   grid-template-columns: 34px minmax(0, 1fr);
   gap: 14px;
   padding: 20px;
-  border: 1px solid #efdad3;
+  border: 1px solid var(--surface-soft-line);
   border-radius: 16px;
-  background: #fff4f1;
+  background: var(--surface-soft);
 }
 .review-sheet-item > span {
   color: var(--coral-deep);
@@ -2600,20 +2700,20 @@ h1 {
   font-weight: 700;
 }
 .dashboard-shortcut-icon.coral {
-  color: var(--coral-deep);
-  background: #fff0ec;
+  color: var(--tint-coral-ink);
+  background: var(--tint-coral-bg);
 }
 .dashboard-shortcut-icon.mint {
-  color: #31785f;
+  color: var(--tint-mint-ink);
   background: var(--mint);
 }
 .dashboard-shortcut-icon.blue {
-  color: #3d6ccb;
-  background: #eaf0fd;
+  color: var(--tint-blue-ink);
+  background: var(--tint-blue-bg);
 }
 .dashboard-shortcut-icon.violet {
-  color: #8756bd;
-  background: #f2eafb;
+  color: var(--tint-violet-ink);
+  background: var(--tint-violet-bg);
 }
 .dashboard-shortcuts strong,
 .dashboard-shortcuts small {
@@ -2639,6 +2739,19 @@ h1 {
 }
 .dashboard-detail-card {
   padding: 19px;
+}
+.review-focus-card {
+  grid-column: 1 / -1;
+}
+.review-focus-count {
+  color: var(--coral-deep);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.review-focus-list {
+  margin-top: 8px;
 }
 .dashboard-detail-heading {
   display: flex;
@@ -2741,6 +2854,11 @@ h1 {
 :root[data-theme="dark"] .sidebar-nav a:hover,
 :root[data-theme="dark"] .sidebar-nav a[aria-current="page"] {
   background: linear-gradient(135deg, rgba(112, 91, 38, 0.62), rgba(36, 41, 54, 0.5));
+}
+/* The launcher keeps its dark ink, so the gradient must stay light here: --yellow turns
+   into a deep brown in this theme and swallowed the left half of the label. */
+:root[data-theme="dark"] .product-help-launcher {
+  background: linear-gradient(135deg, #f2b968, #ffc783 50%, #f7a496);
 }
 
 @media (prefers-color-scheme: dark) {

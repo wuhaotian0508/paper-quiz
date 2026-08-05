@@ -6,6 +6,8 @@ export const ExamReviewTopicSchema = z.object({
   formulaOrProcedure: z.string().trim().max(500),
   commonConfusion: z.string().trim().min(1).max(500),
   sourceNote: z.string().trim().min(1).max(300),
+  relatedMistakeIds: z.array(z.string().trim().min(1).max(200)).max(3),
+  mistakeFocus: z.string().trim().max(500),
 });
 
 export const ExamReviewSheetSchema = z.object({
@@ -20,6 +22,8 @@ export function buildExamReviewInstructions() {
     "You are a precise exam tutor. Create a concise review sheet based only on the supplied study material.",
     "Cover 4 to 8 distinct high-value topics from across the material; do not repeat a topic.",
     "For each topic, state essential ideas, include a formula or procedure only when the source contains one, name one common confusion, and cite the supporting page, section, or transcript topic.",
+    "The supplied PDF or transcript is the sole factual authority. Learner mistakes only determine which source-grounded concepts deserve emphasis.",
+    "Return relatedMistakeIds only from the supplied mistake identifiers, and use an empty array with an empty mistakeFocus when no supplied mistake applies.",
     "Write every user-visible field in English. Do not invent facts or imply this document is permitted during an exam.",
   ].join("\n");
 }

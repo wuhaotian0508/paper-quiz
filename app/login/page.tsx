@@ -1,7 +1,7 @@
 import { LoginView } from "@/components/login-view";
 
 type LoginPageProps = {
-  searchParams?: Promise<{ authError?: string }>;
+  searchParams?: Promise<{ authError?: string; returnTo?: string }>;
 };
 
 function LoginStory() {
@@ -31,13 +31,13 @@ function LoginStory() {
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const { authError } = (await searchParams) ?? {};
+  const { authError, returnTo } = (await searchParams) ?? {};
 
   return (
     <main className="login-page">
       <section className="login-card">
         <LoginStory />
-        <LoginView authError={authError === "callback"} />
+        <LoginView authError={authError === "callback"} returnTo={returnTo} />
       </section>
       <div className="login-features" aria-label="Product benefits">
         <span><b>Upload</b> PDFs, slides, or recordings</span>
@@ -47,4 +47,3 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     </main>
   );
 }
-

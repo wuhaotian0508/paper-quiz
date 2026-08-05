@@ -3,7 +3,11 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { ExamReviewSheetSchema, buildExamReviewInstructions } from "@/lib/exam-review";
 import { getOpenAIClientOptions, getOpenAIModel } from "@/lib/openai-config";
 import { collectResponse } from "@/lib/openai-stream";
-import { MAX_TRANSCRIPT_CHARS, readBoundedText } from "@/lib/request-validation";
+import {
+  MAX_TRANSCRIPT_CHARS,
+  parseReviewMistakeContext,
+  readBoundedText,
+} from "@/lib/request-validation";
 import { buildSourceFileParts, parseSourceFileIds } from "@/lib/source-reference";
 
 export const maxDuration = 60;
@@ -21,6 +25,9 @@ export async function POST(request: Request) {
     const transcript = transcriptValue
       ? readBoundedText(transcriptValue, MAX_TRANSCRIPT_CHARS)
       : "";
+    const rawMistakes = form.get("mistakes");
+    const parsedMistakes =
+      rawMistakes === null ? { ok: true as const, value: [] } : parseReviewMistakeContext(rawMistakes);
 
     if (!fileIds.length && !transcript)
       return jsonError("A saved PDF source or lecture transcript is required.", 400);
@@ -28,6 +35,7 @@ export async function POST(request: Request) {
       return jsonError("Choose either saved PDFs or a lecture transcript, not both.", 400);
     if (typeof transcriptValue === "string" && transcriptValue.trim() && !transcript)
       return jsonError("Lecture transcript is too long or invalid.", 400);
+    if (!parsedMistakes.ok) return jsonError(parsedMistakes.error, 400);
 
     const clientOptions = getOpenAIClientOptions();
     if (!clientOptions)
@@ -35,13 +43,16 @@ export async function POST(request: Request) {
 
     const client = new OpenAI(clientOptions);
     const sourceParts = fileIds.length ? await buildSourceFileParts({ fileIds }) : [];
+    const mistakeContext = parsedMistakes.value.length
+      ? `\n\n<learner_mistakes>\n${JSON.stringify(parsedMistakes.value)}\n</learner_mistakes>`
+      : "\n\n<learner_mistakes>[]</learner_mistakes>";
     const sourceContent = [
       ...sourceParts,
       {
         type: "input_text" as const,
         text: transcript
-          ? `${buildExamReviewInstructions()}\n\n<lecture_transcript>\n${transcript}\n</lecture_transcript>`
-          : `${buildExamReviewInstructions()}\n\nCreate the review from all saved PDF sources.`,
+          ? `${buildExamReviewInstructions()}\n\n<lecture_transcript>\n${transcript}\n</lecture_transcript>${mistakeContext}`
+          : `${buildExamReviewInstructions()}\n\nCreate the review from all saved PDF sources.${mistakeContext}`,
       },
     ];
     const stream = await client.responses.create({
@@ -58,7 +69,19 @@ export async function POST(request: Request) {
     if (stoppedEarlyBecause || !text)
       return jsonError("AI did not return a usable exam review. Please try again.", 502);
 
-    return Response.json(ExamReviewSheetSchema.parse(JSON.parse(text)));
+    const review = ExamReviewSheetSchema.parse(JSON.parse(text));
+    const allowedMistakeIds = new Set(parsedMistakes.value.map((mistake) => mistake.id));
+    return Response.json({
+      ...review,
+      topics: review.topics.map((topic) => {
+        const relatedMistakeIds = topic.relatedMistakeIds.filter((id) => allowedMistakeIds.has(id));
+        return {
+          ...topic,
+          relatedMistakeIds,
+          mistakeFocus: relatedMistakeIds.length ? topic.mistakeFocus : "",
+        };
+      }),
+    });
   } catch (error) {
     console.error(
       "Exam review generation failed",

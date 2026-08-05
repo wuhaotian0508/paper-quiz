@@ -460,6 +460,7 @@ export function getExamReviewPdfBlocks(sheet: ExamReviewSheet): string[] {
         `Key ideas: ${topic.keyIdeas.join(" ")}`,
         ...(topic.formulaOrProcedure ? [`Formula or procedure: ${topic.formulaOrProcedure}`] : []),
         `Common confusion: ${topic.commonConfusion}`,
+        ...(topic.mistakeFocus ? [`Your focus: ${topic.mistakeFocus}`] : []),
         `Source: ${topic.sourceNote}`,
       ].join("\n"),
     ),

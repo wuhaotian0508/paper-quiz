@@ -47,6 +47,14 @@ it("lets a visitor take a shared quiz without exposing the answer before submiss
   render(<SharedChallengeView slug="share-123" client={createClient()} />);
 
   expect(await screen.findByRole("heading", { name: "Probability challenge" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+    "href",
+    "/login?returnTo=%2Fchallenge%2Fshare-123",
+  );
+  expect(screen.getByRole("link", { name: "Use this quiz" })).toHaveAttribute(
+    "href",
+    "#shared-quiz",
+  );
   expect(screen.queryByText("B is right.")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "B" }));
   fireEvent.click(screen.getByRole("button", { name: "Submit challenge" }));

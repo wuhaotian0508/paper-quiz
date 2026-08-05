@@ -1,9 +1,6 @@
-const feedbackAddress = "haotianwu123@berkeley.edu";
-const feedbackSubject = "Paper Plane Quiz feedback";
+const googleFormFeedbackUrl =
+  "https://docs.google.com/forms/d/e/1FAIpQLSdgqSIBtVjXqOVEsb586N1_vdIAcYz-ce-54pfxERikOGudRQ/viewform";
 
-export function createFeedbackHref(context?: string) {
-  const contextLine = context?.trim() ? `Context: ${context.trim()}\n\n` : "";
-  const body = `What were you doing?\n\n${contextLine}What went wrong or could be better?\n\nPage URL: `;
-
-  return `mailto:${feedbackAddress}?subject=${encodeURIComponent(feedbackSubject)}&body=${encodeURIComponent(body)}`;
+export function createFeedbackHref(_context?: string) {
+  return googleFormFeedbackUrl;
 }

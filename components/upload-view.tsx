@@ -3,6 +3,7 @@
 import type { Difficulty } from "@/lib/quiz";
 import { formatBytes, isAudio } from "@/lib/study-file";
 import type { StudySession } from "@/lib/study-history";
+import type { StudyMaterial } from "@/lib/study-material";
 
 export type CustomDraft = { key: string; label: string; instructions: string; count: number };
 
@@ -29,6 +30,7 @@ export function UploadView({
   sessionCount,
   materialCount,
   sessions,
+  reviewFocusMaterials = [],
   onAcceptFiles,
   onCountsChange,
   onCustomChange,
@@ -37,6 +39,7 @@ export function UploadView({
   onOpenProgress,
   onOpenHistory,
   onOpenSession,
+  onOpenMaterial,
   onStart,
 }: {
   files: File[];
@@ -49,6 +52,7 @@ export function UploadView({
   sessionCount: number;
   materialCount: number;
   sessions: StudySession[];
+  reviewFocusMaterials?: StudyMaterial[];
   onAcceptFiles: (next?: FileList | File[]) => void;
   onCountsChange: (update: (previous: Record<string, number>) => Record<string, number>) => void;
   onCustomChange: (update: (previous: CustomDraft[]) => CustomDraft[]) => void;
@@ -57,6 +61,7 @@ export function UploadView({
   onOpenProgress: () => void;
   onOpenHistory: () => void;
   onOpenSession: (session: StudySession) => void;
+  onOpenMaterial?: (material: StudyMaterial) => void;
   onStart: () => void;
 }) {
   const needsTranscription = Boolean(files.length === 1 && isAudio(files[0]));
@@ -270,6 +275,33 @@ export function UploadView({
       </section>
 
       <section className="dashboard-details">
+        {reviewFocusMaterials.length ? (
+          <article className="dashboard-detail-card review-focus-card">
+            <div className="dashboard-detail-heading">
+              <div>
+                <div className="eyebrow">Personalized review</div>
+                <h2>Review focus</h2>
+              </div>
+              <span className="review-focus-count">{reviewFocusMaterials.length} PDF{reviewFocusMaterials.length === 1 ? "" : "s"}</span>
+            </div>
+            <p className="muted-copy">Open a PDF&apos;s review sheet to revisit the mistakes that matter most.</p>
+            <div className="dashboard-session-list review-focus-list">
+              {reviewFocusMaterials.slice(0, 3).map((material) => (
+                <button
+                  key={material.id || material.name}
+                  onClick={() => onOpenMaterial?.(material)}
+                  aria-label={`Open ${material.name} review`}
+                >
+                  <span>
+                    <strong>{material.name}</strong>
+                    <small>{material.mistakes.length} mistake{material.mistakes.length === 1 ? "" : "s"} to revisit</small>
+                  </span>
+                  <span aria-hidden="true">-&gt;</span>
+                </button>
+              ))}
+            </div>
+          </article>
+        ) : null}
         <article className="dashboard-detail-card">
           <div className="dashboard-detail-heading">
             <h2>Recent practice</h2>

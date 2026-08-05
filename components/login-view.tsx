@@ -8,9 +8,10 @@ type LoginViewProps = {
   client?: AuthClient;
   unavailableReason?: string;
   authError?: boolean;
+  returnTo?: string;
 };
 
-export function LoginView({ client, unavailableReason, authError = false }: LoginViewProps) {
+export function LoginView({ client, unavailableReason, authError = false, returnTo = "" }: LoginViewProps) {
   const [authClient, setAuthClient] = useState<AuthClient | null>(client ?? null);
   const [configurationError, setConfigurationError] = useState(unavailableReason ?? "");
   const [email, setEmail] = useState("");
@@ -41,7 +42,7 @@ export function LoginView({ client, unavailableReason, authError = false }: Logi
     setMessage("");
     const { error } = await authClient.auth.signInWithOtp({
       email: trimmedEmail,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { emailRedirectTo: authRedirectUrl(returnTo) },
     });
     setIsSubmitting(false);
     setMessage(error ? error.message : "Check your inbox for a sign-in link.");
@@ -54,7 +55,7 @@ export function LoginView({ client, unavailableReason, authError = false }: Logi
     setMessage("");
     const { error } = await authClient.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: authRedirectUrl(returnTo) },
     });
     setIsSubmitting(false);
     if (error) setMessage(error.message);
@@ -123,3 +124,10 @@ export function LoginView({ client, unavailableReason, authError = false }: Logi
   );
 }
 
+function authRedirectUrl(returnTo: string) {
+  const callback = new URL("/auth/callback", window.location.origin);
+  if (returnTo.startsWith("/") && !returnTo.startsWith("//")) {
+    callback.searchParams.set("returnTo", returnTo);
+  }
+  return callback.toString();
+}

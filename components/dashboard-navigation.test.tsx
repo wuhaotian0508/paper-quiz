@@ -18,7 +18,7 @@ describe("DashboardNavigation", () => {
     expect(screen.getByRole("link", { name: "Help" })).toHaveAttribute("href", "#help");
     expect(screen.getByRole("link", { name: "Feedback" })).toHaveAttribute(
       "href",
-      expect.stringContaining("mailto:haotianwu123@berkeley.edu"),
+      "https://docs.google.com/forms/d/e/1FAIpQLSdgqSIBtVjXqOVEsb586N1_vdIAcYz-ce-54pfxERikOGudRQ/viewform",
     );
     expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
 

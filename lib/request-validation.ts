@@ -5,6 +5,8 @@ export const MAX_ANSWER_CHARS = 12_000;
 export const MAX_MESSAGE_CHARS = 2_000;
 export const MAX_HISTORY_MESSAGES = 8;
 export const MAX_QUESTION_CHARS = 50_000;
+export const MAX_REVIEW_MISTAKES = 20;
+const MAX_REVIEW_MISTAKE_CHARS = 2_000;
 
 const ChatMessageSchema = z
   .object({
@@ -14,6 +16,35 @@ const ChatMessageSchema = z
   .strict();
 
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
+
+const ReviewMistakeContextSchema = z
+  .object({
+    id: z.string().trim().min(1).max(200),
+    prompt: z.string().trim().min(1).max(MAX_REVIEW_MISTAKE_CHARS),
+    answer: z.string().trim().max(MAX_REVIEW_MISTAKE_CHARS),
+    referenceAnswer: z.string().trim().min(1).max(MAX_REVIEW_MISTAKE_CHARS),
+    feedback: z.string().trim().min(1).max(MAX_REVIEW_MISTAKE_CHARS),
+    status: z.enum(["partial", "incorrect"]),
+    sourceNote: z.string().trim().min(1).max(300),
+  })
+  .strict();
+
+export type ReviewMistakeContext = z.infer<typeof ReviewMistakeContextSchema>;
+
+export function parseReviewMistakeContext(
+  raw: unknown,
+): { ok: true; value: ReviewMistakeContext[] } | { ok: false; error: string } {
+  if (typeof raw !== "string" || raw.length > MAX_REVIEW_MISTAKES * 8_000)
+    return { ok: false, error: "Review mistakes are invalid." };
+  try {
+    return {
+      ok: true,
+      value: z.array(ReviewMistakeContextSchema).max(MAX_REVIEW_MISTAKES).parse(JSON.parse(raw)),
+    };
+  } catch {
+    return { ok: false, error: "Review mistakes are invalid." };
+  }
+}
 
 export function parseChatHistory(
   raw: string,

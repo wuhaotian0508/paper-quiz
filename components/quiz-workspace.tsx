@@ -90,6 +90,7 @@ export function QuizWorkspace() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [shareStatus, setShareStatus] = useState("");
+  const [shareUrl, setShareUrl] = useState("");
   const [mistakes, setMistakes] = useState<MistakeBookEntry[]>([]);
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [sessionId, setSessionId] = useState("");
@@ -468,6 +469,7 @@ export function QuizWorkspace() {
     setChat([]);
     setError("");
     setShareStatus("");
+    setShareUrl("");
   };
 
   const shareChallenge = async () => {
@@ -482,6 +484,7 @@ export function QuizWorkspace() {
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       });
       const url = getChallengeShareUrl(window.location.origin, created.slug);
+      setShareUrl(url);
       if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
       setShareStatus(
         "Challenge link copied. It expires in 7 days and shares questions, not your source file.",
@@ -492,6 +495,16 @@ export function QuizWorkspace() {
           ? cause.message
           : "Challenge link could not be created. Please try again.",
       );
+    }
+  };
+
+  const copyShareLink = async () => {
+    if (!shareUrl) return;
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareStatus("Challenge link copied. It expires in 7 days.");
+    } else {
+      setShareStatus("Select the share link and copy it manually.");
     }
   };
 
@@ -601,7 +614,10 @@ export function QuizWorkspace() {
         grades={grades}
         mistakeCount={mistakes.length}
         shareStatus={shareStatus}
+        shareUrl={shareUrl}
         onShare={() => void shareChallenge()}
+        onCopyShare={() => void copyShareLink()}
+        onOpenShare={() => undefined}
         onOpenMistakes={() => setView("mistakes")}
         onRestart={reset}
       />
@@ -620,6 +636,7 @@ export function QuizWorkspace() {
         sessionCount={sessions.length}
         materialCount={materials.length}
         sessions={sessions}
+        reviewFocusMaterials={materials.filter((material) => material.mistakes.length > 0)}
         onAcceptFiles={acceptFiles}
         onCountsChange={setCounts}
         onCustomChange={setCustom}
@@ -628,6 +645,10 @@ export function QuizWorkspace() {
         onOpenProgress={() => setView("progress")}
         onOpenHistory={() => setView("history")}
         onOpenSession={openSession}
+        onOpenMaterial={(material) => {
+          setOpenMaterialId(material.id);
+          setView("material-detail");
+        }}
         onStart={() => {
           if (files.length === 1 && isAudio(files[0])) void transcribe();
           else void generateQuiz();

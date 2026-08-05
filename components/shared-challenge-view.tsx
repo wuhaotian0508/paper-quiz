@@ -96,13 +96,21 @@ export function SharedChallengeView({ slug, client }: { slug: string; client?: S
       <h1>{challenge.title}</h1>
       <p className="muted-copy">{challenge.summary}</p>
       <p className="shared-challenge-note">This link shares questions only, never the original study file.</p>
+      <div className="shared-link-actions">
+        <a className="text-button framed-button" href={`/login?returnTo=${encodeURIComponent(`/challenge/${challenge.slug}`)}`}>
+          Sign in
+        </a>
+        <a className="primary-button" href="#shared-quiz">
+          Use this quiz
+        </a>
+      </div>
       {!result ? (
         <>
           <label className="shared-name">
             Display name (optional)
             <input value={name} maxLength={80} onChange={(event) => setName(event.target.value)} placeholder="Anonymous" />
           </label>
-          <div className="shared-question-list">
+          <div className="shared-question-list" id="shared-quiz">
             {challenge.quiz.questions.map((question, index) => (
               <section className="shared-question" key={question.id}>
                 <span className="question-kicker">QUESTION {String(index + 1).padStart(2, "0")}</span>

@@ -2,10 +2,14 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MaterialDetailView } from "./material-detail-view";
 
+const getSupabaseBrowserClient = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/supabase/browser", () => ({ getSupabaseBrowserClient }));
+
 describe("MaterialDetailView", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    getSupabaseBrowserClient.mockReset();
   });
 
   it("uses a dedicated two-column layout for question cards", () => {
@@ -59,7 +63,7 @@ describe("MaterialDetailView", () => {
     );
 
     expect(screen.queryByText("Lecture.pdf Review Sheet")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Generate review sheet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show practice summary" }));
     expect(screen.getByText("Lecture.pdf Review Sheet")).toBeInTheDocument();
     expect(screen.getByText("No saved questions for this material yet.")).toBeInTheDocument();
   });
@@ -106,7 +110,7 @@ describe("MaterialDetailView", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Generate review sheet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show practice summary" }));
 
     expect(screen.getByText("A durable advantage can come from ___.")).toBeInTheDocument();
     expect(screen.getByText("No saved questions for this material yet.")).toBeInTheDocument();
@@ -126,6 +130,8 @@ describe("MaterialDetailView", () => {
                 formulaOrProcedure: "Retrieve, rank, generate.",
                 commonConfusion: "Retrieval does not retrain the model.",
                 sourceNote: "Page 1",
+                relatedMistakeIds: [],
+                mistakeFocus: "",
               },
               {
                 topic: "Grounding",
@@ -133,6 +139,8 @@ describe("MaterialDetailView", () => {
                 formulaOrProcedure: "",
                 commonConfusion: "Grounding is not a guarantee of truth.",
                 sourceNote: "Page 2",
+                relatedMistakeIds: [],
+                mistakeFocus: "",
               },
               {
                 topic: "Evaluation",
@@ -140,6 +148,8 @@ describe("MaterialDetailView", () => {
                 formulaOrProcedure: "",
                 commonConfusion: "Fluency is not correctness.",
                 sourceNote: "Page 3",
+                relatedMistakeIds: [],
+                mistakeFocus: "",
               },
               {
                 topic: "Failure modes",
@@ -147,6 +157,8 @@ describe("MaterialDetailView", () => {
                 formulaOrProcedure: "Inspect retrieved evidence.",
                 commonConfusion: "Failures can begin before generation.",
                 sourceNote: "Page 4",
+                relatedMistakeIds: [],
+                mistakeFocus: "",
               },
             ],
           }),
@@ -186,9 +198,160 @@ describe("MaterialDetailView", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Generate exam review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate personalized review sheet" }));
 
     expect(await screen.findByText("Lecture Exam Review")).toBeInTheDocument();
     expect(screen.getByText("Retrieve context before generating.")).toBeInTheDocument();
+  });
+
+  it("sends this PDF's mistakes and renders the linked learning focus", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          title: "Lecture Review",
+          topics: Array.from({ length: 4 }, (_, index) => ({
+            topic: `Topic ${index + 1}`,
+            keyIdeas: ["Use source evidence."],
+            formulaOrProcedure: "",
+            commonConfusion: "Do not confuse evidence with training.",
+            sourceNote: `Page ${index + 1}`,
+            relatedMistakeIds: index === 0 ? ["mistake-1"] : [],
+            mistakeFocus: index === 0 ? "Retrieve before generating." : "",
+          })),
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <MaterialDetailView
+        material={{
+          id: "m1",
+          name: "Lecture.pdf",
+          questions: [],
+          mistakes: [
+            {
+              version: 1,
+              id: "mistake-1",
+              question: {
+                id: "q1",
+                type: "fill_blank",
+                prompt: "Retrieval happens before ___.",
+                acceptedAnswers: ["generation"],
+                referenceAnswer: "generation",
+                explanation: "Retrieve source context first.",
+                sourceNote: "Page 1",
+              },
+              answer: "training",
+              status: "incorrect",
+              score: 0,
+              feedback: "Review the retrieval sequence.",
+              missingPoints: [],
+              updatedAt: "2026-08-05T10:00:00.000Z",
+              source: {
+                fileId: "file-lecture123",
+                transcript: "",
+                materialId: "m1",
+                materialName: "Lecture.pdf",
+              },
+            },
+          ],
+          sessions: [
+            {
+              id: "s1",
+              title: "Lecture quiz",
+              createdAt: "2026-08-05T10:00:00.000Z",
+              questions: [],
+              answers: {},
+              grades: {},
+              chat: {},
+              source: {
+                fileId: "file-lecture123",
+                transcript: "",
+                materialId: "m1",
+                materialName: "Lecture.pdf",
+              },
+            },
+          ],
+          lastPracticedAt: "2026-08-05T10:00:00.000Z",
+        }}
+        onBack={vi.fn()}
+        onPractice={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate personalized review sheet" }));
+
+    await screen.findByText("Lecture Review");
+    const form = fetchMock.mock.calls[0][1].body as FormData;
+    expect(JSON.parse(String(form.get("mistakes")))).toEqual([
+      expect.objectContaining({ id: "mistake-1", answer: "training", referenceAnswer: "generation" }),
+    ]);
+    expect(screen.getByText("Your missed question")).toBeInTheDocument();
+    expect(screen.getByText("Retrieve before generating.")).toBeInTheDocument();
+    expect(screen.getByText("Review the retrieval sequence.")).toBeInTheDocument();
+  });
+
+  it("creates a seven-day share link for the generated review", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          title: "Lecture Review",
+          topics: Array.from({ length: 4 }, (_, index) => ({
+            topic: `Topic ${index + 1}`,
+            keyIdeas: ["Use source evidence."],
+            formulaOrProcedure: "",
+            commonConfusion: "Do not confuse evidence with training.",
+            sourceNote: `Page ${index + 1}`,
+            relatedMistakeIds: [],
+            mistakeFocus: "",
+          })),
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    getSupabaseBrowserClient.mockReturnValue({
+      rpc: vi.fn().mockResolvedValue({ data: { slug: "review-123" }, error: null }),
+    });
+    render(
+      <MaterialDetailView
+        material={{
+          id: "m1",
+          name: "Lecture.pdf",
+          questions: [],
+          mistakes: [],
+          sessions: [
+            {
+              id: "s1",
+              title: "Lecture quiz",
+              createdAt: "2026-08-05T10:00:00.000Z",
+              questions: [],
+              answers: {},
+              grades: {},
+              chat: {},
+              source: {
+                fileId: "file-lecture123",
+                transcript: "",
+                materialId: "m1",
+                materialName: "Lecture.pdf",
+              },
+            },
+          ],
+          lastPracticedAt: "2026-08-05T10:00:00.000Z",
+        }}
+        onBack={vi.fn()}
+        onPractice={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate personalized review sheet" }));
+    await screen.findByText("Lecture Review");
+    fireEvent.click(screen.getByRole("button", { name: "Share review link" }));
+
+    expect(await screen.findByLabelText("Review share link")).toHaveValue(
+      "http://localhost:3000/review/review-123",
+    );
+    expect(screen.getByText("Expires in 7 days")).toBeInTheDocument();
   });
 });

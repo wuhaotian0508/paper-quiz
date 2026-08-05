@@ -49,7 +49,7 @@ describe("Home", () => {
     const feedback = screen.getByRole("link", { name: "Feedback" });
     expect(feedback).toHaveAttribute(
       "href",
-      expect.stringContaining("mailto:haotianwu123@berkeley.edu"),
+      "https://docs.google.com/forms/d/e/1FAIpQLSdgqSIBtVjXqOVEsb586N1_vdIAcYz-ce-54pfxERikOGudRQ/viewform",
     );
     expect(screen.getByText("Sign-in unavailable").closest(".app-sidebar")).not.toBeNull();
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();

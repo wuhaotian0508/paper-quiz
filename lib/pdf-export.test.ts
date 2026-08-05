@@ -138,6 +138,8 @@ describe("quiz PDF export contract", () => {
           formulaOrProcedure: "Retrieve, rank, generate.",
           commonConfusion: "Retrieval supplements the model; it does not retrain it.",
           sourceNote: "Lecture 1, pipeline",
+          relatedMistakeIds: ["mistake-1"],
+          mistakeFocus: "Review the retrieval sequence.",
         },
       ],
     };
@@ -147,6 +149,7 @@ describe("quiz PDF export contract", () => {
     expect(content).toContain("PAPER QUIZ AI / EXAM REVIEW");
     expect(content).toContain("Key ideas: Retrieve context before generation.");
     expect(content).toContain("Common confusion: Retrieval supplements the model");
+    expect(content).toContain("Your focus: Review the retrieval sequence.");
     expect(content).toContain("Source: Lecture 1, pipeline");
   });
 

@@ -32,9 +32,9 @@ it("renders a standalone sign-in form without workspace navigation", () => {
   expect(screen.queryByRole("link", { name: "Dashboard" })).not.toBeInTheDocument();
 });
 
-it("sends a magic link to the entered email", async () => {
+it("sends a magic link back to the shared artifact", async () => {
   const client = createClient();
-  render(<LoginView client={client} />);
+  render(<LoginView client={client} returnTo="/review/review-123" />);
 
   fireEvent.change(screen.getByLabelText("Email"), {
     target: { value: "student@example.com" },
@@ -44,7 +44,9 @@ it("sends a magic link to the entered email", async () => {
   await waitFor(() =>
     expect(client.auth.signInWithOtp).toHaveBeenCalledWith({
       email: "student@example.com",
-      options: { emailRedirectTo: "http://localhost:3000/auth/callback" },
+      options: {
+        emailRedirectTo: "http://localhost:3000/auth/callback?returnTo=%2Freview%2Freview-123",
+      },
     }),
   );
   expect(screen.getByRole("status")).toHaveTextContent(/check your inbox/i);
@@ -52,14 +54,14 @@ it("sends a magic link to the entered email", async () => {
 
 it("starts Google OAuth from the dedicated login page", async () => {
   const client = createClient();
-  render(<LoginView client={client} />);
+  render(<LoginView client={client} returnTo="/challenge/share-123" />);
 
   fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
 
   await waitFor(() =>
     expect(client.auth.signInWithOAuth).toHaveBeenCalledWith({
       provider: "google",
-      options: { redirectTo: "http://localhost:3000/auth/callback" },
+      options: { redirectTo: "http://localhost:3000/auth/callback?returnTo=%2Fchallenge%2Fshare-123" },
     }),
   );
 });

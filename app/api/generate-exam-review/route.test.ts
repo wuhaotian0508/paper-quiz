@@ -36,4 +36,16 @@ describe("POST /api/generate-exam-review", () => {
       error: "The server has not been configured with an OpenAI API key.",
     });
   });
+
+  it("rejects malformed learner mistake context before calling OpenAI", async () => {
+    process.env.OPENAI_API_KEY = "test-key";
+    const form = new FormData();
+    form.set("fileIds", JSON.stringify(["file-lecture123"]));
+    form.set("mistakes", "not-json");
+
+    const response = await POST(requestWith(form));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Review mistakes are invalid." });
+  });
 });

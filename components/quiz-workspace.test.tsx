@@ -55,7 +55,7 @@ describe("QuizWorkspace", () => {
     render(<QuizWorkspace />);
 
     expect(
-      await screen.findByRole("heading", { name: "Small steps, clear answers." }),
+      await screen.findByRole("heading", { name: "How can PaperQuiz help?" }),
     ).toBeInTheDocument();
   });
 
