@@ -9,12 +9,24 @@ type LoginViewProps = {
   unavailableReason?: string;
   authError?: boolean;
   returnTo?: string;
+  onAuthenticated?: (destination: string) => void;
 };
 
-export function LoginView({ client, unavailableReason, authError = false, returnTo = "" }: LoginViewProps) {
+type LoginMethod = "password" | "magic-link";
+
+export function LoginView({
+  client,
+  unavailableReason,
+  authError = false,
+  returnTo = "",
+  onAuthenticated,
+}: LoginViewProps) {
   const [authClient, setAuthClient] = useState<AuthClient | null>(client ?? null);
   const [configurationError, setConfigurationError] = useState(unavailableReason ?? "");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>("password");
+  const [isSignUp, setIsSignUp] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -46,6 +58,37 @@ export function LoginView({ client, unavailableReason, authError = false, return
     });
     setIsSubmitting(false);
     setMessage(error ? error.message : "Check your inbox for a sign-in link.");
+  }
+
+  async function submitPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!authClient) return;
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setMessage("Enter your email and password.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage("");
+    const result = isSignUp
+      ? await authClient.auth.signUp({
+          email: trimmedEmail,
+          password,
+          options: { emailRedirectTo: authRedirectUrl(returnTo) },
+        })
+      : await authClient.auth.signInWithPassword({ email: trimmedEmail, password });
+    setIsSubmitting(false);
+    if (result.error) {
+      setMessage(result.error.message);
+    } else if (isSignUp) {
+      setMessage("Account created. Check your inbox if email confirmation is required.");
+    } else {
+      (onAuthenticated ?? ((destination: string) => window.location.assign(destination)))(
+        safeReturnTo(returnTo),
+      );
+    }
   }
 
   async function signInWithGoogle() {
@@ -80,7 +123,32 @@ export function LoginView({ client, unavailableReason, authError = false, return
         </div>
       ) : (
         <>
-          <form className="login-form" onSubmit={(event) => void sendMagicLink(event)}>
+          <div className="login-method-switch" role="tablist" aria-label="Sign-in method">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={loginMethod === "password"}
+              className={loginMethod === "password" ? "is-active" : ""}
+              onClick={() => setLoginMethod("password")}
+            >
+              Password
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={loginMethod === "magic-link"}
+              className={loginMethod === "magic-link" ? "is-active" : ""}
+              onClick={() => setLoginMethod("magic-link")}
+            >
+              Email link
+            </button>
+          </div>
+          <form
+            className="login-form"
+            onSubmit={(event) =>
+              void (loginMethod === "password" ? submitPassword(event) : sendMagicLink(event))
+            }
+          >
             <label htmlFor="login-email">Email</label>
             <input
               id="login-email"
@@ -91,11 +159,48 @@ export function LoginView({ client, unavailableReason, authError = false, return
               placeholder="you@example.com"
               required
             />
-            <p className="login-field-note">We&apos;ll send a secure sign-in link to your inbox.</p>
-            <button type="submit" className="login-primary-button" disabled={isSubmitting || !authClient}>
-              {isSubmitting ? "Sending..." : "Log in"}
+            {loginMethod === "password" ? (
+              <>
+                <label htmlFor="login-password">Password</label>
+                <input
+                  id="login-password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete={isSignUp ? "new-password" : "current-password"}
+                  minLength={6}
+                  required
+                />
+                <p className="login-field-note">Use at least 6 characters.</p>
+              </>
+            ) : (
+              <p className="login-field-note">
+                We&apos;ll send a secure sign-in link to your inbox.
+              </p>
+            )}
+            <button
+              type="submit"
+              className="login-primary-button"
+              disabled={isSubmitting || !authClient}
+            >
+              {isSubmitting
+                ? loginMethod === "magic-link"
+                  ? "Sending..."
+                  : "Working..."
+                : isSignUp
+                  ? "Create account"
+                  : "Log in"}
             </button>
           </form>
+          {loginMethod === "password" ? (
+            <button
+              type="button"
+              className="login-text-button"
+              onClick={() => setIsSignUp((value) => !value)}
+            >
+              {isSignUp ? "Already have an account? Log in" : "New here? Create an account"}
+            </button>
+          ) : null}
           <div className="login-divider" aria-hidden="true">
             <span>or continue with</span>
           </div>
@@ -118,7 +223,8 @@ export function LoginView({ client, unavailableReason, authError = false, return
         </>
       )}
       <p className="login-legal">
-        By logging in, you agree to our <a href="#terms">Terms of Service</a> and <a href="#privacy">Privacy Policy</a>.
+        By logging in, you agree to our <a href="#terms">Terms of Service</a> and{" "}
+        <a href="#privacy">Privacy Policy</a>.
       </p>
     </div>
   );
@@ -130,4 +236,8 @@ function authRedirectUrl(returnTo: string) {
     callback.searchParams.set("returnTo", returnTo);
   }
   return callback.toString();
+}
+
+function safeReturnTo(returnTo: string) {
+  return returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/";
 }

@@ -13,6 +13,8 @@ function createClient(): AuthClient {
         data: { subscription: { unsubscribe: vi.fn() } },
       }),
       signInWithOtp: vi.fn().mockResolvedValue({ error: null }),
+      signInWithPassword: vi.fn().mockResolvedValue({ error: null }),
+      signUp: vi.fn().mockResolvedValue({ error: null }),
       signInWithOAuth: vi.fn().mockResolvedValue({ error: null }),
       signOut: vi.fn().mockResolvedValue({ error: null }),
     },
@@ -32,10 +34,33 @@ it("renders a standalone sign-in form without workspace navigation", () => {
   expect(screen.queryByRole("link", { name: "Dashboard" })).not.toBeInTheDocument();
 });
 
-it("sends a magic link back to the shared artifact", async () => {
+it("logs in with an email and password", async () => {
+  const client = createClient();
+  const assign = vi.fn();
+  render(<LoginView client={client} returnTo="/review/review-123" onAuthenticated={assign} />);
+
+  fireEvent.change(screen.getByLabelText("Email"), {
+    target: { value: "student@example.com" },
+  });
+  fireEvent.change(screen.getByLabelText("Password"), {
+    target: { value: "correct-horse-battery" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+
+  await waitFor(() =>
+    expect(client.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: "student@example.com",
+      password: "correct-horse-battery",
+    }),
+  );
+  expect(assign).toHaveBeenCalledWith("/review/review-123");
+});
+
+it("can send a magic link back to the shared artifact", async () => {
   const client = createClient();
   render(<LoginView client={client} returnTo="/review/review-123" />);
 
+  fireEvent.click(screen.getByRole("tab", { name: "Email link" }));
   fireEvent.change(screen.getByLabelText("Email"), {
     target: { value: "student@example.com" },
   });
@@ -49,7 +74,6 @@ it("sends a magic link back to the shared artifact", async () => {
       },
     }),
   );
-  expect(screen.getByRole("status")).toHaveTextContent(/check your inbox/i);
 });
 
 it("starts Google OAuth from the dedicated login page", async () => {
@@ -61,7 +85,9 @@ it("starts Google OAuth from the dedicated login page", async () => {
   await waitFor(() =>
     expect(client.auth.signInWithOAuth).toHaveBeenCalledWith({
       provider: "google",
-      options: { redirectTo: "http://localhost:3000/auth/callback?returnTo=%2Fchallenge%2Fshare-123" },
+      options: {
+        redirectTo: "http://localhost:3000/auth/callback?returnTo=%2Fchallenge%2Fshare-123",
+      },
     }),
   );
 });

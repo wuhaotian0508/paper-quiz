@@ -50,7 +50,18 @@ export async function POST(request: Request) {
 
     return Response.json(reply);
   } catch (cause) {
-    console.error("Product help failed", cause instanceof Error ? cause.message : "unknown error");
+    if (cause instanceof OpenAI.APIError) {
+      console.error("Product help provider failed", {
+        status: cause.status,
+        code: cause.code,
+        type: cause.type,
+      });
+    } else {
+      console.error(
+        "Product help failed",
+        cause instanceof Error ? cause.message : "unknown error",
+      );
+    }
     return error("Product help failed. Please try again later.", 502);
   }
 }

@@ -54,3 +54,14 @@ it("keeps the question and shows a retryable error after an API failure", async 
     screen.getByText("How do I upload a lecture?", { selector: ".product-help-message.user" }),
   ).toBeInTheDocument();
 });
+
+it("shows the server error returned by the chatbot API", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify({ error: "The help service is not configured." }), { status: 503 }),
+  );
+  render(<ProductHelpConversation />);
+
+  fireEvent.click(screen.getByRole("button", { name: "How do I upload a lecture?" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("The help service is not configured.");
+});

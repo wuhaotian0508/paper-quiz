@@ -12,6 +12,8 @@ function createClient(): AuthClient {
         data: { subscription: { unsubscribe: vi.fn() } },
       }),
       signInWithOtp: vi.fn().mockResolvedValue({ error: null }),
+      signInWithPassword: vi.fn().mockResolvedValue({ error: null }),
+      signUp: vi.fn().mockResolvedValue({ error: null }),
       signInWithOAuth: vi.fn().mockResolvedValue({ error: null }),
       signOut: vi.fn().mockResolvedValue({ error: null }),
     },
@@ -23,11 +25,34 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("sends a Magic Link to the entered email", async () => {
+it("logs in with an email and password", async () => {
   const client = createClient();
   render(<AuthMenu client={client} />);
 
   fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  fireEvent.change(screen.getByLabelText("Email address"), {
+    target: { value: "student@example.com" },
+  });
+  fireEvent.change(screen.getByLabelText("Password"), {
+    target: { value: "correct-horse-battery" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+
+  await waitFor(() =>
+    expect(client.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: "student@example.com",
+      password: "correct-horse-battery",
+    }),
+  );
+  expect(screen.getByText("Logged in successfully.")).toBeInTheDocument();
+});
+
+it("keeps Magic Link as an alternate sign-in method", async () => {
+  const client = createClient();
+  render(<AuthMenu client={client} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Email link" }));
   fireEvent.change(screen.getByLabelText("Email address"), {
     target: { value: "student@example.com" },
   });

@@ -205,6 +205,42 @@ button {
   display: grid;
   gap: 7px;
 }
+.auth-method-switch,
+.login-method-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--paper);
+}
+.auth-method-switch button,
+.login-method-switch button {
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 8px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+.auth-method-switch button.is-active,
+.login-method-switch button.is-active {
+  color: var(--ink);
+  background: var(--white);
+  box-shadow: 0 1px 4px rgba(38, 48, 65, 0.1);
+}
+.auth-text-button,
+.login-text-button {
+  border: 0;
+  padding: 0;
+  color: var(--coral-deep);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
 .auth-panel label {
   font-weight: 700;
 }
@@ -1678,6 +1714,13 @@ h1 {
   display: grid;
   gap: 10px;
   margin-top: 38px;
+}
+.login-method-switch {
+  margin-top: 28px;
+}
+.login-text-button {
+  display: block;
+  margin: 12px auto 0;
 }
 
 .login-form label {

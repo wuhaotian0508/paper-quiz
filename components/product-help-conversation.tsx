@@ -55,21 +55,31 @@ export function ProductHelpConversation() {
     setInput("");
     setError("");
     setSending(true);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 30_000);
     try {
       const response = await fetch("/api/product-help", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ message, history, currentView: currentView() }),
+        signal: controller.signal,
       });
-      const payload = (await response.json()) as HelpResponse;
+      const payload = (await response.json().catch(() => ({}))) as HelpResponse;
       if (!response.ok || !payload.reply) throw new Error(payload.error || "Product help failed.");
       setMessages((items) => [
         ...items,
         { role: "assistant", text: payload.reply!, needsFeedback: Boolean(payload.needsFeedback) },
       ]);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Product help failed. Please try again.");
+      setError(
+        cause instanceof DOMException && cause.name === "AbortError"
+          ? "The help chatbot took too long to respond. Please try again."
+          : cause instanceof Error
+            ? cause.message
+            : "Product help failed. Please try again.",
+      );
     } finally {
+      window.clearTimeout(timeout);
       setSending(false);
     }
   };

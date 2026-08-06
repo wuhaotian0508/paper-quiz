@@ -16,6 +16,12 @@ export type AuthClient = {
       email: string;
       options: { emailRedirectTo: string };
     }) => Promise<AuthResult>;
+    signInWithPassword: (options: { email: string; password: string }) => Promise<AuthResult>;
+    signUp: (options: {
+      email: string;
+      password: string;
+      options: { emailRedirectTo: string };
+    }) => Promise<AuthResult>;
     signInWithOAuth: (options: {
       provider: "google";
       options: { redirectTo: string };
@@ -49,6 +55,9 @@ export function AuthMenu({
   const [authClient, setAuthClient] = useState<AuthClient | null>(client ?? null);
   const [configurationError, setConfigurationError] = useState(unavailableReason ?? "");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginMethod, setLoginMethod] = useState<"password" | "magic-link">("password");
+  const [isSignUp, setIsSignUp] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -135,6 +144,35 @@ export function AuthMenu({
     if (error) setMessage(error.message);
   }
 
+  async function submitPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!authClient) return;
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setMessage("Enter your email and password.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage("");
+    const result = isSignUp
+      ? await authClient.auth.signUp({
+          email: trimmedEmail,
+          password,
+          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        })
+      : await authClient.auth.signInWithPassword({ email: trimmedEmail, password });
+    setIsSubmitting(false);
+    setMessage(
+      result.error
+        ? result.error.message
+        : isSignUp
+          ? "Account created. Check your inbox if email confirmation is required."
+          : "Logged in successfully.",
+    );
+  }
+
   async function signOut() {
     if (!authClient) return;
 
@@ -197,7 +235,31 @@ export function AuthMenu({
         <div className="auth-panel">
           <strong>Keep your study progress</strong>
           <p>Sign in to sync your practice history and mistake book across devices.</p>
-          <form onSubmit={(event) => void sendMagicLink(event)}>
+          <div className="auth-method-switch" role="tablist" aria-label="Sign-in method">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={loginMethod === "password"}
+              className={loginMethod === "password" ? "is-active" : ""}
+              onClick={() => setLoginMethod("password")}
+            >
+              Password
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={loginMethod === "magic-link"}
+              className={loginMethod === "magic-link" ? "is-active" : ""}
+              onClick={() => setLoginMethod("magic-link")}
+            >
+              Email link
+            </button>
+          </div>
+          <form
+            onSubmit={(event) =>
+              void (loginMethod === "password" ? submitPassword(event) : sendMagicLink(event))
+            }
+          >
             <label htmlFor="auth-email">Email address</label>
             <input
               id="auth-email"
@@ -207,10 +269,45 @@ export function AuthMenu({
               autoComplete="email"
               required
             />
-            <button type="submit" className="primary-button" disabled={isSubmitting || !authClient}>
-              Email me a sign-in link
-            </button>
+            {loginMethod === "password" ? (
+              <>
+                <label htmlFor="auth-password">Password</label>
+                <input
+                  id="auth-password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete={isSignUp ? "new-password" : "current-password"}
+                  minLength={6}
+                  required
+                />
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={isSubmitting || !authClient}
+                >
+                  {isSubmitting ? "Working..." : isSignUp ? "Create account" : "Log in"}
+                </button>
+              </>
+            ) : (
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={isSubmitting || !authClient}
+              >
+                {isSubmitting ? "Sending..." : "Email me a sign-in link"}
+              </button>
+            )}
           </form>
+          {loginMethod === "password" ? (
+            <button
+              type="button"
+              className="auth-text-button"
+              onClick={() => setIsSignUp((value) => !value)}
+            >
+              {isSignUp ? "Already have an account? Log in" : "New here? Create an account"}
+            </button>
+          ) : null}
           <div className="auth-divider">or</div>
           <button
             type="button"
