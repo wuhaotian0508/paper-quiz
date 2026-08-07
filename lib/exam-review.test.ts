@@ -68,6 +68,44 @@ describe("ExamReviewSheetSchema", () => {
     expect(buildExamReviewInstructions()).toContain("nextSteps");
   });
 
+  it("asks every section to cite a page, so slide previews have something to match", () => {
+    // The two-column redesign moved topics to sections but left the preview lookup reading
+    // topic source notes, which silently removed every slide from the sheet and its links.
+    expect(buildExamReviewInstructions()).toContain("Give every section its own sourceNote");
+    expect(buildExamReviewInstructions()).toContain("It must contain a page number.");
+  });
+
+  it("carries a section page citation through output normalization", () => {
+    const sections = ["keyConcepts", "importantDetails", "examples", "questions"].map(
+      (kind, index) => ({
+        kind,
+        heading: `Heading ${index + 1}`,
+        items: [{ label: "", body: "A grounded point." }],
+        sourceNote: `Page ${index + 1}`,
+      }),
+    );
+
+    const parsed = parseExamReviewOutput(JSON.stringify({ title: "Review", sections }));
+    expect(parsed.sections?.map((section) => section.sourceNote)).toEqual([
+      "Page 1",
+      "Page 2",
+      "Page 3",
+      "Page 4",
+    ]);
+  });
+
+  it("still loads a section saved before per-section page citations existed", () => {
+    const sections = ["keyConcepts", "importantDetails", "examples", "questions"].map((kind) => ({
+      kind,
+      heading: kind,
+      items: [{ label: "", body: "A grounded point." }],
+    }));
+
+    expect(
+      ExamReviewSheetSchema.parse({ title: "Review", sections }).sections?.[0].sourceNote,
+    ).toBe(undefined);
+  });
+
   it("accepts a JSON response wrapped in a Markdown code fence", () => {
     const topics = Array.from({ length: 4 }, (_, index) => ({
       topic: `Topic ${index + 1}`,

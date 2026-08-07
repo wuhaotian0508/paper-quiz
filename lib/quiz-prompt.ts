@@ -28,5 +28,9 @@ export function buildQuizInstructions(settings: {
     `Write every user-visible field in ${language}, including title, summary, examHeader, prompt, option text, per-option explanation, explanation, and sourceNote, even if the study material is in another language.`,
     "Return JSON only, without a Markdown code fence. The top-level value must be an object containing title, summary, examHeader, and questions.",
     "Every item needs id, type, prompt, points, explanation, sourceNote, and customLabel. Use customLabel only for custom questions; set it to null for every other type. Include the remaining fields appropriate for that type.",
+    // The prose instruction above is not enough on its own: the model follows this field
+    // contract, so an option shape that omits `explanation` gets quizzes with no per-option
+    // analysis, and the nullish schema accepts them silently.
+    'Each entry of a multiple-choice question\'s options array is an object with exactly three fields: id, text, and explanation. For example: {"id": "a", "text": "...", "explanation": "..."}. The explanation field is required on all four options.',
   ].join("\n");
 }

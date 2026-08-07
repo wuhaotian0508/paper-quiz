@@ -992,6 +992,15 @@ h1 {
   font-weight: 600;
   opacity: 1;
 }
+.option-analysis-pending {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  opacity: 0.6;
+}
+.option-analysis ul + .option-analysis-pending {
+  margin-top: 7px;
+}
 .option-analysis-letter {
   display: grid;
   place-items: center;
@@ -3165,6 +3174,24 @@ h1 {
   align-content: start;
   gap: 6px;
   min-width: 0;
+}
+.review-section-slide {
+  margin: 10px 0 0;
+}
+.review-section-slide .review-topic-preview {
+  display: block;
+  width: 100%;
+}
+.review-section-slide img {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--surface-soft-line);
+  border-radius: 8px;
+}
+.review-section-slide figcaption {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
 }
 .review-topic-preview {
   padding: 0;

@@ -12,10 +12,17 @@ import {
 import { readQuizResponse, type GeneratedQuiz } from "@/lib/quiz-response";
 import {
   addMistake,
+  mistakeKey,
   MISTAKE_BOOK_KEY,
   readMistakes,
   type MistakeBookEntry,
 } from "@/lib/mistake-book";
+import {
+  applyOptionExplanations,
+  needsOptionExplanations,
+  withOptionExplanations,
+  type OptionExplanations,
+} from "@/lib/option-explanations";
 import {
   buildMemoryContext,
   captureMemory,
@@ -124,6 +131,8 @@ export function QuizWorkspace() {
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatting, setChatting] = useState(false);
+  /** Question id whose per-option analysis is being backfilled, so the card can say so. */
+  const [analysingOptionsFor, setAnalysingOptionsFor] = useState("");
   const [storageReady, setStorageReady] = useState(false);
   /** Local only for now: not synced to Supabase until the injection proves itself. */
   const [memories, setMemories] = useState<LearnerMemoryEntry[]>([]);
@@ -172,10 +181,7 @@ export function QuizWorkspace() {
     [library, mistakes, sessions],
   );
   /** Today's review papers, one per course. Empty until something the student missed comes due. */
-  const dailyPapers = useMemo(
-    () => buildDailyReviewPapers(mistakes, library),
-    [library, mistakes],
-  );
+  const dailyPapers = useMemo(() => buildDailyReviewPapers(mistakes, library), [library, mistakes]);
   const hydrateStudyState = useCallback(
     ({
       sessions: mergedSessions,
@@ -239,11 +245,55 @@ export function QuizWorkspace() {
     if (graduated.length) requestMistakeDeletion(graduated);
   };
 
+  /**
+   * Fills in per-option analysis for a question that has none.
+   *
+   * Every question saved before per-option analysis existed — the whole of an established
+   * mistake book — renders an empty analysis block, so the explanation is fetched the first
+   * time such a question is answered and written back to both the live quiz and the mistake
+   * book entry. Failure is deliberately silent: the block simply stays empty, which is the
+   * behaviour these questions had anyway.
+   */
+  const backfillOptionAnalysis = async (question: Question) => {
+    if (!needsOptionExplanations(question)) return;
+    setAnalysingOptionsFor(question.id);
+    try {
+      const form = new FormData();
+      form.set("question", JSON.stringify(question));
+      attachSource(form);
+      const response = await postForm("/api/explain-options", form, {
+        timeoutMessage: t("error.optionAnalysisTimeout"),
+      });
+      const data = (await response.json()) as OptionExplanations & { error?: string };
+      if (!response.ok) throw new Error(data.error || t("error.optionAnalysisFailed"));
+
+      setQuiz((old) => (old ? applyOptionExplanations(old, question.id, data) : old));
+      // Keyed on content, not `question.id`: a mistake-book review renumbers questions to the
+      // entry id, while a normal quiz numbers from q1, and only `mistakeKey` matches both.
+      const entryId = mistakeKey(question);
+      setMistakes((old) => {
+        const next = old.map((entry) =>
+          entry.id === entryId
+            ? { ...entry, question: withOptionExplanations(entry.question, data) }
+            : entry,
+        );
+        if (next.some((entry, at) => entry !== old[at]))
+          safeStorageSet(MISTAKE_BOOK_KEY, JSON.stringify(next));
+        return next;
+      });
+    } catch {
+      // Nothing to report: the analysis block is supplementary to the grade already shown.
+    } finally {
+      setAnalysingOptionsFor("");
+    }
+  };
+
   const recordGrade = (question: Question, userAnswer: string, grade: GradeResult) => {
     setAnswers((old) => ({ ...old, [question.id]: userAnswer }));
     setGrades((old) => ({ ...old, [question.id]: grade }));
     saveMistake(question, userAnswer, grade);
     setSubmitted(true);
+    void backfillOptionAnalysis(question);
   };
 
   const acceptFiles = (next?: FileList | File[]) => {
@@ -705,6 +755,7 @@ export function QuizWorkspace() {
         onBack={() => setView("library")}
         onPractice={practiceMistakes}
         onOpenSession={openSession}
+        canShare={Boolean(user)}
       />
     );
   }
@@ -742,6 +793,7 @@ export function QuizWorkspace() {
         chatting={chatting}
         mistakeCount={mistakes.length}
         hasSourceMaterial={sourceAvailable}
+        analysingOptions={analysingOptionsFor === current.id}
         onAnswerChange={setAnswer}
         onChatInputChange={setChatInput}
         onAsk={() => void ask()}

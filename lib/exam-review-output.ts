@@ -147,6 +147,9 @@ function normalizeSection(value: unknown) {
     kind: record.kind,
     heading: textValue(firstValue(record, ["heading", "title", "name"]), String(record.kind ?? "")),
     items: items.length ? items : [{ label: "", body: "Review this section in the source." }],
+    // Rebuilding the section drops anything not named here, so the page citation the slide
+    // preview depends on has to be carried across explicitly.
+    sourceNote: textValue(firstValue(record, ["sourceNote", "source_note", "source", "page"]), ""),
   };
 }
 

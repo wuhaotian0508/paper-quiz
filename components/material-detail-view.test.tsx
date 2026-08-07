@@ -5,11 +5,25 @@ import { MaterialDetailView } from "./material-detail-view";
 const getSupabaseBrowserClient = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/supabase/browser", () => ({ getSupabaseBrowserClient }));
 
+// jsdom has no IndexedDB, so rendered slides are supplied per test.
+type StoredSlide = { materialId: string; pageNumber: number; imageUrl: string };
+const readSourcePageImages = vi.hoisted(() =>
+  vi.fn<(materialId: string) => Promise<StoredSlide[]>>(() => Promise.resolve([])),
+);
+vi.mock("@/lib/source-pages", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/source-pages")>()),
+  readSourcePageImages,
+  readSourcePdf: () => Promise.resolve(null),
+  readSourcePdfTranscript: () => Promise.resolve(""),
+}));
+
 describe("MaterialDetailView", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
     getSupabaseBrowserClient.mockReset();
+    readSourcePageImages.mockReset();
+    readSourcePageImages.mockResolvedValue([]);
   });
 
   it("uses a dedicated two-column layout for question cards", () => {
@@ -89,7 +103,9 @@ describe("MaterialDetailView", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "Practice sets from this PDF" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Practice sets from this PDF" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open Lecture quiz 1" })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Generate knowledge-point review sheet" }),
@@ -123,8 +139,12 @@ describe("MaterialDetailView", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Build your AI Review Sheet" })).toBeInTheDocument();
-    expect(screen.getByText("Key concepts, common confusions, and targeted recall from this PDF.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Generate knowledge-point review sheet" })).toBeInTheDocument();
+    expect(
+      screen.getByText("Key concepts, common confusions, and targeted recall from this PDF."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Generate knowledge-point review sheet" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open this PDF's mistakes" })).toBeInTheDocument();
   });
 
@@ -427,7 +447,11 @@ describe("MaterialDetailView", () => {
     await screen.findByText("Lecture Review");
     const form = fetchMock.mock.calls[0][1].body as FormData;
     expect(JSON.parse(String(form.get("mistakes")))).toEqual([
-      expect.objectContaining({ id: "mistake-1", answer: "training", referenceAnswer: "generation" }),
+      expect.objectContaining({
+        id: "mistake-1",
+        answer: "training",
+        referenceAnswer: "generation",
+      }),
     ]);
     expect(screen.queryByText("Your missed question")).not.toBeInTheDocument();
     expect(screen.getByText("Retrieve before generating.")).toBeInTheDocument();
@@ -495,5 +519,158 @@ describe("MaterialDetailView", () => {
       "http://localhost:3000/review/review-123",
     );
     expect(screen.getByText("Expires in 7 days")).toBeInTheDocument();
+  });
+
+  it("shows the source slide beside each section of a two-column review sheet", async () => {
+    const sections = ["keyConcepts", "importantDetails", "examples", "questions"].map(
+      (kind, index) => ({
+        kind,
+        heading: `Heading ${index + 1}`,
+        items: [{ label: "", body: "A grounded point." }],
+        sourceNote: `Page ${index + 1}`,
+      }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ title: "Lecture Review", sections }), {
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    readSourcePageImages.mockResolvedValue([
+      { materialId: "m1", pageNumber: 1, imageUrl: "data:image/jpeg;base64,p1" },
+      { materialId: "m1", pageNumber: 2, imageUrl: "data:image/jpeg;base64,p2" },
+    ]);
+    render(
+      <MaterialDetailView
+        material={{
+          id: "m1",
+          name: "Lecture.pdf",
+          questions: [
+            {
+              id: "q1",
+              type: "fill_blank",
+              prompt: "Evidence comes from ___.",
+              acceptedAnswers: ["sources"],
+              referenceAnswer: "sources",
+              explanation: "The PDF grounds the answer.",
+              sourceNote: "Page 1",
+            },
+          ],
+          mistakes: [],
+          sessions: [],
+          lastPracticedAt: "",
+        }}
+        onBack={vi.fn()}
+        onPractice={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate knowledge-point review sheet" }));
+    await screen.findByText("Lecture Review");
+
+    // Slides used to hang off `topics`, which the section layout always sets to null. Without
+    // a per-section lookup the whole sheet renders with no previews at all.
+    expect(await screen.findByAltText("Source slide, page 2, for Heading 2")).toBeInTheDocument();
+  });
+
+  describe("practice share link", () => {
+    const material = {
+      id: "m1",
+      name: "Lecture.pdf",
+      questions: [
+        {
+          id: "q1",
+          type: "multiple_choice" as const,
+          prompt: "Which document is required?",
+          options: [
+            { id: "a" as const, text: "Passport", explanation: "The guide names it." },
+            { id: "b" as const, text: "Visa", explanation: "Needed for entry, not here." },
+            { id: "c" as const, text: "Form", explanation: "Not mentioned." },
+            { id: "d" as const, text: "None", explanation: "One document is required." },
+          ],
+          correctOptionId: "a" as const,
+          explanation: "The guide says passport.",
+          sourceNote: "Page 10",
+        },
+      ],
+      mistakes: [],
+      sessions: [],
+      lastPracticedAt: "",
+    };
+
+    it("shares saved questions without first generating a review sheet", async () => {
+      const rpc = vi.fn().mockResolvedValue({ data: { slug: "practice-abc" }, error: null });
+      getSupabaseBrowserClient.mockReturnValue({ rpc });
+      render(<MaterialDetailView material={material} onBack={vi.fn()} onPractice={vi.fn()} />);
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Share a practice link for Lecture.pdf" }),
+      );
+
+      expect(await screen.findByLabelText("Practice share link")).toHaveValue(
+        "http://localhost:3000/challenge/practice-abc",
+      );
+      expect(screen.getByText("Expires in 7 days")).toBeInTheDocument();
+    });
+
+    it("keeps the answer key out of the shared questions", async () => {
+      const rpc = vi.fn().mockResolvedValue({ data: { slug: "practice-abc" }, error: null });
+      getSupabaseBrowserClient.mockReturnValue({ rpc });
+      render(<MaterialDetailView material={material} onBack={vi.fn()} onPractice={vi.fn()} />);
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Share a practice link for Lecture.pdf" }),
+      );
+      await screen.findByLabelText("Practice share link");
+
+      // Per-option explanations would hand over the answer to anyone opening the link.
+      const [, parameters] = rpc.mock.calls[0];
+      expect(JSON.stringify(parameters.p_public_quiz)).not.toContain("The guide names it.");
+      expect(parameters.p_public_quiz.questions[0].options).toEqual([
+        { id: "a", text: "Passport" },
+        { id: "b", text: "Visa" },
+        { id: "c", text: "Form" },
+        { id: "d", text: "None" },
+      ]);
+      expect(parameters.p_answer_key.questions[0].correctOptionId).toBe("a");
+    });
+
+    it("asks an anonymous visitor to sign in rather than failing in Supabase", () => {
+      const rpc = vi.fn();
+      getSupabaseBrowserClient.mockReturnValue({ rpc });
+      render(
+        <MaterialDetailView
+          material={material}
+          onBack={vi.fn()}
+          onPractice={vi.fn()}
+          canShare={false}
+        />,
+      );
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Share a practice link for Lecture.pdf" }),
+      );
+
+      expect(
+        screen.getByText("Sign in with Google or email before creating a share link."),
+      ).toBeInTheDocument();
+      expect(rpc).not.toHaveBeenCalled();
+    });
+
+    it("cannot share a material that has no saved questions", () => {
+      render(
+        <MaterialDetailView
+          material={{ ...material, questions: [] }}
+          onBack={vi.fn()}
+          onPractice={vi.fn()}
+        />,
+      );
+
+      expect(
+        screen.getByRole("button", { name: "Share a practice link for Lecture.pdf" }),
+      ).toBeDisabled();
+    });
   });
 });

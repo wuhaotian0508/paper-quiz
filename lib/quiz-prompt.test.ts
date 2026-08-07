@@ -20,4 +20,16 @@ describe("buildQuizInstructions", () => {
     expect(instructions).toContain("Give every multiple-choice option its own explanation");
     expect(instructions).toContain("Fill in examHeader with courseTitle");
   });
+
+  it("spells out the option object shape so per-option analysis is not dropped", () => {
+    const instructions = buildQuizInstructions({
+      questions: [{ type: "multiple_choice", count: 5 }],
+      difficulty: "mixed",
+    });
+
+    // Asking for it in prose was not enough on its own: the field contract is what the
+    // model follows, and an option shape without `explanation` parses fine but renders blank.
+    expect(instructions).toContain('{"id": "a", "text": "...", "explanation": "..."}');
+    expect(instructions).toContain("required on all four options");
+  });
 });

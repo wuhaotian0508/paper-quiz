@@ -32,6 +32,7 @@ export function QuizView({
   chatting,
   mistakeCount,
   hasSourceMaterial,
+  analysingOptions,
   onAnswerChange,
   onChatInputChange,
   onAsk,
@@ -53,6 +54,8 @@ export function QuizView({
   chatting: boolean;
   mistakeCount: number;
   hasSourceMaterial: boolean;
+  /** A backfill is in flight for a question saved before per-option analysis existed. */
+  analysingOptions?: boolean;
   onAnswerChange: (value: string) => void;
   onChatInputChange: (value: string) => void;
   onAsk: () => void;
@@ -156,7 +159,7 @@ export function QuizView({
                 <strong>{t("quiz.referenceAnswer")}</strong> {current.referenceAnswer}
               </p>
             )}
-            <OptionAnalysis question={current} />
+            <OptionAnalysis question={current} loading={analysingOptions} />
             <span className="source-note">
               {t("quiz.sourceLabel", { note: current.sourceNote })}
             </span>

@@ -88,6 +88,8 @@ export const en = {
     "Upload the same study file again before grading this written question.",
   "error.gradeTimeout": "Grading ran past the 60 second limit. Please try again.",
   "error.gradeFailed": "Answer grading failed.",
+  "error.optionAnalysisTimeout": "Option analysis ran past the 60 second limit.",
+  "error.optionAnalysisFailed": "Option analysis failed.",
   "error.tutorTimeout": "The tutor ran past the 60 second limit. Please try a shorter question.",
   "error.tutorFailed": "Tutor chat failed.",
   "share.signInFirst": "Sign in with Google or email before creating a share link.",
@@ -132,6 +134,7 @@ export const en = {
   "quiz.viewResults": "View results",
   "quiz.nextQuestion": "Next question",
   "quiz.optionAnalysis": "Why each option is right or wrong",
+  "quiz.optionAnalysisLoading": "Working out why each option is right or wrong...",
 
   // Exported exam paper
   "exam.section.multipleChoice": "Multiple Choice",
@@ -158,6 +161,9 @@ export const en = {
   "review.subject": "Subject",
   "review.scope": "Scope",
   "review.goal": "Goal",
+  "review.pageLabel": "Page {page}",
+  "review.slideAlt": "Source slide, page {page}, for {heading}",
+  "review.enlargeSlideAria": "Enlarge source slide, page {page}, for {heading}",
 
   // Results
   "results.eyebrow": "Practice complete",
@@ -221,6 +227,18 @@ export const en = {
   "material.summaryJoin": "{questions} and {mistakes} across {sets}.",
   "material.continueLatest": "Continue latest practice",
   "material.exportAll": "Export all questions",
+  "material.sharePracticeLink": "Share practice link",
+  "material.sharePracticeLinkAria": "Share a practice link for {name}",
+  "material.creatingPracticeLink": "Creating link...",
+  "material.creatingPracticeLinkStatus": "Creating a 7-day practice link...",
+  "material.practiceLinkCopied": "Practice link copied. It expires in 7 days.",
+  "material.practiceLinkFailed": "Practice link could not be created. Please try again.",
+  "material.practiceCopyManually": "Select the practice link and copy it manually.",
+  "material.practiceSharingAria": "Practice sharing",
+  "material.practiceShareLink": "Practice share link",
+  "material.practiceSharePrivacy":
+    "Shares these questions, not your source PDF or your mistake history.",
+  "material.shareSignInFirst": "Sign in with Google or email before creating a share link.",
   "material.expiredSource":
     "The original PDF source has expired, so this review will use the saved questions from this PDF plus its mistakes.",
   "material.attachPdf": "Attach original PDF",
@@ -336,7 +354,6 @@ export const en = {
   "daily.behind": "{count} overdue",
   "daily.start": "Start review",
 
-
   // Personal review sheet
   "reviewSheet.eyebrow": "Personal review sheet",
   "reviewSheet.heading": "Study what you have not mastered yet.",
@@ -349,7 +366,15 @@ export const en = {
   "reviewSheet.empty":
     "Complete a quiz and save a missed question to build your first review sheet.",
   "reviewSheet.back": "Back to mistake book",
-
+  "reviewSheet.slideForAria": "Source slide for {prompt}",
+  "reviewSheet.enlargeSlideAria": "Enlarge source slide, page {page}",
+  "reviewSheet.slideAlt": "Source slide, page {page}",
+  "reviewSheet.pageLabel": "Page {page}",
+  "reviewSheet.slideUnavailable": "Slide unavailable",
+  "reviewSheet.slidePreviewAria": "Source slide page {page} preview",
+  "reviewSheet.slideSource": "Slide source",
+  "reviewSheet.closePreviewAria": "Close slide preview",
+  "reviewSheet.enlargedSlideAlt": "Enlarged source slide, page {page}",
 
   // Materials
   "materials.eyebrow": "Study materials",

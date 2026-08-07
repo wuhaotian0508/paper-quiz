@@ -33,6 +33,12 @@ export const ExamReviewSectionSchema = z.object({
   kind: z.enum(REVIEW_SECTION_KINDS),
   heading: z.string().trim().min(1).max(60),
   items: z.array(ExamReviewItemSchema).min(1).max(8),
+  /**
+   * Which pages this section came from, so it can show the slide beside it. Nullish because
+   * sheets saved between the two-column redesign and this field have none — those render
+   * without slides rather than failing to load.
+   */
+  sourceNote: z.string().trim().max(300).nullish(),
 });
 
 export const ExamReviewTopicSchema = z.object({
@@ -102,6 +108,9 @@ export function buildExamReviewInstructions(locale: Locale = DEFAULT_LOCALE) {
     "The sheet is printed as numbered sections. Produce one section for each of these kinds, in this order, and use the kind value verbatim:",
     "keyConcepts (the definitions and principles that everything else rests on), importantDetails (the specifics that get marked: classifications, conditions, step-by-step procedures), examples (worked examples or practice problems with their key steps), questions (open questions a learner should still resolve, written as questions), takeaways (a short summary of what matters most), formulas (formulas and constants, with what each one is for), mistakes (specific errors learners make on this material), connections (how these ideas link to neighbouring topics), nextSteps (concrete revision actions).",
     "Each section needs a heading written for the reader and 1 to 8 items. Give an item a short label when it names a term, an example, or a formula, and leave label as an empty string otherwise. Keep each body to one or two sentences so it fits a narrow column.",
+    // Without this the sheet has no page reference to hang a slide preview on, which is how
+    // the previews were lost when the flat topic list became two-column sections.
+    'Give every section its own sourceNote naming the page it draws on, written as "Page N" (for example "Page 4" or "Pages 4-5"). It must contain a page number.',
     "Fill in subject, scope, and goal for the sheet banner, and sourceNote with the pages or sections the material came from.",
     "Set topics to null; it exists only for sheets saved before this layout.",
     "The supplied PDF or transcript is the sole factual authority. Learner mistakes only determine which source-grounded points deserve emphasis, and belong in the mistakes section.",

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { loadSharedReview, type SharedReviewClient } from "@/lib/shared-review-client";
 import { useLocale } from "@/hooks/use-locale";
 import { ExamReviewSectionSchema } from "@/lib/exam-review";
+import { extractPageNumber } from "@/lib/source-pages";
 import { ReviewSheetSections } from "@/components/review-sheet-sections";
 
 const ReviewSchema = z.object({
@@ -66,6 +67,15 @@ export function SharedReviewView({ slug, client }: { slug: string; client?: Shar
     };
   }, [client, slug, t]);
 
+  // Built before the early return so the hook order stays stable across loading and loaded.
+  const slideForSourceNote = useMemo(() => {
+    const byPage = new Map((review?.sourcePages ?? []).map((page) => [page.pageNumber, page]));
+    return (sourceNote: string) => {
+      const pageNumber = extractPageNumber(sourceNote);
+      return pageNumber ? byPage.get(pageNumber) : undefined;
+    };
+  }, [review]);
+
   if (!review)
     return (
       <main className="shared-challenge-page">
@@ -111,7 +121,7 @@ export function SharedReviewView({ slug, client }: { slug: string; client?: Shar
         </section>
       ) : null}
       <div id="review-topics">
-        <ReviewSheetSections sheet={review} />
+        <ReviewSheetSections sheet={review} slideFor={slideForSourceNote} />
       </div>
       <div className="review-sheet-list">
         {review.topics.map((topic, index) => (

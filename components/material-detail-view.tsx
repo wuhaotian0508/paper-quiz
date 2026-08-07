@@ -13,6 +13,8 @@ import { postForm } from "@/lib/api-client";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { createSharedReview } from "@/lib/shared-review-client";
 import { getSharedReviewUrl } from "@/lib/shared-review";
+import { createSharedChallenge } from "@/lib/shared-challenge-client";
+import { getChallengeShareUrl } from "@/lib/shared-challenge";
 import { getSavedExamReview, saveExamReview } from "@/lib/saved-exam-review";
 import {
   dedupeSourcePages,
@@ -32,11 +34,14 @@ export function MaterialDetailView({
   onBack,
   onPractice,
   onOpenSession,
+  canShare = true,
 }: {
   material: StudyMaterial;
   onBack: () => void;
   onPractice: (entries: MistakeBookEntry[]) => void;
   onOpenSession?: (session: StudySession) => void;
+  /** Sharing writes through Supabase, so an anonymous visitor is told to sign in first. */
+  canShare?: boolean;
 }) {
   const { locale, t } = useLocale();
   const [tab, setTab] = useState<"questions" | "mistakes">("questions");
@@ -48,6 +53,9 @@ export function MaterialDetailView({
   const [reviewShareLoading, setReviewShareLoading] = useState(false);
   const [reviewShareStatus, setReviewShareStatus] = useState("");
   const [reviewShareUrl, setReviewShareUrl] = useState("");
+  const [practiceShareLoading, setPracticeShareLoading] = useState(false);
+  const [practiceShareStatus, setPracticeShareStatus] = useState("");
+  const [practiceShareUrl, setPracticeShareUrl] = useState("");
   const [sourcePages, setSourcePages] = useState<SourcePageImage[]>([]);
   const [previewPage, setPreviewPage] = useState<SourcePageImage | null>(null);
   const [attachedSourceFile, setAttachedSourceFile] = useState<File | null>(null);
@@ -213,10 +221,54 @@ export function MaterialDetailView({
     }
   };
 
+  /**
+   * Shares every saved question from this PDF as a challenge, without waiting for a review
+   * sheet to be generated first. `buildSharedChallenge` splits the answer key out of the
+   * public quiz, so the link hands over the questions but not the answers — which now
+   * matters more, since each option carries its own explanation.
+   */
+  const sharePracticeSet = async () => {
+    if (!material.questions.length || practiceShareLoading) return;
+    if (!canShare) {
+      setPracticeShareStatus(t("material.shareSignInFirst"));
+      return;
+    }
+    setPracticeShareLoading(true);
+    setPracticeShareStatus(t("material.creatingPracticeLinkStatus"));
+    try {
+      const created = await createSharedChallenge(getSupabaseBrowserClient(), asQuiz, {
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+      const url = getChallengeShareUrl(window.location.origin, created.slug);
+      setPracticeShareUrl(url);
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
+      setPracticeShareStatus(t("material.practiceLinkCopied"));
+    } catch (cause) {
+      setPracticeShareStatus(
+        cause instanceof Error ? cause.message : t("material.practiceLinkFailed"),
+      );
+    } finally {
+      setPracticeShareLoading(false);
+    }
+  };
+
+  const copyPracticeShare = async () => {
+    if (!practiceShareUrl) return;
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(practiceShareUrl);
+      setPracticeShareStatus(t("material.practiceLinkCopied"));
+    } else {
+      setPracticeShareStatus(t("material.practiceCopyManually"));
+    }
+  };
+
   const reviewSourcePages = useMemo(() => {
     if (!examReview) return [];
     const pageNumbers = new Set(
       [
+        // Sections replaced topics in the two-column redesign. Collecting only topic notes is
+        // what silently emptied this list, taking the previews and the shared slides with it.
+        ...(examReview.sections ?? []).map((section) => section.sourceNote || ""),
         ...(examReview.topics ?? []).map((topic) => topic.sourceNote),
         ...(examReview.sourceNote ? [examReview.sourceNote] : []),
       ]
@@ -225,6 +277,14 @@ export function MaterialDetailView({
     );
     return dedupeSourcePages(sourcePages.filter((page) => pageNumbers.has(page.pageNumber)));
   }, [examReview, sourcePages]);
+
+  const slideForSourceNote = useMemo(() => {
+    const byPage = new Map(sourcePages.map((page) => [page.pageNumber, page]));
+    return (sourceNote: string) => {
+      const pageNumber = extractPageNumber(sourceNote);
+      return pageNumber ? byPage.get(pageNumber) : undefined;
+    };
+  }, [sourcePages]);
 
   const attachOriginalPdf = (file: File | undefined) => {
     if (!file) return;
@@ -286,8 +346,42 @@ export function MaterialDetailView({
           >
             {t("material.exportAll")}
           </button>
+          <button
+            aria-label={t("material.sharePracticeLinkAria", { name: material.name })}
+            className="text-button framed-button"
+            disabled={!material.questions.length || practiceShareLoading}
+            onClick={() => void sharePracticeSet()}
+          >
+            {practiceShareLoading
+              ? t("material.creatingPracticeLink")
+              : t("material.sharePracticeLink")}
+          </button>
         </div>
       </header>
+      {practiceShareUrl ? (
+        <div className="share-link-panel" aria-label={t("material.practiceSharingAria")}>
+          <label htmlFor="practice-share-link">{t("material.practiceShareLink")}</label>
+          <input
+            id="practice-share-link"
+            aria-label={t("material.practiceShareLink")}
+            readOnly
+            value={practiceShareUrl}
+          />
+          <button className="text-button" onClick={() => void copyPracticeShare()}>
+            {t("material.copyLink")}
+          </button>
+          <a className="text-button" href={practiceShareUrl} target="_blank" rel="noreferrer">
+            {t("material.openLink")}
+          </a>
+          <small>{t("material.expiresIn7Days")}</small>
+          <small>{t("material.practiceSharePrivacy")}</small>
+        </div>
+      ) : null}
+      {practiceShareStatus ? (
+        <p className="share-status" role="status">
+          {practiceShareStatus}
+        </p>
+      ) : null}
       {!reviewSource && hasReviewContext ? (
         <div className="material-review-source-note">
           <p>{t("material.expiredSource")}</p>
@@ -435,7 +529,11 @@ export function MaterialDetailView({
               {reviewShareStatus}
             </p>
           ) : null}
-          <ReviewSheetSections sheet={examReview} />
+          <ReviewSheetSections
+            sheet={examReview}
+            slideFor={slideForSourceNote}
+            onPreviewSlide={(slide) => setPreviewPage({ ...slide, materialId: material.id })}
+          />
           <div className="review-sheet-list">
             {(examReview.topics ?? []).map((topic, index) => {
               const pageNumber = extractPageNumber(topic.sourceNote);

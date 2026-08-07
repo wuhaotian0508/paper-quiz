@@ -83,6 +83,8 @@ export const zh: Messages = {
   "error.reuploadForGrading": "批改这道主观题前，请重新上传同一份学习文件。",
   "error.gradeTimeout": "批改超过了 60 秒上限。请重试。",
   "error.gradeFailed": "答案批改失败。",
+  "error.optionAnalysisTimeout": "选项解析超过了 60 秒上限。",
+  "error.optionAnalysisFailed": "选项解析失败。",
   "error.tutorTimeout": "辅导回复超过了 60 秒上限。请把问题问得更简短一些。",
   "error.tutorFailed": "辅导对话失败。",
   "share.signInFirst": "创建分享链接前，请先用 Google 或邮箱登录。",
@@ -125,6 +127,7 @@ export const zh: Messages = {
   "quiz.viewResults": "查看结果",
   "quiz.nextQuestion": "下一题",
   "quiz.optionAnalysis": "每个选项为什么对／为什么错",
+  "quiz.optionAnalysisLoading": "正在分析每个选项为什么对／为什么错……",
 
   // 导出的试卷
   "exam.section.multipleChoice": "选择题",
@@ -151,6 +154,9 @@ export const zh: Messages = {
   "review.subject": "科目",
   "review.scope": "范围",
   "review.goal": "目标",
+  "review.pageLabel": "第 {page} 页",
+  "review.slideAlt": "《{heading}》对应的原文第 {page} 页",
+  "review.enlargeSlideAria": "放大《{heading}》对应的第 {page} 页",
 
   // 结果页
   "results.eyebrow": "练习完成",
@@ -213,6 +219,17 @@ export const zh: Messages = {
   "material.summaryJoin": "共 {questions}、{mistakes}，分布在 {sets} 中。",
   "material.continueLatest": "继续最近的练习",
   "material.exportAll": "导出全部题目",
+  "material.sharePracticeLink": "分享练习链接",
+  "material.sharePracticeLinkAria": "分享《{name}》的练习链接",
+  "material.creatingPracticeLink": "正在生成链接……",
+  "material.creatingPracticeLinkStatus": "正在生成 7 天有效的练习链接……",
+  "material.practiceLinkCopied": "练习链接已复制，7 天后失效。",
+  "material.practiceLinkFailed": "练习链接生成失败，请重试。",
+  "material.practiceCopyManually": "请选中练习链接并手动复制。",
+  "material.practiceSharingAria": "练习分享",
+  "material.practiceShareLink": "练习分享链接",
+  "material.practiceSharePrivacy": "只分享这些题目，不包含你的原始 PDF 和错题记录。",
+  "material.shareSignInFirst": "请先用 Google 或邮箱登录，再创建分享链接。",
   "material.expiredSource":
     "原始 PDF 已过期，本次复习提纲将使用这份 PDF 已保存的题目和错题来生成。",
   "material.attachPdf": "附上原始 PDF",
@@ -323,7 +340,6 @@ export const zh: Messages = {
   "daily.behind": "{count} 题已逾期",
   "daily.start": "开始复习",
 
-
   // 个人复习提纲
   "reviewSheet.eyebrow": "个人复习提纲",
   "reviewSheet.heading": "专攻你还没掌握的部分。",
@@ -334,7 +350,15 @@ export const zh: Messages = {
   "reviewSheet.remember": "记住：",
   "reviewSheet.empty": "完成一次测验并保存一道错题，就能生成你的第一份复习提纲。",
   "reviewSheet.back": "返回错题本",
-
+  "reviewSheet.slideForAria": "《{prompt}》对应的原文幻灯片",
+  "reviewSheet.enlargeSlideAria": "放大第 {page} 页幻灯片",
+  "reviewSheet.slideAlt": "原文幻灯片第 {page} 页",
+  "reviewSheet.pageLabel": "第 {page} 页",
+  "reviewSheet.slideUnavailable": "暂无幻灯片",
+  "reviewSheet.slidePreviewAria": "第 {page} 页幻灯片预览",
+  "reviewSheet.slideSource": "幻灯片来源",
+  "reviewSheet.closePreviewAria": "关闭幻灯片预览",
+  "reviewSheet.enlargedSlideAlt": "放大的原文幻灯片第 {page} 页",
 
   // 学习资料列表
   "materials.eyebrow": "学习资料",
