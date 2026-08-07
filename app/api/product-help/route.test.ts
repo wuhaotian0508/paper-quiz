@@ -21,6 +21,10 @@ function request(body: unknown) {
   });
 }
 
+async function* textResponse(text: string) {
+  yield { type: "response.output_text.delta", delta: text };
+}
+
 afterEach(() => {
   process.env.OPENAI_API_KEY = originalKey;
   create.mockReset();
@@ -28,14 +32,16 @@ afterEach(() => {
 
 it("returns API guidance for a valid product question", async () => {
   process.env.OPENAI_API_KEY = "test-key";
-  create.mockResolvedValue({
-    output_text: JSON.stringify({ reply: "1. Click History.", needsFeedback: false }),
-  });
+  create.mockResolvedValue(
+    textResponse(JSON.stringify({ reply: "1. Click History.", needsFeedback: false })),
+  );
 
   const response = await POST(request({ message: "Where is my past work?" }));
 
   expect(await response.json()).toEqual({ reply: "1. Click History.", needsFeedback: false });
-  expect(create).toHaveBeenCalledWith(expect.objectContaining({ model: expect.any(String) }));
+  expect(create).toHaveBeenCalledWith(
+    expect.objectContaining({ model: expect.any(String), stream: true }),
+  );
 });
 
 it("rejects study material fields without calling OpenAI", async () => {

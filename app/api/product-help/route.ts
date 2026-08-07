@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
-import { getOpenAIClientOptions } from "@/lib/openai-config";
+import { getOpenAIClientOptions, getOpenAIModel } from "@/lib/openai-config";
+import { collectResponse } from "@/lib/openai-stream";
 import {
   buildProductHelpInstructions,
   parseProductHelpReply,
@@ -9,7 +10,6 @@ import {
 } from "@/lib/product-help";
 
 export const maxDuration = 60;
-const PRODUCT_HELP_MODEL = "gpt-4o-mini";
 
 function error(message: string, status: number) {
   return Response.json({ error: message }, { status });
@@ -30,7 +30,8 @@ export async function POST(request: Request) {
     if (!options) return error("The server has not been configured with an OpenAI API key.", 503);
 
     const response = await new OpenAI(options).responses.create({
-      model: PRODUCT_HELP_MODEL,
+      model: getOpenAIModel(),
+      stream: true,
       max_output_tokens: 700,
       input: [
         { role: "developer", content: buildProductHelpInstructions() },
@@ -45,7 +46,11 @@ export async function POST(request: Request) {
       ],
       text: { format: zodTextFormat(ProductHelpReplySchema, "product_help_reply") },
     });
-    const reply = parseProductHelpReply(response.output_text);
+    const { text, stoppedEarlyBecause } = await collectResponse(response);
+    if (stoppedEarlyBecause || !text)
+      return error("The help chatbot did not return a usable answer. Please try again.", 502);
+
+    const reply = parseProductHelpReply(text);
     if (!reply)
       return error("The help chatbot did not return a usable answer. Please try again.", 502);
 
