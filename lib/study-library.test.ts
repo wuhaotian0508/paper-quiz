@@ -14,11 +14,12 @@ import {
   upsertStudyLibrary,
   type StudyLibraryRecord,
 } from "./study-library";
+import { normalizeMaterialId } from "./study-history";
 
 const now = new Date("2026-08-06T10:00:00.000Z");
 
 const record = (overrides: Partial<StudyLibraryRecord> = {}): StudyLibraryRecord => ({
-  id: "lecture.pdf::100",
+  id: "lecture.pdf",
   name: "lecture.pdf",
   uploadedAt: "2026-08-04T10:00:00.000Z",
   lastOpenedAt: "",
@@ -30,7 +31,7 @@ const record = (overrides: Partial<StudyLibraryRecord> = {}): StudyLibraryRecord
 describe("study library", () => {
   it("keeps an uploaded PDF in the library before it has a quiz session", () => {
     const uploaded = record({
-      id: "Business Model Canvas.pdf::1200",
+      id: "Business Model Canvas.pdf",
       name: "Business Model Canvas.pdf",
     });
 
@@ -47,7 +48,7 @@ describe("study library", () => {
   });
 
   it("guesses the course from the file name when a material is first seen", () => {
-    const created = createLibraryRecord({ id: "x::1", name: "UGBA 117 Lecture 4.pdf" }, now);
+    const created = createLibraryRecord({ id: "x", name: "UGBA 117 Lecture 4.pdf" }, now);
 
     expect(created.subject).toBe("UGBA 117");
     expect(created.updatedAt).toBe(now.toISOString());
@@ -62,9 +63,9 @@ describe("study library", () => {
   });
 
   it("lets a student unassign a subject, and does not re-guess it on the next load", () => {
-    const guessed = createLibraryRecord({ id: "x::1", name: "UGBA 117 Lecture 4.pdf" }, now);
+    const guessed = createLibraryRecord({ id: "x", name: "UGBA 117 Lecture 4.pdf" }, now);
 
-    const cleared = setLibrarySubject([guessed], "x::1", "", now);
+    const cleared = setLibrarySubject([guessed], "x", "", now);
     const reloaded = readStudyLibrary(JSON.stringify(cleared));
 
     expect(reloaded[0].subject).toBe("");
@@ -73,7 +74,7 @@ describe("study library", () => {
   it("backfills subjects for a library saved before subjects existed", () => {
     const legacy = JSON.stringify([
       {
-        id: "UGBA 117 Lecture 4.pdf::900",
+        id: "UGBA 117 Lecture 4.pdf",
         name: "UGBA 117 Lecture 4.pdf",
         uploadedAt: "2026-07-01T10:00:00.000Z",
         lastOpenedAt: "2026-07-02T10:00:00.000Z",
@@ -88,10 +89,10 @@ describe("study library", () => {
 
   it("lists the courses in use for the subject picker", () => {
     const records = [
-      record({ id: "a::1", subject: "MATH 1A" }),
-      record({ id: "b::1", subject: "" }),
-      record({ id: "c::1", subject: "CS 61A" }),
-      record({ id: "d::1", subject: "MATH 1A" }),
+      record({ id: "a", subject: "MATH 1A" }),
+      record({ id: "b", subject: "" }),
+      record({ id: "c", subject: "CS 61A" }),
+      record({ id: "d", subject: "MATH 1A" }),
     ];
 
     expect(listSubjects(records)).toEqual(["CS 61A", "MATH 1A"]);
@@ -201,5 +202,59 @@ describe("hand-created courses", () => {
       { subject: "UGBA 117", items: ["a"] },
       { subject: "", items: ["b"] },
     ]);
+  });
+});
+
+describe("one PDF name, one material", () => {
+  it("collapses the copies one PDF got, one per byte size it was saved at", () => {
+    const stored = JSON.stringify([
+      {
+        id: "Topic 1.pdf::900",
+        name: "Topic 1.pdf",
+        uploadedAt: "2026-07-01T10:00:00.000Z",
+        lastOpenedAt: "2026-08-05T10:00:00.000Z",
+        subject: "",
+        updatedAt: "2026-08-05T10:00:00.000Z",
+      },
+      {
+        id: "Topic 1.pdf::1200",
+        name: "Topic 1.pdf",
+        uploadedAt: "2026-06-01T10:00:00.000Z",
+        lastOpenedAt: "2026-08-01T10:00:00.000Z",
+        subject: "UGBA 117",
+        updatedAt: "2026-08-01T10:00:00.000Z",
+      },
+    ]);
+
+    const merged = readStudyLibrary(stored);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0].id).toBe("Topic 1.pdf");
+    // The copy filed under a course is rarely the one opened last, so the subject survives.
+    expect(merged[0].subject).toBe("UGBA 117");
+    expect(merged[0].lastOpenedAt).toBe("2026-08-05T10:00:00.000Z");
+    expect(merged[0].uploadedAt).toBe("2026-06-01T10:00:00.000Z");
+  });
+
+  it("keeps two genuinely different PDFs apart", () => {
+    const stored = JSON.stringify(
+      ["Topic 1.pdf::900", "Topic 6.pdf::900"].map((id) => ({
+        id,
+        name: id.split("::")[0],
+        uploadedAt: "2026-07-01T10:00:00.000Z",
+        lastOpenedAt: "",
+        subject: "",
+        updatedAt: "2026-07-01T10:00:00.000Z",
+      })),
+    );
+
+    expect(readStudyLibrary(stored).map((item) => item.id)).toEqual(["Topic 1.pdf", "Topic 6.pdf"]);
+  });
+
+  it("leaves a name that merely contains digits alone", () => {
+    expect(normalizeMaterialId("Lecture 2026.pdf")).toBe("Lecture 2026.pdf");
+    expect(normalizeMaterialId("Topic 1.pdf::900")).toBe("Topic 1.pdf");
+    expect(normalizeMaterialId("Topic 1.pdf")).toBe("Topic 1.pdf");
+    expect(normalizeMaterialId("")).toBe("");
   });
 });

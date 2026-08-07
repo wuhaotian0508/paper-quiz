@@ -66,7 +66,7 @@ describe("DashboardNavigation", () => {
 
   it("shows uploaded PDFs in the Your Library sidebar", () => {
     storeLibrary([
-      { id: "biology.pdf::1200", name: "Biology.pdf", uploadedAt: "2026-08-05T10:00:00.000Z" },
+      { id: "biology.pdf", name: "Biology.pdf", uploadedAt: "2026-08-05T10:00:00.000Z" },
     ]);
 
     render(<DashboardNavigation />);
@@ -80,7 +80,7 @@ describe("DashboardNavigation", () => {
 
   it("opens a specific library PDF instead of the all-history view", () => {
     storeLibrary([
-      { id: "biology.pdf::1200", name: "Biology.pdf", uploadedAt: "2026-08-05T10:00:00.000Z" },
+      { id: "biology.pdf", name: "Biology.pdf", uploadedAt: "2026-08-05T10:00:00.000Z" },
     ]);
     const onOpen = vi.fn();
     window.addEventListener("paper-quiz-open-material", onOpen);
@@ -89,7 +89,7 @@ describe("DashboardNavigation", () => {
     fireEvent.click(screen.getByRole("link", { name: "Biology.pdf" }));
 
     expect(onOpen).toHaveBeenCalledTimes(1);
-    expect((onOpen.mock.calls[0][0] as CustomEvent<string>).detail).toBe("biology.pdf::1200");
+    expect((onOpen.mock.calls[0][0] as CustomEvent<string>).detail).toBe("biology.pdf");
     window.removeEventListener("paper-quiz-open-material", onOpen);
   });
 

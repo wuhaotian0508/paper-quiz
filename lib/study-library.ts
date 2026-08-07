@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeMaterialId } from "@/lib/study-history";
 import {
   compareSubjects,
   inferSubject,
@@ -109,15 +110,42 @@ export function readStudyLibrary(value: string | null): StudyLibraryRecord[] {
   try {
     const parsed: unknown = JSON.parse(value || "[]");
     if (!Array.isArray(parsed)) return [];
-    return parsed
-      .flatMap((item) => {
-        const result = LibraryRecordSchema.safeParse(item);
-        return result.success ? [migrateSubject(result.data)] : [];
-      })
-      .slice(0, MAX_LIBRARY_ITEMS);
+    const records = parsed.flatMap((item) => {
+      const result = LibraryRecordSchema.safeParse(item);
+      if (!result.success) return [];
+      const record = migrateSubject(result.data);
+      return [{ ...record, id: normalizeMaterialId(record.id) }];
+    });
+    return mergeDuplicateMaterials(records).slice(0, MAX_LIBRARY_ITEMS);
   } catch {
     return [];
   }
+}
+
+/**
+ * Collapses the several records one PDF used to get, one per byte size it was ever saved at.
+ *
+ * The most recently touched copy wins, but an assigned subject is kept from whichever copy
+ * has one: the duplicate a student happened to file under a course is usually not the
+ * duplicate they opened last, and losing that would undo their filing.
+ */
+function mergeDuplicateMaterials(records: StudyLibraryRecord[]): StudyLibraryRecord[] {
+  const byId = new Map<string, StudyLibraryRecord>();
+  for (const record of records) {
+    const existing = byId.get(record.id);
+    if (!existing) {
+      byId.set(record.id, record);
+      continue;
+    }
+    const newest = libraryDate(record) > libraryDate(existing) ? record : existing;
+    const oldest = newest === record ? existing : record;
+    byId.set(record.id, {
+      ...newest,
+      subject: newest.subject || oldest.subject,
+      uploadedAt: oldest.uploadedAt || newest.uploadedAt,
+    });
+  }
+  return [...byId.values()];
 }
 
 /**

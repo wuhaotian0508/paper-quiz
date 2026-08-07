@@ -36,8 +36,21 @@ export const EMPTY_SOURCE: PersistedSource = {
   materialName: "",
 };
 
+/**
+ * Drops the byte size that material ids used to carry.
+ *
+ * The id was `name::size`, so re-exporting a deck, or re-saving it with one slide changed,
+ * produced a second material: the sidebar showed the file twice and its quizzes, mistakes
+ * and slides were split between the two. Since the size was always a suffix on the name,
+ * old ids convert without a lookup, and this runs wherever one is read.
+ */
+export function normalizeMaterialId(id: string): string {
+  return id.replace(/::\d+$/, "");
+}
+
+/** A material is identified by its file name, so re-uploading it groups with what came before. */
 export function materialFromFile(file: File): { materialId: string; materialName: string } {
-  return { materialId: `${file.name}::${file.size}`, materialName: file.name };
+  return { materialId: file.name, materialName: file.name };
 }
 
 const readString = (value: unknown) => (typeof value === "string" ? value : "");
@@ -55,7 +68,9 @@ export function boundSource(source: Partial<PersistedSource> | null | undefined)
       ? source.fileIds.filter((id): id is string => typeof id === "string").slice(0, 5)
       : undefined,
     transcript: transcript.length <= MAX_PERSISTED_TRANSCRIPT_CHARS ? transcript : "",
-    materialId: readString(source?.materialId).slice(0, MAX_MATERIAL_NAME_CHARS + 32),
+    materialId: normalizeMaterialId(
+      readString(source?.materialId).slice(0, MAX_MATERIAL_NAME_CHARS + 32),
+    ),
     materialName: readString(source?.materialName).slice(0, MAX_MATERIAL_NAME_CHARS),
   };
 }
@@ -85,7 +100,10 @@ const SourceSchema = z.object({
   materialId: z
     .string()
     .max(MAX_MATERIAL_NAME_CHARS + 32)
-    .default(""),
+    .default("")
+    // Sessions are read through this schema rather than `boundSource`, so the same
+    // conversion has to happen here or saved quizzes stay under their old split ids.
+    .transform(normalizeMaterialId),
   materialName: z.string().max(MAX_MATERIAL_NAME_CHARS).default(""),
 });
 const SessionSchema = z.object({

@@ -1,3 +1,5 @@
+import { normalizeMaterialId } from "@/lib/study-history";
+
 export type SourcePageImage = {
   materialId: string;
   pageNumber: number;
@@ -42,7 +44,8 @@ function openDatabase(): Promise<IDBDatabase | null> {
         db.createObjectStore(PDF_STORE_NAME, { keyPath: "materialId" });
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error("Source page storage is unavailable."));
+    request.onerror = () =>
+      reject(request.error || new Error("Source page storage is unavailable."));
   });
 }
 
@@ -86,13 +89,22 @@ async function readStoredSourcePdf(materialId: string): Promise<StoredSourcePdf 
   try {
     const db = await openDatabase();
     if (!db) return null;
-    const stored = await new Promise<StoredSourcePdf | undefined>(
-      (resolve, reject) => {
-        const request = db.transaction(PDF_STORE_NAME, "readonly").objectStore(PDF_STORE_NAME).get(materialId);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      },
-    );
+    const stored = await new Promise<StoredSourcePdf | undefined>((resolve, reject) => {
+      // Scanned rather than fetched by key: pages stored before material ids dropped the
+      // byte size are still filed under `name::size`, and a keyed get would miss them,
+      // silently losing the slides for every PDF already in the library.
+      const request = db
+        .transaction(PDF_STORE_NAME, "readonly")
+        .objectStore(PDF_STORE_NAME)
+        .getAll();
+      request.onsuccess = () =>
+        resolve(
+          (request.result as (StoredSourcePdf & { materialId?: string })[]).find(
+            (item) => normalizeMaterialId(item.materialId || "") === materialId,
+          ),
+        );
+      request.onerror = () => reject(request.error);
+    });
     return stored || null;
   } catch {
     return null;
@@ -105,11 +117,16 @@ export async function readSourcePageImages(materialId: string): Promise<SourcePa
     if (!db) return [];
     return await new Promise((resolve, reject) => {
       const request = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).getAll();
-      request.onsuccess = () => resolve(
-        dedupeSourcePages(
-          (request.result as SourcePageImage[]).filter((page) => page.materialId === materialId),
-        ),
-      );
+      request.onsuccess = () =>
+        resolve(
+          dedupeSourcePages(
+            // Matched on the normalized id so slides rendered under the older `name::size`
+            // id keep resolving; `dedupeSourcePages` then collapses a page rendered twice.
+            (request.result as SourcePageImage[]).filter(
+              (page) => normalizeMaterialId(page.materialId) === materialId,
+            ),
+          ),
+        );
       request.onerror = () => reject(request.error);
     });
   } catch {
@@ -137,7 +154,10 @@ export async function renderAndStorePdfPages(file: File, materialId: string): Pr
     const db = await openDatabase();
     if (!db) return "";
     const count = Math.min(pdf.numPages, MAX_RENDERED_PAGES);
-    const perPageTextBudget = Math.max(1, Math.floor((MAX_REVIEW_TRANSCRIPT_CHARS - count * 16) / count));
+    const perPageTextBudget = Math.max(
+      1,
+      Math.floor((MAX_REVIEW_TRANSCRIPT_CHARS - count * 16) / count),
+    );
     const transcriptPages: string[] = [];
     for (let pageNumber = 1; pageNumber <= count; pageNumber += 1) {
       const page = await pdf.getPage(pageNumber);
@@ -154,7 +174,8 @@ export async function renderAndStorePdfPages(file: File, materialId: string): Pr
         .join(" ")
         .replace(/\s+/g, " ")
         .trim();
-      if (pageText) transcriptPages.push(`Page ${pageNumber}:\n${pageText.slice(0, perPageTextBudget)}`);
+      if (pageText)
+        transcriptPages.push(`Page ${pageNumber}:\n${pageText.slice(0, perPageTextBudget)}`);
       await new Promise<void>((resolve, reject) => {
         const request = db
           .transaction(STORE_NAME, "readwrite")

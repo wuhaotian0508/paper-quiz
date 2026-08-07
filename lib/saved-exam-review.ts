@@ -1,11 +1,14 @@
 import { z } from "zod";
 import { ExamReviewSheetSchema, type ExamReviewSheet } from "@/lib/exam-review";
+import { normalizeMaterialId } from "@/lib/study-history";
 
 export const SAVED_EXAM_REVIEWS_KEY = "paper-quiz-saved-exam-reviews-v1";
 const MAX_SAVED_REVIEWS = 40;
 
 const SavedExamReviewSchema = z.object({
-  materialId: z.string().trim().min(1).max(240),
+  // Normalized on read, so a review saved against the older `name::size` id still opens
+  // under the material it belongs to rather than looking lost.
+  materialId: z.string().trim().min(1).max(240).transform(normalizeMaterialId),
   review: ExamReviewSheetSchema,
   updatedAt: z.string().datetime(),
 });

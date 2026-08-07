@@ -114,7 +114,7 @@ describe("useStudySync", () => {
 
   it("takes a subject assigned on another device over the local guess", async () => {
     const localRecord = {
-      id: "lecture.pdf::100",
+      id: "lecture.pdf",
       name: "lecture.pdf",
       uploadedAt: "2026-08-01T10:00:00.000Z",
       lastOpenedAt: "",
@@ -152,7 +152,7 @@ describe("useStudySync", () => {
   it("uploads a locally assigned subject to the library table", async () => {
     vi.useFakeTimers();
     const assigned = {
-      id: "lecture.pdf::100",
+      id: "lecture.pdf",
       name: "lecture.pdf",
       uploadedAt: "2026-08-01T10:00:00.000Z",
       lastOpenedAt: "",
@@ -229,7 +229,7 @@ describe("useStudySync", () => {
       source: {
         fileId: "file-local-device",
         transcript: "Lecture transcript",
-        materialId: "lecture::42",
+        materialId: "lecture",
         materialName: "lecture.pdf",
       },
     };
@@ -239,7 +239,14 @@ describe("useStudySync", () => {
     const onHydrate = vi.fn();
     const { result, rerender } = renderHook(
       ({ mistakes }) =>
-        useStudySync({ client: client as never, ready: true, sessions: [], mistakes, library: [], onHydrate }),
+        useStudySync({
+          client: client as never,
+          ready: true,
+          sessions: [],
+          mistakes,
+          library: [],
+          onHydrate,
+        }),
       { initialProps: { mistakes: [remoteMistake] } },
     );
 
@@ -280,7 +287,7 @@ describe("useStudySync", () => {
       source: {
         fileId: "file-local-device",
         transcript: "Lecture transcript",
-        materialId: "lecture::42",
+        materialId: "lecture",
         materialName: "lecture.pdf",
       },
     };
@@ -337,7 +344,7 @@ describe("useStudySync", () => {
       source: {
         fileId: "file-local-device",
         transcript: "Lecture transcript",
-        materialId: "lecture::42",
+        materialId: "lecture",
         materialName: "lecture.pdf",
       },
     };
@@ -367,7 +374,7 @@ describe("useStudySync", () => {
       source: {
         fileId: null,
         transcript: "Lecture transcript",
-        materialId: "lecture::42",
+        materialId: "lecture",
         materialName: "lecture.pdf",
       },
     });
@@ -439,7 +446,14 @@ describe("useStudySync", () => {
     const onHydrate = vi.fn();
     const { rerender } = renderHook(
       ({ sessions }) =>
-        useStudySync({ client: client as never, ready: true, sessions, mistakes: [], library: [], onHydrate }),
+        useStudySync({
+          client: client as never,
+          ready: true,
+          sessions,
+          mistakes: [],
+          library: [],
+          onHydrate,
+        }),
       { initialProps: { sessions: [] as (typeof localSession)[] } },
     );
 
@@ -467,7 +481,14 @@ describe("useStudySync", () => {
     });
     const onHydrate = vi.fn();
     renderHook(() =>
-      useStudySync({ client: client as never, ready: true, sessions: [], mistakes: [], library: [], onHydrate }),
+      useStudySync({
+        client: client as never,
+        ready: true,
+        sessions: [],
+        mistakes: [],
+        library: [],
+        onHydrate,
+      }),
     );
 
     await waitFor(() => expect(onHydrate).toHaveBeenCalledTimes(1));
@@ -497,7 +518,7 @@ describe("useStudySync", () => {
         fileId: "file-from-another-device",
         fileIds: ["file-from-another-device", "file-homework-from-another-device"],
         transcript: "Lecture transcript",
-        materialId: "lecture::42",
+        materialId: "lecture",
         materialName: "lecture.pdf",
       },
     };
@@ -508,14 +529,21 @@ describe("useStudySync", () => {
     });
     const onHydrate = vi.fn();
     renderHook(() =>
-      useStudySync({ client: client as never, ready: true, sessions: [], mistakes: [], library: [], onHydrate }),
+      useStudySync({
+        client: client as never,
+        ready: true,
+        sessions: [],
+        mistakes: [],
+        library: [],
+        onHydrate,
+      }),
     );
 
     await waitFor(() => expect(onHydrate).toHaveBeenCalledTimes(1));
     expect(onHydrate.mock.calls[0][0].mistakes[0].source).toEqual({
       fileId: null,
       transcript: "Lecture transcript",
-      materialId: "lecture::42",
+      materialId: "lecture",
       materialName: "lecture.pdf",
     });
   });
@@ -539,6 +567,3 @@ describe("useStudySync", () => {
     expect(onHydrate).not.toHaveBeenCalled();
   });
 });
-
-
-

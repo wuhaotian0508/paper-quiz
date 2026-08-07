@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { groupStudyMaterials, mergeStudyLibraryMaterials, UNGROUPED_NAME } from "./study-material";
-import { EMPTY_SOURCE, type PersistedSource, type StudySession } from "./study-history";
+import {
+  EMPTY_SOURCE,
+  readSessions,
+  type PersistedSource,
+  type StudySession,
+} from "./study-history";
 import type { MistakeBookEntry } from "./mistake-book";
 import { questionKey, type Question } from "./quiz";
 import type { StudyLibraryRecord } from "./study-library";
@@ -167,4 +172,54 @@ describe("groupStudyMaterials", () => {
   });
 });
 
+describe("one PDF name, one material", () => {
+  const source = (materialId: string) => ({
+    fileId: null,
+    fileIds: [],
+    transcript: "",
+    materialId,
+    materialName: "Topic 1.pdf",
+  });
 
+  const session = (id: string, materialId: string, prompt: string) => ({
+    id,
+    title: `Quiz ${id}`,
+    createdAt: "2026-08-05T10:00:00.000Z",
+    questions: [
+      {
+        id: "q1",
+        type: "fill_blank" as const,
+        prompt,
+        acceptedAnswers: ["x"],
+        referenceAnswer: "x",
+        explanation: "e",
+        sourceNote: "Page 1",
+      },
+    ],
+    answers: {},
+    grades: {},
+    chat: {},
+    source: source(materialId),
+  });
+
+  it("gathers quizzes saved under a PDF's older size-suffixed ids", () => {
+    // Re-saving the deck changed its byte size, which used to split it into two materials
+    // with the quizzes divided between them.
+    const stored = JSON.stringify([
+      session("s1", "Topic 1.pdf::900", "First question"),
+      session("s2", "Topic 1.pdf::1200", "Second question"),
+      session("s3", "Topic 1.pdf", "Third question"),
+    ]);
+
+    const materials = groupStudyMaterials(readSessions(stored), []);
+
+    expect(materials).toHaveLength(1);
+    expect(materials[0].id).toBe("Topic 1.pdf");
+    expect(materials[0].sessions).toHaveLength(3);
+    expect(materials[0].questions.map((question) => question.prompt)).toEqual([
+      "First question",
+      "Second question",
+      "Third question",
+    ]);
+  });
+});
