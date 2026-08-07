@@ -55,6 +55,7 @@ export async function POST(request: Request) {
         status: cause.status,
         code: cause.code,
         type: cause.type,
+        message: cause.message,
       });
     } else {
       console.error(
