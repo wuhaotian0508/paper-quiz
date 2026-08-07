@@ -7,15 +7,21 @@ import { MISTAKE_BOOK_KEY, readMistakes } from "@/lib/mistake-book";
 import { readSessions, STUDY_HISTORY_KEY } from "@/lib/study-history";
 import { groupStudyMaterials } from "@/lib/study-material";
 import {
+  addStudySubject,
   createLibraryRecord,
   libraryDate,
+  libraryFolders,
   readStudyLibrary,
+  readStudySubjects,
   removeLibrarySubject,
+  removeStudySubject,
   renameLibrarySubject,
+  renameStudySubject,
   setLibrarySubject,
   STUDY_LIBRARY_KEY,
   STUDY_LIBRARY_UPDATED_EVENT,
   STUDY_MATERIAL_OPEN_EVENT,
+  STUDY_SUBJECTS_KEY,
   type StudyLibraryRecord,
 } from "@/lib/study-library";
 import { groupBySubject, MAX_SUBJECT_CHARS, UNASSIGNED_SUBJECT } from "@/lib/subject";
@@ -66,6 +72,9 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
   const [editingSubject, setEditingSubject] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [dragOverSubject, setDragOverSubject] = useState<string | null>(null);
+  /** Courses created by hand, including any still empty, and the new-course draft. */
+  const [subjects, setSubjects] = useState<string[]>([]);
+  const [newSubject, setNewSubject] = useState<string | null>(null);
   const { locale, setLocale, t } = useLocale();
 
   /**
@@ -75,11 +84,14 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
    */
   const folders = useMemo(
     () =>
-      groupBySubject(
-        [...library].sort((left, right) => libraryDate(right).localeCompare(libraryDate(left))),
-        (record) => record.subject,
+      libraryFolders(
+        groupBySubject(
+          [...library].sort((left, right) => libraryDate(right).localeCompare(libraryDate(left))),
+          (record) => record.subject,
+        ),
+        subjects,
       ),
-    [library],
+    [library, subjects],
   );
 
   const toggle = (set: (update: (previous: string[]) => string[]) => void, subject: string) =>
@@ -98,6 +110,17 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
     setLibrary(next);
     safeStorageSet(STUDY_LIBRARY_KEY, JSON.stringify(next));
     window.dispatchEvent(new Event(STUDY_LIBRARY_UPDATED_EVENT));
+  };
+
+  const writeSubjects = (next: string[]) => {
+    setSubjects(next);
+    safeStorageSet(STUDY_SUBJECTS_KEY, JSON.stringify(next));
+  };
+
+  const createSubject = () => {
+    const name = (newSubject ?? "").trim();
+    setNewSubject(null);
+    if (name) writeSubjects(addStudySubject(subjects, name));
   };
 
   const dropOnFolder = (subject: string, materialId: string) => {
@@ -121,14 +144,19 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
     const next = draftName.trim();
     // An emptied name would silently unassign every file in the folder, which is the delete
     // action, not the rename one. Cancel instead and leave the folder as it was.
-    if (next && next !== editingSubject)
+    if (next && next !== editingSubject) {
       writeLibrary(renameLibrarySubject(library, editingSubject, next));
+      // A folder can be created by hand, derived from its files, or both, so the created
+      // list is renamed too — otherwise an empty course reappears under its old name.
+      writeSubjects(addStudySubject(renameStudySubject(subjects, editingSubject, next), next));
+    }
     setEditingSubject(null);
     setDraftName("");
   };
 
   const deleteFolder = (subject: string) => {
     writeLibrary(removeLibrarySubject(library, subject));
+    writeSubjects(removeStudySubject(subjects, subject));
     setEditingSubject(null);
     setDraftName("");
   };
@@ -160,6 +188,7 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
       const next = [...stored, ...derived].slice(0, 50);
       if (derived.length) safeStorageSet(STUDY_LIBRARY_KEY, JSON.stringify(next));
       setLibrary(next);
+      setSubjects(readStudySubjects(window.localStorage.getItem(STUDY_SUBJECTS_KEY)));
     };
     syncLibrary();
     window.addEventListener("storage", syncLibrary);
@@ -213,10 +242,32 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
       <section className="sidebar-library" aria-labelledby="sidebar-library-heading">
         <div className="sidebar-library-heading">
           <h2 id="sidebar-library-heading">{t("nav.yourLibrary")}</h2>
-          <a href="#dashboard" aria-label={t("nav.new")}>
+          <button
+            aria-label={t("nav.newCourseAria")}
+            className="sidebar-library-new"
+            onClick={() => setNewSubject("")}
+            type="button"
+          >
             {t("nav.new")}
-          </a>
+          </button>
         </div>
+        {newSubject !== null ? (
+          <div className="sidebar-library-folder-edit">
+            <input
+              aria-label={t("nav.newCourseNameAria")}
+              autoFocus
+              maxLength={MAX_SUBJECT_CHARS}
+              onBlur={createSubject}
+              onChange={(event) => setNewSubject(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") createSubject();
+                if (event.key === "Escape") setNewSubject(null);
+              }}
+              placeholder={t("nav.newCoursePlaceholder")}
+              value={newSubject}
+            />
+          </div>
+        ) : null}
         {folders.length ? (
           <div className="sidebar-library-folders">
             {folders.map(({ subject, items }) => {

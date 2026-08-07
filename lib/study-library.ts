@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  compareSubjects,
   inferSubject,
   MAX_SUBJECT_CHARS,
   normaliseSubject,
@@ -10,6 +11,73 @@ export const STUDY_LIBRARY_KEY = "paper-plane-quiz-library-v1";
 export const STUDY_LIBRARY_UPDATED_EVENT = "paper-quiz-library-updated";
 export const STUDY_MATERIAL_OPEN_EVENT = "paper-quiz-open-material";
 const MAX_LIBRARY_ITEMS = 50;
+
+/**
+ * Courses the student created by hand, stored apart from the materials.
+ *
+ * A subject is otherwise only a field on a material, so a course with nothing filed under it
+ * yet has nowhere to live and would vanish on reload. This list is what lets an empty folder
+ * exist long enough to drag the first PDF into it.
+ */
+export const STUDY_SUBJECTS_KEY = "paper-plane-quiz-subjects-v1";
+const MAX_SUBJECTS = 40;
+
+export function readStudySubjects(value: string | null): string[] {
+  try {
+    const parsed: unknown = JSON.parse(value || "[]");
+    if (!Array.isArray(parsed)) return [];
+    const named = parsed
+      .filter((item): item is string => typeof item === "string")
+      .map(normaliseSubject)
+      .filter((subject) => subject !== UNASSIGNED_SUBJECT);
+    return [...new Set(named)].slice(0, MAX_SUBJECTS);
+  } catch {
+    return [];
+  }
+}
+
+/** Returns the same array when the course already exists, so callers can skip the write. */
+export function addStudySubject(subjects: readonly string[], name: string): string[] {
+  const subject = normaliseSubject(name);
+  if (!subject || subjects.some((item) => normaliseSubject(item) === subject))
+    return subjects as string[];
+  return [...subjects, subject].slice(0, MAX_SUBJECTS);
+}
+
+export function renameStudySubject(
+  subjects: readonly string[],
+  from: string,
+  to: string,
+): string[] {
+  const source = normaliseSubject(from);
+  const target = normaliseSubject(to);
+  if (!target || source === target) return subjects as string[];
+  const renamed = subjects.map((item) => (normaliseSubject(item) === source ? target : item));
+  // Renaming onto an existing course merges the folders, so the name must not appear twice.
+  return [...new Set(renamed)];
+}
+
+export function removeStudySubject(subjects: readonly string[], name: string): string[] {
+  const subject = normaliseSubject(name);
+  return subjects.filter((item) => normaliseSubject(item) !== subject);
+}
+
+/**
+ * Every folder the sidebar shows: the courses materials are filed under, plus the created
+ * ones still standing empty. Ordering stays with `groupBySubject` so an empty course sorts
+ * among the rest rather than being appended after them.
+ */
+export function libraryFolders<T>(
+  grouped: { subject: string; items: T[] }[],
+  subjects: readonly string[],
+): { subject: string; items: T[] }[] {
+  const seen = new Set(grouped.map((group) => normaliseSubject(group.subject)));
+  const empty = subjects
+    .map(normaliseSubject)
+    .filter((subject) => subject && !seen.has(subject))
+    .map((subject) => ({ subject, items: [] as T[] }));
+  return [...grouped, ...empty].sort((left, right) => compareSubjects(left.subject, right.subject));
+}
 
 export type StudyLibraryRecord = {
   id: string;

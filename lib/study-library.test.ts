@@ -3,7 +3,12 @@ import {
   createLibraryRecord,
   listSubjects,
   readStudyLibrary,
+  addStudySubject,
+  libraryFolders,
+  readStudySubjects,
   removeLibrarySubject,
+  removeStudySubject,
+  renameStudySubject,
   renameLibrarySubject,
   setLibrarySubject,
   upsertStudyLibrary,
@@ -147,5 +152,54 @@ describe("course folders", () => {
     expect(next).toHaveLength(2);
     expect(next[0].subject).toBe("");
     expect(next[1].subject).toBe("CS 61A");
+  });
+});
+
+describe("hand-created courses", () => {
+  it("keeps only valid, unique names", () => {
+    // Case is preserved, matching how the rest of the app groups by subject.
+    expect(
+      readStudySubjects(JSON.stringify(["UGBA 117", "  UGBA   117 ", "", 7, "CS 61A"])),
+    ).toEqual(["UGBA 117", "CS 61A"]);
+  });
+
+  it("survives storage that is not a list", () => {
+    expect(readStudySubjects("null")).toEqual([]);
+    expect(readStudySubjects("not json")).toEqual([]);
+    expect(readStudySubjects(null)).toEqual([]);
+  });
+
+  it("adds a course and ignores one that already exists", () => {
+    const subjects = addStudySubject([], "UGBA 117");
+    expect(subjects).toEqual(["UGBA 117"]);
+    // Returning the same array lets the caller skip a pointless write.
+    expect(addStudySubject(subjects, " UGBA  117 ")).toBe(subjects);
+    expect(addStudySubject(subjects, "   ")).toBe(subjects);
+  });
+
+  it("renames a course, merging when the new name is taken", () => {
+    expect(renameStudySubject(["UGBA 117", "CS 61A"], "UGBA 117", "UGBA 118")).toEqual([
+      "UGBA 118",
+      "CS 61A",
+    ]);
+    expect(renameStudySubject(["UGBA 117", "CS 61A"], "UGBA 117", "CS 61A")).toEqual(["CS 61A"]);
+  });
+
+  it("removes a course", () => {
+    expect(removeStudySubject(["UGBA 117", "CS 61A"], " UGBA  117 ")).toEqual(["CS 61A"]);
+  });
+
+  it("shows an empty course alongside the ones that have files", () => {
+    const grouped = [
+      { subject: "UGBA 117", items: ["a"] },
+      { subject: "", items: ["b"] },
+    ];
+
+    // Sorted among the rest, not appended after them, and unassigned still sorts last.
+    expect(libraryFolders(grouped, ["MATH 1A", "UGBA 117"])).toEqual([
+      { subject: "MATH 1A", items: [] },
+      { subject: "UGBA 117", items: ["a"] },
+      { subject: "", items: ["b"] },
+    ]);
   });
 });

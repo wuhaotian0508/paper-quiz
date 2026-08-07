@@ -73,7 +73,9 @@ describe("DashboardNavigation", () => {
 
     expect(screen.getByRole("heading", { name: "Your Library" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Biology.pdf" })).toHaveAttribute("href", "#library");
-    expect(screen.getByRole("link", { name: "+ New" })).toHaveAttribute("href", "#dashboard");
+    // "+ New" adds a course rather than linking to the upload page, which the Dashboard
+    // item directly above it already reaches.
+    expect(screen.getByRole("button", { name: "Add a course" })).toHaveTextContent("+ New");
   });
 
   it("opens a specific library PDF instead of the all-history view", () => {
@@ -349,5 +351,111 @@ describe("organising courses from the sidebar", () => {
     fireEvent.keyDown(screen.getByText("UGBA 117"), { key: "F2" });
 
     expect(screen.getByLabelText("Course name")).toHaveValue("UGBA 117");
+  });
+});
+
+describe("creating a course from the sidebar", () => {
+  const storedSubjects = () =>
+    JSON.parse(window.localStorage.getItem("paper-plane-quiz-subjects-v1") || "[]") as string[];
+
+  const storedLibrary = () =>
+    JSON.parse(window.localStorage.getItem("paper-plane-quiz-library-v1") || "[]") as {
+      id: string;
+      subject: string;
+    }[];
+
+  const storeCourses = (records: { id: string; name: string; subject: string }[]) =>
+    window.localStorage.setItem(
+      "paper-plane-quiz-library-v1",
+      JSON.stringify(
+        records.map((record) => ({
+          ...record,
+          uploadedAt: "2026-08-01T00:00:00.000Z",
+          lastOpenedAt: "",
+          updatedAt: "2026-08-01T00:00:00.000Z",
+        })),
+      ),
+    );
+
+  it("adds an empty course that survives a reload", () => {
+    render(<DashboardNavigation />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add a course" }));
+    const input = screen.getByLabelText("New course name");
+    fireEvent.change(input, { target: { value: "MATH 1A" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(storedSubjects()).toEqual(["MATH 1A"]);
+    // A course is otherwise only a field on a material, so an empty one needs its own store.
+    cleanup();
+    render(<DashboardNavigation />);
+    expect(screen.getByText("MATH 1A")).toBeInTheDocument();
+  });
+
+  it("abandons the new course on Escape", () => {
+    render(<DashboardNavigation />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add a course" }));
+    const input = screen.getByLabelText("New course name");
+    fireEvent.change(input, { target: { value: "MATH 1A" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(storedSubjects()).toEqual([]);
+    expect(screen.queryByText("MATH 1A")).not.toBeInTheDocument();
+  });
+
+  it("ignores an empty name", () => {
+    render(<DashboardNavigation />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add a course" }));
+    fireEvent.keyDown(screen.getByLabelText("New course name"), { key: "Enter" });
+
+    expect(storedSubjects()).toEqual([]);
+  });
+
+  it("accepts a PDF dragged into a course that is still empty", () => {
+    window.localStorage.setItem("paper-plane-quiz-subjects-v1", JSON.stringify(["MATH 1A"]));
+    storeCourses([{ id: "m1", name: "Week 1.pdf", subject: "UGBA 117" }]);
+    render(<DashboardNavigation />);
+
+    const store = new Map([["text/plain", "m1"]]);
+    const transfer = {
+      dropEffect: "",
+      getData: (format: string) => store.get(format) ?? "",
+      setData: () => undefined,
+      clearData: () => undefined,
+    };
+    const target = screen.getByText("MATH 1A").closest(".sidebar-library-folder");
+    if (!target) throw new Error("no folder");
+    fireEvent.dragOver(target, { dataTransfer: transfer });
+    fireEvent.drop(target, { dataTransfer: transfer });
+
+    expect(storedLibrary().find((item) => item.id === "m1")?.subject).toBe("MATH 1A");
+  });
+
+  it("renaming an empty course does not resurrect the old name", () => {
+    window.localStorage.setItem("paper-plane-quiz-subjects-v1", JSON.stringify(["MATH 1A"]));
+    render(<DashboardNavigation />);
+
+    fireEvent.doubleClick(screen.getByText("MATH 1A"));
+    const input = screen.getByLabelText("Course name");
+    fireEvent.change(input, { target: { value: "MATH 1B" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(storedSubjects()).toEqual(["MATH 1B"]);
+    expect(screen.queryByText("MATH 1A")).not.toBeInTheDocument();
+  });
+
+  it("deleting an empty course removes the folder", () => {
+    window.localStorage.setItem("paper-plane-quiz-subjects-v1", JSON.stringify(["MATH 1A"]));
+    render(<DashboardNavigation />);
+
+    fireEvent.doubleClick(screen.getByText("MATH 1A"));
+    fireEvent.mouseDown(
+      screen.getByLabelText("Delete the MATH 1A course and leave its files unassigned"),
+    );
+
+    expect(storedSubjects()).toEqual([]);
+    expect(screen.queryByText("MATH 1A")).not.toBeInTheDocument();
   });
 });
