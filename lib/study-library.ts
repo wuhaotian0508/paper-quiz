@@ -127,6 +127,12 @@ export function subjectsByMaterial(
   return new Map(records.map((record) => [record.id, record.subject]));
 }
 
-function libraryDate(record: StudyLibraryRecord) {
+/**
+ * When a material last mattered to the student: the moment they opened it, or failing that
+ * the upload. Exported so the sidebar orders a course's files by the same rule the store
+ * orders the whole library by, rather than growing a second, subtly different notion of
+ * "most recent".
+ */
+export function libraryDate(record: StudyLibraryRecord) {
   return record.lastOpenedAt || record.uploadedAt;
 }

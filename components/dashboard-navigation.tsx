@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AuthMenu } from "@/components/auth-menu";
 import { createFeedbackHref } from "@/lib/feedback";
 import { MISTAKE_BOOK_KEY, readMistakes } from "@/lib/mistake-book";
@@ -8,12 +8,14 @@ import { readSessions, STUDY_HISTORY_KEY } from "@/lib/study-history";
 import { groupStudyMaterials } from "@/lib/study-material";
 import {
   createLibraryRecord,
+  libraryDate,
   readStudyLibrary,
   STUDY_LIBRARY_KEY,
   STUDY_LIBRARY_UPDATED_EVENT,
   STUDY_MATERIAL_OPEN_EVENT,
   type StudyLibraryRecord,
 } from "@/lib/study-library";
+import { groupBySubject } from "@/lib/subject";
 import { safeStorageSet } from "@/lib/request-validation";
 import { useLocale } from "@/hooks/use-locale";
 import { localeLabels, nextLocale, type MessageKey } from "@/lib/i18n";
@@ -32,6 +34,13 @@ const navigationItems = [
 
 type NavigationId = (typeof navigationItems)[number]["id"];
 
+/**
+ * How many of a course's files the sidebar lists before it offers to show the rest. Four
+ * keeps a folder glanceable — the sidebar is a "jump back in" list, and the Library page is
+ * where a student goes to see everything.
+ */
+const FILES_PER_FOLDER = 4;
+
 const navigationIds = new Set<NavigationId>(navigationItems.map((item) => item.id));
 const themeStorageKey = "paper-quiz-theme";
 
@@ -46,7 +55,32 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
   const [activeId, setActiveId] = useState<NavigationId>("dashboard");
   const [theme, setTheme] = useState<Theme | null>(null);
   const [library, setLibrary] = useState<StudyLibraryRecord[]>([]);
+  // Both are lists of subjects, and both are the exception rather than the rule: folders open
+  // and capped is the default, so an empty list on first load is the right starting state.
+  const [collapsedFolders, setCollapsedFolders] = useState<string[]>([]);
+  const [uncappedFolders, setUncappedFolders] = useState<string[]>([]);
   const { locale, setLocale, t } = useLocale();
+
+  /**
+   * The sidebar mirrors the Library page's courses, so a student sees the same folders in
+   * both places. Files are sorted before grouping, which leaves each folder in
+   * most-recent-first order.
+   */
+  const folders = useMemo(
+    () =>
+      groupBySubject(
+        [...library].sort((left, right) => libraryDate(right).localeCompare(libraryDate(left))),
+        (record) => record.subject,
+      ),
+    [library],
+  );
+
+  const toggle = (set: (update: (previous: string[]) => string[]) => void, subject: string) =>
+    set((previous) =>
+      previous.includes(subject)
+        ? previous.filter((name) => name !== subject)
+        : [...previous, subject],
+    );
 
   useEffect(() => {
     const syncWithLocation = () => setActiveId(selectedNavigationId(window.location.hash));
@@ -132,27 +166,66 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
             {t("nav.new")}
           </a>
         </div>
-        {library.length ? (
-          <div className="sidebar-library-list">
-            {library.slice(0, 4).map((item) => (
-              <a
-                href="#library"
-                key={item.id}
-                onClick={(event) => {
-                  event.preventDefault();
-                  window.dispatchEvent(new CustomEvent(STUDY_MATERIAL_OPEN_EVENT, { detail: item.id }));
-                }}
-                title={t("nav.openLibrary", { name: item.name })}
-              >
-                <span aria-hidden="true">PDF</span>
-                <strong>{item.name}</strong>
-              </a>
-            ))}
-            {library.length > 4 ? (
-              <a className="sidebar-library-view-all" href="#library">
-                {t("nav.viewAll")}
-              </a>
-            ) : null}
+        {folders.length ? (
+          <div className="sidebar-library-folders">
+            {folders.map(({ subject, items }) => {
+              const collapsed = collapsedFolders.includes(subject);
+              const uncapped = uncappedFolders.includes(subject);
+              const name = subject || t("library.unassigned");
+              return (
+                <div className="sidebar-library-folder" key={subject || "unassigned"}>
+                  <h3 className="sidebar-library-folder-name">
+                    <button
+                      aria-expanded={!collapsed}
+                      className="sidebar-library-folder-toggle"
+                      onClick={() => toggle(setCollapsedFolders, subject)}
+                      type="button"
+                    >
+                      <span aria-hidden="true" className="sidebar-library-folder-caret" />
+                      <span aria-hidden="true" className="sidebar-library-folder-icon" />
+                      <span className="sidebar-library-folder-label">{name}</span>
+                    </button>
+                  </h3>
+                  {/*
+                    A collapsed folder drops its files from the tree rather than hiding them
+                    with CSS, so they leave the tab order and the screen reader's list too.
+                    Whether it was uncapped is remembered, and comes back on re-opening.
+                  */}
+                  {collapsed ? null : (
+                    <>
+                      <div className="sidebar-library-list">
+                        {(uncapped ? items : items.slice(0, FILES_PER_FOLDER)).map((item) => (
+                          <a
+                            href="#library"
+                            key={item.id}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              window.dispatchEvent(
+                                new CustomEvent(STUDY_MATERIAL_OPEN_EVENT, { detail: item.id }),
+                              );
+                            }}
+                            title={t("nav.openLibrary", { name: item.name })}
+                          >
+                            <strong>{item.name}</strong>
+                          </a>
+                        ))}
+                      </div>
+                      {items.length > FILES_PER_FOLDER ? (
+                        <button
+                          // The visible label repeats in every folder, so the course names the target.
+                          aria-label={t(uncapped ? "nav.showLessAria" : "nav.showMoreAria", { name })}
+                          className="sidebar-library-more"
+                          onClick={() => toggle(setUncappedFolders, subject)}
+                          type="button"
+                        >
+                          {uncapped ? t("nav.showLess") : t("nav.showMore")}
+                        </button>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <p className="sidebar-library-empty">{t("nav.libraryEmpty")}</p>

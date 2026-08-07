@@ -3406,54 +3406,129 @@ h1 {
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-.sidebar-library-heading a,
-.sidebar-library-view-all {
+.sidebar-library-heading a {
   color: var(--coral-deep);
   font-size: 11px;
   font-weight: 800;
   text-decoration: none;
 }
-.sidebar-library-heading a:hover,
-.sidebar-library-view-all:hover {
+.sidebar-library-heading a:hover {
   text-decoration: underline;
+}
+.sidebar-library-folders {
+  display: grid;
+  gap: 14px;
+}
+.sidebar-library-folder {
+  display: grid;
+  gap: 2px;
+}
+.sidebar-library-folder-name {
+  margin: 0;
+}
+.sidebar-library-folder-toggle {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+.sidebar-library-folder-toggle:hover {
+  background: rgba(255, 231, 164, 0.35);
+}
+.sidebar-library-folder-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Drawn from two borders for the same reason as the folder: no icon font ships with the app. */
+.sidebar-library-folder-caret {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  margin-left: 1px;
+  border-right: 1px solid var(--muted);
+  border-bottom: 1px solid var(--muted);
+  /* Points down when the folder is open; the collapsed rule below turns it to the right. */
+  transform: translateY(-1px) rotate(45deg);
+}
+.sidebar-library-folder-toggle[aria-expanded="false"] .sidebar-library-folder-caret {
+  transform: translateX(-1px) rotate(-45deg);
+}
+/**
+ * Drawn rather than set in a glyph: no font this ships with carries a folder character that
+ * renders the same in both languages, and the app uses no icon library.
+ */
+.sidebar-library-folder-icon {
+  position: relative;
+  width: 13px;
+  height: 10px;
+  flex: 0 0 auto;
+  /* 1px, not 1.5: a half pixel blurs the outline on the 1x displays most laptops run. */
+  border: 1px solid var(--muted);
+  border-radius: 0 3px 3px 3px;
+}
+.sidebar-library-folder-icon::before {
+  position: absolute;
+  top: -4px;
+  left: -1px;
+  width: 5px;
+  height: 3px;
+  border: 1px solid var(--muted);
+  border-bottom: 0;
+  border-radius: 2px 2px 0 0;
+  content: "";
 }
 .sidebar-library-list {
   display: grid;
-  gap: 3px;
+  gap: 1px;
+  /* Lines the file names up with the folder's name: caret + gap + icon + gap. */
+  padding-left: 26px;
 }
-.sidebar-library-list > a:not(.sidebar-library-view-all) {
+.sidebar-library-list > a {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 8px;
-  padding: 7px 6px;
+  padding: 6px 6px;
   border-radius: 9px;
   color: var(--ink);
   text-decoration: none;
 }
-.sidebar-library-list > a:not(.sidebar-library-view-all):hover {
+.sidebar-library-list > a:hover {
   background: rgba(255, 231, 164, 0.35);
-}
-.sidebar-library-list > a > span {
-  display: grid;
-  width: 23px;
-  height: 23px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 6px;
-  color: var(--coral-deep);
-  background: var(--paper-deep);
-  font-size: 8px;
-  font-weight: 800;
 }
 .sidebar-library-list strong {
   overflow: hidden;
   font-size: 11px;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sidebar-library-view-all {
-  padding: 4px 6px 0;
+.sidebar-library-more {
+  justify-self: start;
+  margin-left: 26px;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  text-align: left;
+}
+.sidebar-library-more:hover {
+  color: var(--ink);
+  background: rgba(255, 231, 164, 0.35);
 }
 .sidebar-library-empty {
   margin: 0;
