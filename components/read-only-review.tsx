@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { downloadReviewPdf } from "@/lib/pdf-export";
 import type { StudySession } from "@/lib/study-history";
+import { useLocale } from "@/hooks/use-locale";
 
 export function ReadOnlyReview({ session, onBack }: { session: StudySession; onBack: () => void }) {
+  const { t } = useLocale();
   const [index, setIndex] = useState(0);
   const question = session.questions[index];
   const grade = session.grades[question.id];
@@ -17,17 +19,19 @@ export function ReadOnlyReview({ session, onBack }: { session: StudySession; onB
     <section className="quiz-shell">
       <div className="workspace-toolbar">
         <button className="text-button" onClick={() => downloadReviewPdf(session)}>
-          Export graded review PDF
+          {t("readOnly.exportPdf")}
         </button>
       </div>
       <div className="quiz-topline">
-        <span className="eyebrow">Read-only review - {session.title}</span>
+        <span className="eyebrow">{t("readOnly.title", { title: session.title })}</span>
         <span className="quiz-count">
           {index + 1} / {session.questions.length}
         </span>
       </div>
       <div className="question-card review-card">
-        <div className="question-kicker">QUESTION {String(index + 1).padStart(2, "0")}</div>
+        <div className="question-kicker">
+          {t("readOnly.questionKicker")} {String(index + 1).padStart(2, "0")}
+        </div>
         <h1>{question.prompt}</h1>
         {question.type === "multiple_choice" ? (
           <div className="option-list">
@@ -38,44 +42,50 @@ export function ReadOnlyReview({ session, onBack }: { session: StudySession; onB
               >
                 <span className="option-letter">{option.id.toUpperCase()}</span>
                 <span>{option.text}</span>
-                {selected === option.id && <span className="option-status">Your answer</span>}
+                {selected === option.id && (
+                  <span className="option-status">{t("readOnly.yourAnswerOption")}</span>
+                )}
               </div>
             ))}
           </div>
         ) : (
           <div className="review-answer">
-            <strong>Your answer</strong>
-            <p>{selected || "Skipped"}</p>
+            <strong>{t("readOnly.yourAnswer")}</strong>
+            <p>{selected || t("readOnly.skipped")}</p>
           </div>
         )}
         <div className={`explanation ${grade?.status === "correct" ? "is-correct" : "is-wrong"}`}>
           <div className="explanation-title">
-            {grade ? `${grade.status} - ${Math.round(grade.score * 100)}%` : "Not graded"}
+            {grade
+              ? `${grade.status} - ${Math.round(grade.score * 100)}%`
+              : t("readOnly.notGraded")}
           </div>
           <p>
-            <strong>Correct answer:</strong> {correct}
+            <strong>{t("readOnly.correctAnswer")}</strong> {correct}
           </p>
           <p>{grade?.feedback || question.explanation}</p>
-          <span className="source-note">Source: {question.sourceNote}</span>
+          <span className="source-note">
+            {t("readOnly.sourceLabel", { note: question.sourceNote })}
+          </span>
         </div>
       </div>
       <div className="quiz-actions">
         <button className="text-button" onClick={onBack}>
-          Back to progress
+          {t("readOnly.back")}
         </button>
         <button
           className="text-button"
           disabled={index === 0}
           onClick={() => setIndex((value) => value - 1)}
         >
-          Previous
+          {t("readOnly.previous")}
         </button>
         <button
           className="primary-button"
           disabled={index === session.questions.length - 1}
           onClick={() => setIndex((value) => value + 1)}
         >
-          Next
+          {t("readOnly.next")}
         </button>
       </div>
     </section>

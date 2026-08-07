@@ -3,6 +3,7 @@
 import { buildMaterialReviewSheet } from "@/lib/material-review-sheet";
 import type { StudyLibraryRecord } from "@/lib/study-library";
 import type { StudyMaterial } from "@/lib/study-material";
+import { useLocale } from "@/hooks/use-locale";
 
 const tones = ["violet", "mint", "blue", "coral"] as const;
 
@@ -17,6 +18,7 @@ export function ReviewLibrary({
   onOpen: (material: StudyMaterial) => void;
   onViewAll: () => void;
 }) {
+  const { t } = useLocale();
   const libraryById = new Map(library.map((item) => [item.id, item]));
   const ordered = [...materials].sort((left, right) => {
     const leftDate = left.lastPracticedAt || libraryById.get(left.id)?.lastOpenedAt || libraryById.get(left.id)?.uploadedAt || "";
@@ -28,19 +30,19 @@ export function ReviewLibrary({
     <section className="review-library" aria-labelledby="review-library-heading">
       <div className="review-library-heading">
         <div>
-          <div className="eyebrow">Review sheets</div>
-          <h2 id="review-library-heading">Your review sheets by document</h2>
-          <p>Each PDF has its own library, practice history, and personalized review sheet.</p>
+          <div className="eyebrow">{t("reviewLibrary.eyebrow")}</div>
+          <h2 id="review-library-heading">{t("reviewLibrary.heading")}</h2>
+          <p>{t("reviewLibrary.note")}</p>
         </div>
         <div className="review-library-controls">
           <label>
-            <span className="sr-only">Sort review sheets</span>
-            <select aria-label="Sort review sheets" defaultValue="recent">
-              <option value="recent">Recently updated</option>
-              <option value="name">Name</option>
+            <span className="sr-only">{t("reviewLibrary.sortAria")}</span>
+            <select aria-label={t("reviewLibrary.sortAria")} defaultValue="recent">
+              <option value="recent">{t("reviewLibrary.sortRecent")}</option>
+              <option value="name">{t("reviewLibrary.sortName")}</option>
             </select>
           </label>
-          <span className="review-library-view-toggle" aria-label="Grid view selected">
+          <span className="review-library-view-toggle" aria-label={t("reviewLibrary.gridViewAria")}>
             ▦
           </span>
           <span className="review-library-view-toggle is-muted" aria-hidden="true">
@@ -65,24 +67,34 @@ export function ReviewLibrary({
                   <span className="review-library-file-icon" aria-hidden="true">PDF</span>
                   <div>
                     <strong>{material.name}</strong>
-                    <small>{lastDate ? `Last practiced ${new Date(lastDate).toLocaleDateString()}` : "Uploaded recently"}</small>
+                    <small>
+                      {lastDate
+                        ? t("reviewLibrary.lastPracticed", {
+                            date: new Date(lastDate).toLocaleDateString(),
+                          })
+                        : t("reviewLibrary.uploadedRecently")}
+                    </small>
                   </div>
-                  <button className="review-library-menu" aria-label={`More options for ${material.name}`} type="button">
+                  <button
+                    className="review-library-menu"
+                    aria-label={t("reviewLibrary.moreOptionsAria", { name: material.name })}
+                    type="button"
+                  >
                     ⋮
                   </button>
                 </div>
                 <div className="review-library-stats">
-                  <span><strong>{review.weaknesses.length}</strong><small>Weak concepts</small></span>
-                  <span><strong>{material.mistakes.length}</strong><small>Mistakes</small></span>
-                  <span className="review-library-mastery"><strong>{mastery}%</strong><small>Mastery</small></span>
+                  <span><strong>{review.weaknesses.length}</strong><small>{t("reviewLibrary.weakConcepts")}</small></span>
+                  <span><strong>{material.mistakes.length}</strong><small>{t("reviewLibrary.mistakes")}</small></span>
+                  <span className="review-library-mastery"><strong>{mastery}%</strong><small>{t("reviewLibrary.mastery")}</small></span>
                 </div>
                 <button
-                  aria-label={`Open ${material.name} review sheet`}
+                  aria-label={t("reviewLibrary.openSheetAria", { name: material.name })}
                   className="review-library-open"
                   onClick={() => onOpen(material)}
                   type="button"
                 >
-                  Open Review Sheet <span aria-hidden="true">→</span>
+                  {t("reviewLibrary.openSheet")} <span aria-hidden="true">→</span>
                 </button>
               </article>
             );
@@ -90,14 +102,14 @@ export function ReviewLibrary({
         </div>
       ) : (
         <div className="review-library-empty">
-          <strong>Your PDF libraries will appear here.</strong>
-          <span>Upload a PDF and complete a practice set to generate its first review sheet.</span>
+          <strong>{t("reviewLibrary.emptyHeading")}</strong>
+          <span>{t("reviewLibrary.emptyBody")}</span>
         </div>
       )}
 
       {ordered.length ? (
         <button className="review-library-view-all" onClick={onViewAll} type="button">
-          View all review sheets <span aria-hidden="true">→</span>
+          {t("reviewLibrary.viewAll")} <span aria-hidden="true">→</span>
         </button>
       ) : null}
     </section>

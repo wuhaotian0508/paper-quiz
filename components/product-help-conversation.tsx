@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { createFeedbackHref } from "@/lib/feedback";
+import { useLocale } from "@/hooks/use-locale";
+import type { MessageKey } from "@/lib/i18n";
 
 type Message = {
   role: "user" | "assistant";
@@ -15,11 +17,11 @@ type HelpResponse = {
   error?: string;
 };
 
-const suggestions = [
-  "How do I upload a lecture?",
-  "How do I choose question types?",
-  "Where is my mistake book?",
-  "How do I export a PDF?",
+const suggestionKeys: MessageKey[] = [
+  "help.suggestionUpload",
+  "help.suggestionTypes",
+  "help.suggestionMistakes",
+  "help.suggestionExport",
 ];
 
 function currentView() {
@@ -42,6 +44,7 @@ function currentView() {
 }
 
 export function ProductHelpConversation() {
+  const { locale, t } = useLocale();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [sending, setSending] = useState(false);
@@ -61,11 +64,12 @@ export function ProductHelpConversation() {
       const response = await fetch("/api/product-help", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message, history, currentView: currentView() }),
+        body: JSON.stringify({ message, history, currentView: currentView(), locale }),
         signal: controller.signal,
       });
       const payload = (await response.json().catch(() => ({}))) as HelpResponse;
-      if (!response.ok || !payload.reply) throw new Error(payload.error || "Product help failed.");
+      if (!response.ok || !payload.reply)
+        throw new Error(payload.error || t("help.failedShort"));
       setMessages((items) => [
         ...items,
         { role: "assistant", text: payload.reply!, needsFeedback: Boolean(payload.needsFeedback) },
@@ -73,10 +77,10 @@ export function ProductHelpConversation() {
     } catch (cause) {
       setError(
         cause instanceof DOMException && cause.name === "AbortError"
-          ? "The help chatbot took too long to respond. Please try again."
+          ? t("help.timeout")
           : cause instanceof Error
             ? cause.message
-            : "Product help failed. Please try again.",
+            : t("help.failed"),
       );
     } finally {
       window.clearTimeout(timeout);
@@ -88,17 +92,17 @@ export function ProductHelpConversation() {
     <div className="product-help-conversation">
       <div className="product-help-messages" aria-live="polite">
         {messages.length === 0 && (
-          <p>Ask what you want to do and I will point you to the right PaperQuiz buttons.</p>
+          <p>{t("help.emptyPrompt")}</p>
         )}
         {messages.map((message, index) => (
           <div className={`product-help-message ${message.role}`} key={`${message.role}-${index}`}>
             {message.text}
-            {message.needsFeedback && <a href={createFeedbackHref()}>Send feedback</a>}
+            {message.needsFeedback && <a href={createFeedbackHref()}>{t("help.sendFeedback")}</a>}
           </div>
         ))}
         {sending && (
           <div className="product-help-pending" role="status">
-            Thinking…
+            {t("help.thinking")}
           </div>
         )}
       </div>
@@ -108,9 +112,9 @@ export function ProductHelpConversation() {
         </p>
       )}
       <div className="product-help-suggestions">
-        {suggestions.map((question) => (
-          <button key={question} disabled={sending} onClick={() => void send(question)}>
-            {question}
+        {suggestionKeys.map((key) => (
+          <button key={key} disabled={sending} onClick={() => void send(t(key))}>
+            {t(key)}
           </button>
         ))}
       </div>
@@ -121,17 +125,21 @@ export function ProductHelpConversation() {
         }}
       >
         <label className="sr-only" htmlFor="product-help-question">
-          Ask how to use PaperQuiz
+          {t("help.inputLabel")}
         </label>
         <input
           id="product-help-question"
-          aria-label="Ask how to use PaperQuiz"
+          aria-label={t("help.inputLabel")}
           value={input}
           onChange={(event) => setInput(event.target.value)}
-          placeholder="e.g. where do I start?"
+          placeholder={t("help.inputPlaceholder")}
         />
-        <button type="submit" aria-label="Send help question" disabled={sending || !input.trim()}>
-          {sending ? "Thinking…" : "Send"}
+        <button
+          type="submit"
+          aria-label={t("help.sendAria")}
+          disabled={sending || !input.trim()}
+        >
+          {sending ? t("help.thinking") : t("help.send")}
         </button>
       </form>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import type { StudyMaterial } from "@/lib/study-material";
+import { useLocale } from "@/hooks/use-locale";
 
 export function HistoryView({
   materials,
@@ -11,15 +12,12 @@ export function HistoryView({
   onBack: () => void;
   onOpen: (material: StudyMaterial) => void;
 }) {
+  const { t } = useLocale();
   return (
     <section className="results-card">
-      <div className="eyebrow">PDF history</div>
-      <h1>Your PDF question history.</h1>
-      {materials.length ? (
-        <p className="muted-copy">
-          Every PDF keeps its saved questions, mistakes, and practice sessions together.
-        </p>
-      ) : null}
+      <div className="eyebrow">{t("history.eyebrow")}</div>
+      <h1>{t("history.heading")}</h1>
+      {materials.length ? <p className="muted-copy">{t("history.note")}</p> : null}
       {materials.length ? (
         <div className="review-list">
           {materials.map((material) => (
@@ -32,27 +30,34 @@ export function HistoryView({
               <span>
                 <strong>{material.name}</strong>
                 <small>
-                  {material.questions.length} saved question
-                  {material.questions.length === 1 ? "" : "s"} - {material.mistakes.length} mistake
-                  {material.mistakes.length === 1 ? "" : "s"} - {material.sessions.length} practice
-                  set
-                  {material.sessions.length === 1 ? "" : "s"}
+                  {t(
+                    material.questions.length === 1
+                      ? "history.savedQuestionOne"
+                      : "history.savedQuestionOther",
+                    { count: material.questions.length },
+                  )}{" "}
+                  -{" "}
+                  {t(material.mistakes.length === 1 ? "history.mistakeOne" : "history.mistakeOther", {
+                    count: material.mistakes.length,
+                  })}{" "}
+                  -{" "}
+                  {t(material.sessions.length === 1 ? "history.setOne" : "history.setOther", {
+                    count: material.sessions.length,
+                  })}
                 </small>
               </span>
               <button className="text-button" onClick={() => onOpen(material)}>
-                Open PDF
+                {t("history.openPdf")}
               </button>
             </div>
           ))}
         </div>
       ) : (
-        <p className="muted-copy">
-          Generate a quiz from a PDF or recording and its saved questions will appear here.
-        </p>
+        <p className="muted-copy">{t("history.empty")}</p>
       )}
       <div className="quiz-actions">
         <button className="text-button" onClick={onBack}>
-          Back to dashboard
+          {t("history.back")}
         </button>
       </div>
     </section>

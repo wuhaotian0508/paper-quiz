@@ -12,6 +12,7 @@ import {
   validatePdfFile,
 } from "@/lib/request-validation";
 import { buildSourceFileParts, parseSourceFileIds } from "@/lib/source-reference";
+import { readLocale } from "@/lib/i18n";
 
 export const maxDuration = 60;
 
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
     const questionContext = questionContextValue
       ? readBoundedText(questionContextValue, MAX_QUESTION_CHARS)
       : "";
+    const locale = readLocale(form.get("locale") === null ? null : String(form.get("locale")));
     const rawMistakes = form.get("mistakes");
     const parsedMistakes =
       rawMistakes === null ? { ok: true as const, value: [] } : parseReviewMistakeContext(rawMistakes);
@@ -75,10 +77,10 @@ export async function POST(request: Request) {
       {
         type: "input_text" as const,
         text: transcript
-          ? `${buildExamReviewInstructions()}\n\n<lecture_transcript>\n${transcript}\n</lecture_transcript>${mistakeContext}`
+          ? `${buildExamReviewInstructions(locale)}\n\n<lecture_transcript>\n${transcript}\n</lecture_transcript>${mistakeContext}`
           : questionContext
-            ? `${buildExamReviewInstructions()}\n\n<saved_quiz_questions>\n${questionContext}\n</saved_quiz_questions>${mistakeContext}`
-          : `${buildExamReviewInstructions()}\n\nCreate the review from all attached PDF sources.${mistakeContext}`,
+            ? `${buildExamReviewInstructions(locale)}\n\n<saved_quiz_questions>\n${questionContext}\n</saved_quiz_questions>${mistakeContext}`
+          : `${buildExamReviewInstructions(locale)}\n\nCreate the review from all attached PDF sources.${mistakeContext}`,
       },
     ];
     const stream = await client.responses.create({

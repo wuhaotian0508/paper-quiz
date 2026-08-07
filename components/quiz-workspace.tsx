@@ -58,6 +58,7 @@ import { useStudySync } from "@/hooks/use-study-sync";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { createSharedChallenge } from "@/lib/shared-challenge-client";
 import { getChallengeShareUrl } from "@/lib/shared-challenge";
+import { useLocale } from "@/hooks/use-locale";
 
 type View =
   | "upload"
@@ -76,6 +77,7 @@ type View =
   | "review-sheets";
 
 export function QuizWorkspace() {
+  const { locale, t } = useLocale();
   const [view, setView] = useState<View>("upload");
   const [files, setFiles] = useState<File[]>([]);
   const [transcript, setTranscript] = useState("");
@@ -178,6 +180,7 @@ export function QuizWorkspace() {
   }, [syncStatus]);
 
   const attachSource = (form: FormData) => {
+    form.set("locale", locale);
     if (sourceFileIds.length > 1) form.set("fileIds", JSON.stringify(sourceFileIds));
     else if (sourceFileId) form.set("fileId", sourceFileId);
     else if (transcript) form.set("transcript", transcript);
@@ -209,7 +212,7 @@ export function QuizWorkspace() {
       selected.some((file) => !isPdf(file) && !isAudio(file)) ||
       (hasRecording && (selected.length !== 1 || !isAudio(selected[0])))
     )
-      return setError("Choose a PDF, MP3, M4A, WAV, WebM, or MP4 study file.");
+      return setError(t("error.chooseStudyFile"));
     setError("");
     const uploadedAt = new Date().toISOString();
     const nextLibrary: StudyLibraryRecord[] = selected
@@ -258,12 +261,11 @@ export function QuizWorkspace() {
   const generateQuiz = async () => {
     const questions = config();
     const total = questions.reduce((sum, item) => sum + item.count, 0);
-    if (!files.length && !transcript.trim())
-      return setError("Choose a study file or review a transcript first.");
-    if (!questions.length || total < 1) return setError("Choose at least one question.");
-    if (total > 15) return setError("Choose 15 questions or fewer.");
+    if (!files.length && !transcript.trim()) return setError(t("error.chooseFileOrTranscript"));
+    if (!questions.length || total < 1) return setError(t("error.chooseAtLeastOne"));
+    if (total > 15) return setError(t("error.maxQuestions"));
     if (questions.some((item) => item.type === "custom" && (!item.label || !item.instructions)))
-      return setError("Give every custom question type a name and requirements.");
+      return setError(t("error.customNeedsDetails"));
     setError("");
     setLoading(true);
     setView("generating");
@@ -274,12 +276,12 @@ export function QuizWorkspace() {
       form.set("questions", JSON.stringify(questions));
       form.set("difficulty", difficulty);
       form.set("count", String(total));
+      form.set("locale", locale);
       const response = await postForm("/api/generate-quiz", form, {
-        timeoutMessage:
-          "Quiz generation ran past the 60 second limit. Try fewer questions or a shorter lecture.",
+        timeoutMessage: t("error.quizTimeout"),
       });
       const data = await readQuizResponse(response);
-      if (!response.ok) throw new Error("error" in data ? data.error : "Quiz generation failed.");
+      if (!response.ok) throw new Error("error" in data ? data.error : t("error.quizFailed"));
       const generated = data as GeneratedQuiz;
       const rawSourceFileIds = generated.sourceFileIds || [];
       const generatedSourceFileIds =
@@ -304,7 +306,7 @@ export function QuizWorkspace() {
       setShareStatus("");
       setView("quiz");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Quiz generation failed.");
+      setError(cause instanceof Error ? cause.message : t("error.quizFailed"));
       setView("upload");
     } finally {
       setLoading(false);
@@ -319,16 +321,15 @@ export function QuizWorkspace() {
       const form = new FormData();
       await attachStudyFile(form, file);
       const response = await postForm("/api/transcribe", form, {
-        timeoutMessage:
-          "Transcription ran past the 60 second limit. Try a shorter or smaller recording.",
+        timeoutMessage: t("error.transcribeTimeout"),
       });
       const data = (await response.json()) as { transcript?: string; error?: string };
       if (!response.ok || !data.transcript)
-        throw new Error(data.error || "Audio transcription failed.");
+        throw new Error(data.error || t("error.transcribeFailed"));
       setTranscript(data.transcript);
       setView("reviewing");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Audio transcription failed.");
+      setError(cause instanceof Error ? cause.message : t("error.transcribeFailed"));
       setView("upload");
     }
   };
@@ -358,8 +359,7 @@ export function QuizWorkspace() {
         missingPoints: isCorrect ? [] : [current.referenceAnswer],
       });
     }
-    if (!sourceAvailable)
-      return setError("Upload the same study file again before grading this written question.");
+    if (!sourceAvailable) return setError(t("error.reuploadForGrading"));
     setLoading(true);
     try {
       const form = new FormData();
@@ -367,13 +367,13 @@ export function QuizWorkspace() {
       form.set("answer", answer);
       attachSource(form);
       const response = await postForm("/api/grade-answer", form, {
-        timeoutMessage: "Grading ran past the 60 second limit. Please try again.",
+        timeoutMessage: t("error.gradeTimeout"),
       });
       const grade = (await response.json()) as GradeResult & { error?: string };
-      if (!response.ok) throw new Error(grade.error || "Answer grading failed.");
+      if (!response.ok) throw new Error(grade.error || t("error.gradeFailed"));
       recordGrade(current, answer, grade);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Answer grading failed.");
+      setError(cause instanceof Error ? cause.message : t("error.gradeFailed"));
     } finally {
       setLoading(false);
     }
@@ -425,13 +425,13 @@ export function QuizWorkspace() {
       form.set("history", JSON.stringify(chat));
       attachSource(form);
       const response = await postForm("/api/question-chat", form, {
-        timeoutMessage: "The tutor ran past the 60 second limit. Please try a shorter question.",
+        timeoutMessage: t("error.tutorTimeout"),
       });
       const data = (await response.json()) as { reply?: string; error?: string };
-      if (!response.ok || !data.reply) throw new Error(data.error || "Tutor chat failed.");
+      if (!response.ok || !data.reply) throw new Error(data.error || t("error.tutorFailed"));
       setChat((items) => [...items, { role: "assistant", content: data.reply! }]);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Tutor chat failed.");
+      setError(cause instanceof Error ? cause.message : t("error.tutorFailed"));
     } finally {
       setChatting(false);
     }
@@ -462,7 +462,7 @@ export function QuizWorkspace() {
   const practiceMistakes = (entries = mistakes) => {
     if (!entries.length) return;
     startReviewQuiz(
-      "Mistake book review",
+      t("workspace.mistakeBookReview"),
       // Entries come from different quizzes that each numbered questions from q1, so the
       // per-entry key becomes the question id here to keep answers and grades separate.
       entries.map((item) => ({ ...item.question, id: item.id })),
@@ -516,10 +516,10 @@ export function QuizWorkspace() {
   const shareChallenge = async () => {
     if (!quiz) return;
     if (!user) {
-      setShareStatus("Sign in with Google or email before creating a share link.");
+      setShareStatus(t("share.signInFirst"));
       return;
     }
-    setShareStatus("Creating a 7-day challenge link...");
+    setShareStatus(t("share.creatingChallenge"));
     try {
       const created = await createSharedChallenge(getSupabaseBrowserClient(), quiz, {
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -527,15 +527,9 @@ export function QuizWorkspace() {
       const url = getChallengeShareUrl(window.location.origin, created.slug);
       setShareUrl(url);
       if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
-      setShareStatus(
-        "Challenge link copied. It expires in 7 days and shares questions, not your source file.",
-      );
+      setShareStatus(t("share.challengeCopied"));
     } catch (cause) {
-      setShareStatus(
-        cause instanceof Error
-          ? cause.message
-          : "Challenge link could not be created. Please try again.",
-      );
+      setShareStatus(cause instanceof Error ? cause.message : t("share.challengeFailed"));
     }
   };
 
@@ -543,9 +537,9 @@ export function QuizWorkspace() {
     if (!shareUrl) return;
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(shareUrl);
-      setShareStatus("Challenge link copied. It expires in 7 days.");
+      setShareStatus(t("share.challengeCopiedShort"));
     } else {
-      setShareStatus("Select the share link and copy it manually.");
+      setShareStatus(t("share.copyManually"));
     }
   };
 
@@ -621,7 +615,7 @@ export function QuizWorkspace() {
     );
   if (view === "review-sheets")
     return (
-      <section className="dashboard-page" aria-label="Review sheets">
+      <section className="dashboard-page" aria-label={t("workspace.reviewSheetsAria")}>
         <ReviewLibrary
           materials={materials}
           library={library}

@@ -2,6 +2,14 @@
 
 import type { GradeResult, Question, Quiz } from "@/lib/quiz";
 import { downloadQuizPdf } from "@/lib/pdf-export";
+import { useLocale } from "@/hooks/use-locale";
+import type { MessageKey } from "@/lib/i18n";
+
+const questionTypeKeys: Record<string, MessageKey> = {
+  multiple_choice: "quiz.typeMultipleChoice",
+  fill_blank: "quiz.typeFillBlank",
+  short_answer: "quiz.typeShortAnswer",
+};
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -52,10 +60,14 @@ export function QuizView({
   onExit: () => void;
   onOpenMistakes: () => void;
 }) {
+  const { t } = useLocale();
+  const typeKey = questionTypeKeys[current.type];
   const label =
     current.type === "custom"
-      ? current.customLabel || "Custom question"
-      : current.type.replaceAll("_", " ");
+      ? current.customLabel || t("quiz.customQuestion")
+      : typeKey
+        ? t(typeKey)
+        : current.type.replaceAll("_", " ");
   // A restored session has no PDF in memory, so written grading and tutor chat are
   // unavailable until the lecture is uploaded again. Say so instead of failing on submit.
   const blocked = needsSourceMaterial(current) && !hasSourceMaterial;
@@ -64,13 +76,13 @@ export function QuizView({
     <section className="quiz-shell">
       <div className="workspace-toolbar">
         <button className="text-button" onClick={() => downloadQuizPdf(quiz, "student")}>
-          Student copy (no answers)
+          {t("quiz.studentCopy")}
         </button>
         <button className="text-button" onClick={() => downloadQuizPdf(quiz, "answer_key")}>
-          Answer key (with answers)
+          {t("quiz.answerKey")}
         </button>
         <button className="text-button" onClick={onOpenMistakes}>
-          Mistake book ({mistakeCount})
+          {t("quiz.mistakeBookCount", { count: mistakeCount })}
         </button>
       </div>
       <div className="quiz-topline">
@@ -87,7 +99,9 @@ export function QuizView({
         />
       </div>
       <div className="question-card">
-        <div className="question-kicker">QUESTION {String(index + 1).padStart(2, "0")}</div>
+        <div className="question-kicker">
+          {t("quiz.questionKicker")} {String(index + 1).padStart(2, "0")}
+        </div>
         <h1>{current.prompt}</h1>
         {current.type === "multiple_choice" ? (
           <div className="option-list">
@@ -106,50 +120,46 @@ export function QuizView({
         ) : (
           <textarea
             className="written-answer"
-            aria-label="Your answer"
+            aria-label={t("quiz.yourAnswerAria")}
             disabled={submitted}
             value={answer}
             onChange={(event) => onAnswerChange(event.target.value)}
-            placeholder="Write your answer here..."
+            placeholder={t("quiz.answerPlaceholder")}
             rows={current.type === "fill_blank" ? 3 : 7}
           />
         )}
         {blocked && !submitted && (
-          <div className="error-message">
-            This question is graded against your lecture, which is no longer loaded. Upload the same
-            study file again to grade it, or check the reference answer in the answer key.
-          </div>
+          <div className="error-message">{t("quiz.blockedNotice")}</div>
         )}
         {error && <div className="error-message">{error}</div>}
         {submitted && grade && (
           <div className={`explanation ${grade.status === "correct" ? "is-correct" : "is-wrong"}`}>
             <div className="explanation-title">
               {grade.status === "correct"
-                ? "Correct"
+                ? t("quiz.correct")
                 : grade.status === "partial"
-                  ? "Partly correct"
-                  : "Review this reasoning"}{" "}
+                  ? t("quiz.partlyCorrect")
+                  : t("quiz.reviewReasoning")}{" "}
               - {Math.round(grade.score * 100)}%
             </div>
             <p>{grade.feedback}</p>
             {grade.missingPoints.length > 0 && (
-              <p>Still to include: {grade.missingPoints.join(", ")}</p>
+              <p>{t("quiz.stillToInclude", { points: grade.missingPoints.join(", ") })}</p>
             )}
             {current.type !== "multiple_choice" && (
               <p>
-                <strong>Reference answer:</strong> {current.referenceAnswer}
+                <strong>{t("quiz.referenceAnswer")}</strong> {current.referenceAnswer}
               </p>
             )}
-            <span className="source-note">Source: {current.sourceNote}</span>
+            <span className="source-note">
+              {t("quiz.sourceLabel", { note: current.sourceNote })}
+            </span>
           </div>
         )}
         {submitted && hasSourceMaterial && (
           <div className="chat-box">
-            <strong>Ask about this question</strong>
-            <p>
-              Ask for an explanation, comparison, or a worked step. Replies stay grounded in your
-              lecture.
-            </p>
+            <strong>{t("quiz.askAbout")}</strong>
+            <p>{t("quiz.askDescription")}</p>
             {chat.map((message, messageIndex) => (
               <div className={`chat-message ${message.role}`} key={messageIndex}>
                 {message.content}
@@ -157,20 +167,20 @@ export function QuizView({
             ))}
             <div className="chat-compose">
               <input
-                aria-label="Ask a follow-up question"
+                aria-label={t("quiz.askFollowUpAria")}
                 value={chatInput}
                 onChange={(event) => onChatInputChange(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") onAsk();
                 }}
-                placeholder="What is still unclear?"
+                placeholder={t("quiz.askPlaceholder")}
               />
               <button
                 className="primary-button"
                 disabled={chatting || !chatInput.trim()}
                 onClick={onAsk}
               >
-                {chatting ? "Thinking..." : "Ask"}
+                {chatting ? t("quiz.thinking") : t("quiz.ask")}
               </button>
             </div>
           </div>
@@ -178,24 +188,24 @@ export function QuizView({
       </div>
       <div className="quiz-actions">
         <button className="text-button" onClick={onExit}>
-          Exit this quiz
+          {t("quiz.exit")}
         </button>
         {!submitted ? (
           <>
             <button className="text-button" onClick={onNext}>
-              Skip
+              {t("quiz.skip")}
             </button>
             <button
               className="primary-button"
               disabled={!answer.trim() || loading || blocked}
               onClick={onSubmit}
             >
-              {loading ? "Grading..." : "Submit answer"}
+              {loading ? t("quiz.grading") : t("quiz.submitAnswer")}
             </button>
           </>
         ) : (
           <button className="primary-button" onClick={onNext}>
-            {index === quiz.questions.length - 1 ? "View results" : "Next question"}
+            {index === quiz.questions.length - 1 ? t("quiz.viewResults") : t("quiz.nextQuestion")}
           </button>
         )}
       </div>

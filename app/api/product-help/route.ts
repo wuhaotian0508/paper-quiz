@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       stream: true,
       max_output_tokens: 700,
       input: [
-        { role: "developer", content: buildProductHelpInstructions() },
+        { role: "developer", content: buildProductHelpInstructions(parsed.data.locale) },
         ...parsed.data.history.map((message) => ({
           role: message.role,
           content: message.content,

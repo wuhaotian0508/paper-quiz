@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { AuthClient } from "@/components/auth-menu";
+import { useLocale } from "@/hooks/use-locale";
 
 type LoginViewProps = {
   client?: AuthClient;
@@ -21,6 +22,7 @@ export function LoginView({
   returnTo = "",
   onAuthenticated,
 }: LoginViewProps) {
+  const { t } = useLocale();
   const [authClient, setAuthClient] = useState<AuthClient | null>(client ?? null);
   const [configurationError, setConfigurationError] = useState(unavailableReason ?? "");
   const [email, setEmail] = useState("");
@@ -36,9 +38,9 @@ export function LoginView({
     try {
       setAuthClient(getSupabaseBrowserClient() as unknown as AuthClient);
     } catch (error) {
-      setConfigurationError(error instanceof Error ? error.message : "Supabase is unavailable");
+      setConfigurationError(error instanceof Error ? error.message : t("auth.supabaseUnavailable"));
     }
-  }, [client, unavailableReason]);
+  }, [client, t, unavailableReason]);
 
   async function sendMagicLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,7 +48,7 @@ export function LoginView({
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setMessage("Enter your email address to receive a sign-in link.");
+      setMessage(t("auth.enterEmailForLink"));
       return;
     }
 
@@ -57,7 +59,7 @@ export function LoginView({
       options: { emailRedirectTo: authRedirectUrl(returnTo) },
     });
     setIsSubmitting(false);
-    setMessage(error ? error.message : "Check your inbox for a sign-in link.");
+    setMessage(error ? error.message : t("auth.checkInbox"));
   }
 
   async function submitPassword(event: FormEvent<HTMLFormElement>) {
@@ -66,7 +68,7 @@ export function LoginView({
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
-      setMessage("Enter your email and password.");
+      setMessage(t("auth.enterEmailAndPassword"));
       return;
     }
 
@@ -83,7 +85,7 @@ export function LoginView({
     if (result.error) {
       setMessage(result.error.message);
     } else if (isSignUp) {
-      setMessage("Account created. Check your inbox if email confirmation is required.");
+      setMessage(t("auth.accountCreated"));
     } else {
       (onAuthenticated ?? ((destination: string) => window.location.assign(destination)))(
         safeReturnTo(returnTo),
@@ -107,23 +109,23 @@ export function LoginView({
   return (
     <div className="login-form-panel">
       <div className="login-form-heading">
-        <p className="login-kicker">Your study space</p>
-        <h1>Welcome back!</h1>
-        <p>Log in to continue to your account.</p>
+        <p className="login-kicker">{t("login.kicker")}</p>
+        <h1>{t("login.heading")}</h1>
+        <p>{t("login.subheading")}</p>
       </div>
       {authError ? (
         <p className="login-alert" role="alert">
-          Sign-in didn&apos;t finish. Please try again.
+          {t("auth.unfinished")}
         </p>
       ) : null}
       {configurationError ? (
         <div className="login-unavailable" role="status">
-          <strong>Sign-in unavailable</strong>
-          <span>Configure Supabase to enable account sync.</span>
+          <strong>{t("auth.unavailable")}</strong>
+          <span>{t("auth.configureSupabase")}</span>
         </div>
       ) : (
         <>
-          <div className="login-method-switch" role="tablist" aria-label="Sign-in method">
+          <div className="login-method-switch" role="tablist" aria-label={t("auth.methodAria")}>
             <button
               type="button"
               role="tab"
@@ -131,7 +133,7 @@ export function LoginView({
               className={loginMethod === "password" ? "is-active" : ""}
               onClick={() => setLoginMethod("password")}
             >
-              Password
+              {t("auth.password")}
             </button>
             <button
               type="button"
@@ -140,7 +142,7 @@ export function LoginView({
               className={loginMethod === "magic-link" ? "is-active" : ""}
               onClick={() => setLoginMethod("magic-link")}
             >
-              Email link
+              {t("auth.emailLink")}
             </button>
           </div>
           <form
@@ -149,19 +151,19 @@ export function LoginView({
               void (loginMethod === "password" ? submitPassword(event) : sendMagicLink(event))
             }
           >
-            <label htmlFor="login-email">Email</label>
+            <label htmlFor="login-email">{t("login.email")}</label>
             <input
               id="login-email"
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               autoComplete="email"
-              placeholder="you@example.com"
+              placeholder={t("login.emailPlaceholder")}
               required
             />
             {loginMethod === "password" ? (
               <>
-                <label htmlFor="login-password">Password</label>
+                <label htmlFor="login-password">{t("auth.password")}</label>
                 <input
                   id="login-password"
                   type="password"
@@ -171,12 +173,10 @@ export function LoginView({
                   minLength={6}
                   required
                 />
-                <p className="login-field-note">Use at least 6 characters.</p>
+                <p className="login-field-note">{t("login.passwordNote")}</p>
               </>
             ) : (
-              <p className="login-field-note">
-                We&apos;ll send a secure sign-in link to your inbox.
-              </p>
+              <p className="login-field-note">{t("login.magicLinkNote")}</p>
             )}
             <button
               type="submit"
@@ -185,11 +185,11 @@ export function LoginView({
             >
               {isSubmitting
                 ? loginMethod === "magic-link"
-                  ? "Sending..."
-                  : "Working..."
+                  ? t("auth.sending")
+                  : t("auth.working")
                 : isSignUp
-                  ? "Create account"
-                  : "Log in"}
+                  ? t("auth.createAccount")
+                  : t("auth.logIn")}
             </button>
           </form>
           {loginMethod === "password" ? (
@@ -198,11 +198,11 @@ export function LoginView({
               className="login-text-button"
               onClick={() => setIsSignUp((value) => !value)}
             >
-              {isSignUp ? "Already have an account? Log in" : "New here? Create an account"}
+              {isSignUp ? t("auth.haveAccount") : t("auth.newHere")}
             </button>
           ) : null}
           <div className="login-divider" aria-hidden="true">
-            <span>or continue with</span>
+            <span>{t("login.orContinueWith")}</span>
           </div>
           <button
             type="button"
@@ -213,7 +213,7 @@ export function LoginView({
             <span className="login-provider-icon" aria-hidden="true">
               G
             </span>
-            Continue with Google
+            {t("auth.continueWithGoogle")}
           </button>
           {message ? (
             <p className="login-message" role="status">
@@ -223,8 +223,8 @@ export function LoginView({
         </>
       )}
       <p className="login-legal">
-        By logging in, you agree to our <a href="#terms">Terms of Service</a> and{" "}
-        <a href="#privacy">Privacy Policy</a>.
+        {t("login.legalPrefix")} <a href="#terms">{t("login.terms")}</a> {t("login.and")}{" "}
+        <a href="#privacy">{t("login.privacy")}</a>.
       </p>
     </div>
   );

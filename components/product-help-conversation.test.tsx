@@ -29,6 +29,7 @@ it("sends only product-help fields to the dedicated API and renders guidance", a
     message: "Where are my mistakes?",
     history: [],
     currentView: "dashboard",
+    locale: "en",
   });
 });
 

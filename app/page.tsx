@@ -1,6 +1,7 @@
 import { QuizWorkspace } from "@/components/quiz-workspace";
 import { ProductHelpChat } from "@/components/product-help-chat";
 import { DashboardNavigation } from "@/components/dashboard-navigation";
+import { SiteFooter } from "@/components/site-footer";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -23,10 +24,7 @@ export default async function Home({ searchParams }: HomeProps) {
       <section className="app-content">
         <QuizWorkspace />
         <ProductHelpChat />
-        <footer className="site-footer">
-          <span>Made for the night-before-the-exam mood.</span>
-          <span>Study material is used only for this generation.</span>
-        </footer>
+        <SiteFooter />
       </section>
     </main>
   );

@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { downloadMistakesPdf } from "@/lib/pdf-export";
 import type { MistakeBookEntry } from "@/lib/mistake-book";
 import { correctAnswerText } from "@/lib/quiz";
+import { useLocale } from "@/hooks/use-locale";
+import type { MessageKey } from "@/lib/i18n";
 
 type Filter = "all" | "multiple_choice" | "fill_blank" | "short_answer" | "custom";
 type Props = {
@@ -13,17 +15,18 @@ type Props = {
   onPractice: (entries: MistakeBookEntry[]) => void;
   onReview?: () => void;
 };
-const labels: Record<Filter, string> = {
-  all: "All",
-  multiple_choice: "Multiple choice",
-  fill_blank: "Fill blank",
-  short_answer: "Short answer",
-  custom: "Custom",
+const labels: Record<Filter, MessageKey> = {
+  all: "mistakes.filterAll",
+  multiple_choice: "mistakes.filterMultipleChoice",
+  fill_blank: "mistakes.filterFillBlank",
+  short_answer: "mistakes.filterShortAnswer",
+  custom: "mistakes.filterCustom",
 };
 
 const answerText = (entry: MistakeBookEntry) => correctAnswerText(entry.question);
 
 export function MistakeBookView({ entries, onBack, onChange, onPractice, onReview }: Props) {
+  const { t } = useLocale();
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<string[]>([]);
@@ -39,13 +42,15 @@ export function MistakeBookView({ entries, onBack, onChange, onPractice, onRevie
     <section className="mistake-page" id="mistake-book">
       <header className="mistake-heading">
         <div>
-          <div className="eyebrow">Mistake book</div>
-          <h1>Turn misses into mastery.</h1>
+          <div className="eyebrow">{t("mistakes.eyebrow")}</div>
+          <h1>{t("mistakes.heading")}</h1>
           <p className="muted-copy">
             <strong>
-              {entries.length} {entries.length === 1 ? "mistake" : "mistakes"}
+              {t(entries.length === 1 ? "mistakes.savedCountOne" : "mistakes.savedCountOther", {
+                count: entries.length,
+              })}
             </strong>{" "}
-            saved on this browser.
+            {t("mistakes.savedOnBrowser")}
           </p>
         </div>
         <div className="mistake-primary-actions">
@@ -54,18 +59,18 @@ export function MistakeBookView({ entries, onBack, onChange, onPractice, onRevie
             disabled={!entries.length}
             onClick={() => onPractice(entries)}
           >
-            Practice all
+            {t("mistakes.practiceAll")}
           </button>
           <button
             className="text-button framed-button"
             disabled={!entries.length}
             onClick={() => downloadMistakesPdf(entries)}
           >
-            Export PDF
+            {t("mistakes.exportPdf")}
           </button>
           {onReview ? (
             <button className="text-button framed-button" disabled={!entries.length} onClick={onReview}>
-              Build review sheet
+              {t("mistakes.buildReviewSheet")}
             </button>
           ) : null}
         </div>
@@ -78,7 +83,7 @@ export function MistakeBookView({ entries, onBack, onChange, onPractice, onRevie
               key={value}
               onClick={() => setFilter(value)}
             >
-              {labels[value]}
+              {t(labels[value])}
               {value !== "all" && (
                 <span>{entries.filter((entry) => entry.question.type === value).length}</span>
               )}
@@ -86,12 +91,12 @@ export function MistakeBookView({ entries, onBack, onChange, onPractice, onRevie
           ))}
         </div>
         <div className="selection-actions">
-          <span>{selected.length} selected</span>
+          <span>{t("mistakes.selectedCount", { count: selected.length })}</span>
           <button disabled={!selected.length} onClick={() => onPractice(selectedEntries)}>
-            Practice selected
+            {t("mistakes.practiceSelected")}
           </button>
           <button disabled={!selected.length} onClick={() => downloadMistakesPdf(selectedEntries)}>
-            Export selected
+            {t("mistakes.exportSelected")}
           </button>
         </div>
       </div>
@@ -103,35 +108,40 @@ export function MistakeBookView({ entries, onBack, onChange, onPractice, onRevie
               <article className="mistake-item" key={entry.id}>
                 <label className="mistake-select">
                   <input
-                    aria-label={`Select question ${index + 1}`}
+                    aria-label={t("mistakes.selectQuestionAria", { number: index + 1 })}
                     checked={selected.includes(entry.id)}
                     type="checkbox"
                     onChange={() => setSelected((values) => toggle(values, entry.id))}
                   />
                 </label>
                 <div className="mistake-type">
-                  <span>{labels[entry.question.type]}</span>
+                  <span>{t(labels[entry.question.type])}</span>
                   <small>{new Date(entry.updatedAt).toLocaleDateString()}</small>
                 </div>
                 <div className="mistake-content">
                   <h2>{entry.question.prompt}</h2>
                   <div className="mistake-meta">
-                    <span>{entry.status === "partial" ? "Partly correct" : "Incorrect"}</span>
+                    <span>
+                      {entry.status === "partial"
+                        ? t("mistakes.partlyCorrect")
+                        : t("mistakes.incorrect")}
+                    </span>
                     <span>{Math.round(entry.score * 100)}%</span>
                   </div>
                   {isExpanded && (
                     <div className="mistake-details">
                       <p>
-                        <strong>Your answer:</strong> {entry.answer || "Skipped"}
+                        <strong>{t("mistakes.yourAnswer")}</strong>{" "}
+                        {entry.answer || t("mistakes.skipped")}
                       </p>
                       <p>
-                        <strong>Correct answer:</strong> {answerText(entry)}
+                        <strong>{t("mistakes.correctAnswer")}</strong> {answerText(entry)}
                       </p>
                       <p>
-                        <strong>Feedback:</strong> {entry.feedback}
+                        <strong>{t("mistakes.feedback")}</strong> {entry.feedback}
                       </p>
                       <p>
-                        <strong>Source:</strong> {entry.question.sourceNote}
+                        <strong>{t("mistakes.source")}</strong> {entry.question.sourceNote}
                       </p>
                     </div>
                   )}
@@ -139,18 +149,18 @@ export function MistakeBookView({ entries, onBack, onChange, onPractice, onRevie
                     className="detail-button"
                     onClick={() => setExpanded((values) => toggle(values, entry.id))}
                   >
-                    {isExpanded ? "Hide details" : "View details"}
+                    {isExpanded ? t("mistakes.hideDetails") : t("mistakes.viewDetails")}
                   </button>
                 </div>
                 <div className="mistake-item-actions">
                   <button className="primary-button" onClick={() => onPractice([entry])}>
-                    Practice again
+                    {t("mistakes.practiceAgain")}
                   </button>
                   <button
                     className="remove-button"
                     onClick={() => onChange(entries.filter((item) => item.id !== entry.id))}
                   >
-                    Remove
+                    {t("mistakes.remove")}
                   </button>
                 </div>
               </article>
@@ -159,22 +169,22 @@ export function MistakeBookView({ entries, onBack, onChange, onPractice, onRevie
         </div>
       ) : (
         <div className="mistake-empty">
-          <h2>No mistakes in this filter.</h2>
-          <p>Choose another question type or start a new practice set.</p>
+          <h2>{t("mistakes.emptyHeading")}</h2>
+          <p>{t("mistakes.emptyBody")}</p>
         </div>
       )}
       <footer className="mistake-footer">
         <button className="text-button" onClick={onBack}>
-          Back to upload
+          {t("mistakes.backToUpload")}
         </button>
         {entries.length > 0 && (
           <button
             className="danger-link"
             onClick={() => {
-              if (window.confirm("Clear every saved mistake? This cannot be undone.")) onChange([]);
+              if (window.confirm(t("mistakes.clearConfirm"))) onChange([]);
             }}
           >
-            Clear all mistakes
+            {t("mistakes.clearAll")}
           </button>
         )}
       </footer>

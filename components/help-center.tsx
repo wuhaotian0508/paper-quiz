@@ -1,23 +1,23 @@
 "use client";
 
 import { ProductHelpConversation } from "@/components/product-help-conversation";
+import { useLocale } from "@/hooks/use-locale";
 
 export function HelpCenter({ onBack }: { onBack: () => void }) {
+  const { t } = useLocale();
   return (
     <section className="help-page">
       <header className="help-heading">
         <div>
-          <div className="eyebrow">PaperQuiz chatbot</div>
-          <h1>How can PaperQuiz help?</h1>
-          <p className="muted-copy">
-            Tell me what you want to do and I will point you to the right buttons.
-          </p>
+          <div className="eyebrow">{t("help.eyebrow")}</div>
+          <h1>{t("help.heading")}</h1>
+          <p className="muted-copy">{t("help.note")}</p>
         </div>
         <button className="text-button" onClick={onBack}>
-          Back to quiz
+          {t("help.backToQuiz")}
         </button>
       </header>
-      <section className="help-chat-page" aria-label="Product help chat">
+      <section className="help-chat-page" aria-label={t("help.chatAria")}>
         <ProductHelpConversation />
       </section>
     </section>

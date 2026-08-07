@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { loadSharedReview, type SharedReviewClient } from "@/lib/shared-review-client";
+import { useLocale } from "@/hooks/use-locale";
 
 const ReviewSchema = z.object({
   slug: z.string().min(1),
@@ -29,8 +30,9 @@ const ReviewSchema = z.object({
 });
 
 export function SharedReviewView({ slug, client }: { slug: string; client?: SharedReviewClient }) {
+  const { t } = useLocale();
   const [review, setReview] = useState<z.infer<typeof ReviewSchema> | null>(null);
-  const [message, setMessage] = useState("Loading review...");
+  const [message, setMessage] = useState(t("shared.loadingReview"));
 
   useEffect(() => {
     let active = true;
@@ -42,42 +44,46 @@ export function SharedReviewView({ slug, client }: { slug: string; client?: Shar
         setReview(data);
         setMessage("");
       } catch (cause) {
-        if (active) setMessage(cause instanceof Error ? cause.message : "This review is unavailable.");
+        if (active) setMessage(cause instanceof Error ? cause.message : t("shared.reviewUnavailable"));
       }
     }
     void load();
     return () => {
       active = false;
     };
-  }, [client, slug]);
+  }, [client, slug, t]);
 
   if (!review) return <main className="shared-challenge-page"><p role="status">{message}</p></main>;
 
   return (
     <main className="shared-challenge-page">
-      <div className="eyebrow">Paper Plane Quiz review</div>
+      <div className="eyebrow">{t("shared.reviewEyebrow")}</div>
       <h1>{review.title}</h1>
-      <p className="muted-copy">A read-only review sheet generated from the shared study material.</p>
-      <p className="shared-challenge-note">This link shares review notes and selected page previews, never the original PDF or private answer records.</p>
+      <p className="muted-copy">{t("shared.reviewNote")}</p>
+      <p className="shared-challenge-note">{t("shared.reviewPrivacy")}</p>
       <div className="shared-link-actions">
         <a className="text-button framed-button" href={`/login?returnTo=${encodeURIComponent(`/review/${review.slug}`)}`}>
-          Sign in
+          {t("shared.signIn")}
         </a>
         <a className="primary-button" href="#review-topics">
-          Use this review
+          {t("shared.useThisReview")}
         </a>
       </div>
       {review.sourcePages?.length ? (
-        <section className="review-source-pages" aria-label="Source pages">
-          <div className="eyebrow">Source pages</div>
-          <p className="muted-copy">The supporting PDF/PPT pages are shown in source order.</p>
+        <section className="review-source-pages" aria-label={t("shared.sourcePagesAria")}>
+          <div className="eyebrow">{t("shared.sourcePages")}</div>
+          <p className="muted-copy">{t("shared.sourcePagesNote")}</p>
           <div className="review-source-page-grid">
             {review.sourcePages.map((page) => (
               <figure className="review-source-page" key={page.pageNumber}>
                 {/* Shared previews are data URLs created from the learner's source PDF. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={page.imageUrl} alt={`Source page ${page.pageNumber}`} loading="lazy" />
-                <figcaption>Page {page.pageNumber}</figcaption>
+                <img
+                  src={page.imageUrl}
+                  alt={t("shared.sourcePageAlt", { page: page.pageNumber })}
+                  loading="lazy"
+                />
+                <figcaption>{t("shared.pageLabel", { page: page.pageNumber })}</figcaption>
               </figure>
             ))}
           </div>
@@ -90,10 +96,10 @@ export function SharedReviewView({ slug, client }: { slug: string; client?: Shar
             <div>
               <h2>{topic.topic}</h2>
               <p>{topic.keyIdeas.join(" ")}</p>
-              {topic.formulaOrProcedure ? <p><strong>Formula or procedure:</strong> {topic.formulaOrProcedure}</p> : null}
-              <p><strong>Common confusion:</strong> {topic.commonConfusion}</p>
-              {topic.mistakeFocus ? <p><strong>Review focus:</strong> {topic.mistakeFocus}</p> : null}
-              <small>Source: {topic.sourceNote}</small>
+              {topic.formulaOrProcedure ? <p><strong>{t("shared.formulaOrProcedure")}</strong> {topic.formulaOrProcedure}</p> : null}
+              <p><strong>{t("shared.commonConfusion")}</strong> {topic.commonConfusion}</p>
+              {topic.mistakeFocus ? <p><strong>{t("shared.reviewFocus")}</strong> {topic.mistakeFocus}</p> : null}
+              <small>{t("shared.sourceLabel", { note: topic.sourceNote })}</small>
             </div>
           </article>
         ))}

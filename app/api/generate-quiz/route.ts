@@ -16,6 +16,7 @@ import { MAX_TRANSCRIPT_CHARS, readBoundedText, validatePdfFile } from "@/lib/re
 import { buildSourceFileParts, MAX_SOURCE_FILES, uploadSourceFiles } from "@/lib/source-reference";
 import { del } from "@vercel/blob";
 import { readStudyFiles } from "@/lib/study-upload";
+import { readLocale, translate } from "@/lib/i18n";
 
 export const maxDuration = 60;
 
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
     const countValue = String(form.get("count") ?? "");
     const questionConfigValue = String(form.get("questions") ?? "");
     const difficultyValue = String(form.get("difficulty") ?? "");
+    const locale = readLocale(form.get("locale") === null ? null : String(form.get("locale")));
 
     if (!files.length && !transcript) {
       return jsonError("Please upload a PDF or provide a lecture transcript.", 400);
@@ -87,8 +89,8 @@ export async function POST(request: Request) {
       : [];
     const generateOnce = async (correction?: string) => {
       const instructions = files.length
-        ? `${buildQuizInstructions(settings)}\n\nUse all selected PDFs as one study set. In every sourceNote, name the supporting source file and page or section when available. Selected files: ${sourceNames}.`
-        : `${buildQuizInstructions(settings)}\n\n<lecture_transcript>\n${transcript}\n</lecture_transcript>`;
+        ? `${buildQuizInstructions({ ...settings, locale })}\n\nUse all selected PDFs as one study set. In every sourceNote, name the supporting source file and page or section when available. Selected files: ${sourceNames}.`
+        : `${buildQuizInstructions({ ...settings, locale })}\n\n<lecture_transcript>\n${transcript}\n</lecture_transcript>`;
       const stream = await client.responses.create({
         ...generationOptions,
         input: [
@@ -114,7 +116,9 @@ export async function POST(request: Request) {
       if (!outputText) throw new Error("AI did not return a usable quiz. Please try again.");
       return parseQuizOutput(
         outputText,
-        files.length ? files.map((file) => file.name).join(" + ") : "Lecture transcript",
+        files.length
+          ? files.map((file) => file.name).join(" + ")
+          : translate(locale, "transcript.label"),
       );
     };
 

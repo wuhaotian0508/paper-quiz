@@ -3138,7 +3138,8 @@ h1 {
 .sidebar-utility-link:hover {
   color: var(--coral-deep);
 }
-.sidebar-theme-toggle {
+.sidebar-theme-toggle,
+.sidebar-locale-toggle {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -3151,10 +3152,12 @@ h1 {
   font-weight: 700;
   text-align: left;
 }
-.sidebar-theme-toggle:hover {
+.sidebar-theme-toggle:hover,
+.sidebar-locale-toggle:hover {
   color: var(--coral-deep);
 }
-.sidebar-theme-toggle span {
+.sidebar-theme-toggle span,
+.sidebar-locale-toggle span {
   display: grid;
   width: 20px;
   height: 20px;
@@ -3552,11 +3555,13 @@ h1 {
   .sidebar-utility-link {
     font-size: 11px;
   }
-  .sidebar-theme-toggle {
+  .sidebar-theme-toggle,
+  .sidebar-locale-toggle {
     gap: 0;
     font-size: 0;
   }
-  .sidebar-theme-toggle span {
+  .sidebar-theme-toggle span,
+  .sidebar-locale-toggle span {
     width: 20px;
     height: 20px;
   }

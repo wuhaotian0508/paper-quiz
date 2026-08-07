@@ -3,6 +3,7 @@
 import { downloadWeaknessReviewPdf } from "@/lib/pdf-export";
 import { buildWeaknessReviewSheet } from "@/lib/review-sheet";
 import type { MistakeBookEntry } from "@/lib/mistake-book";
+import { useLocale } from "@/hooks/use-locale";
 
 export function ReviewSheetView({
   entries,
@@ -13,6 +14,7 @@ export function ReviewSheetView({
   onBack: () => void;
   onPractice: (entries: MistakeBookEntry[]) => void;
 }) {
+  const { t } = useLocale();
   const sheet = buildWeaknessReviewSheet(entries);
   const selected = entries.filter((entry) => sheet.items.some((item) => item.id === entry.id));
 
@@ -20,16 +22,24 @@ export function ReviewSheetView({
     <section className="review-sheet-page">
       <header className="mistake-heading">
         <div>
-          <div className="eyebrow">Personal review sheet</div>
-          <h1>Study what you have not mastered yet.</h1>
-          <p className="muted-copy">Built from your saved mistakes. It summarizes learning gaps, not source files.</p>
+          <div className="eyebrow">{t("reviewSheet.eyebrow")}</div>
+          <h1>{t("reviewSheet.heading")}</h1>
+          <p className="muted-copy">{t("reviewSheet.note")}</p>
         </div>
         <div className="mistake-primary-actions">
-          <button className="primary-button" disabled={!selected.length} onClick={() => onPractice(selected)}>
-            Practice these areas
+          <button
+            className="primary-button"
+            disabled={!selected.length}
+            onClick={() => onPractice(selected)}
+          >
+            {t("reviewSheet.practiceAreas")}
           </button>
-          <button className="text-button framed-button" disabled={!sheet.items.length} onClick={() => downloadWeaknessReviewPdf(sheet)}>
-            Export one-page PDF
+          <button
+            className="text-button framed-button"
+            disabled={!sheet.items.length}
+            onClick={() => downloadWeaknessReviewPdf(sheet)}
+          >
+            {t("reviewSheet.exportOnePage")}
           </button>
         </div>
       </header>
@@ -40,15 +50,23 @@ export function ReviewSheetView({
               <span>{String(index + 1).padStart(2, "0")}</span>
               <div>
                 <h2>{item.prompt}</h2>
-                <p><strong>Key answer:</strong> {item.keyAnswer}</p>
-                <p><strong>Remember:</strong> {item.remember}</p>
+                <p>
+                  <strong>{t("reviewSheet.keyAnswer")}</strong> {item.keyAnswer}
+                </p>
+                <p>
+                  <strong>{t("reviewSheet.remember")}</strong> {item.remember}
+                </p>
                 <small>{item.action}</small>
               </div>
             </article>
           ))}
         </div>
-      ) : <p className="mistake-empty">Complete a quiz and save a missed question to build your first review sheet.</p>}
-      <button className="text-button" onClick={onBack}>Back to mistake book</button>
+      ) : (
+        <p className="mistake-empty">{t("reviewSheet.empty")}</p>
+      )}
+      <button className="text-button" onClick={onBack}>
+        {t("reviewSheet.back")}
+      </button>
     </section>
   );
 }

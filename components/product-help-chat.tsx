@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { ProductHelpConversation } from "@/components/product-help-conversation";
+import { useLocale } from "@/hooks/use-locale";
 
 export function ProductHelpChat() {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -22,20 +24,20 @@ export function ProductHelpChat() {
         aria-controls="product-help-panel"
         onClick={() => setOpen((value) => !value)}
       >
-        Help
+        {t("help.launcher")}
       </button>
       {open && (
         <section
           id="product-help-panel"
           className="product-help-panel"
-          aria-label="Product help chat"
+          aria-label={t("help.chatAria")}
         >
           <header>
             <div>
-              <strong>PaperQuiz chatbot</strong>
-              <span>Ask how to use the app</span>
+              <strong>{t("help.widgetTitle")}</strong>
+              <span>{t("help.widgetSubtitle")}</span>
             </div>
-            <button aria-label="Close help" onClick={() => setOpen(false)}>
+            <button aria-label={t("help.closeAria")} onClick={() => setOpen(false)}>
               x
             </button>
           </header>

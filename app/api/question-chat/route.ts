@@ -15,6 +15,7 @@ import {
   parseSourceFileId,
   parseSourceFileIds,
 } from "@/lib/source-reference";
+import { generationLanguage, readLocale } from "@/lib/i18n";
 
 function error(message: string, status: number) {
   return Response.json({ error: message }, { status });
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
     const transcript = readBoundedText(form.get("transcript"), MAX_TRANSCRIPT_CHARS) || "";
     const rawQuestion = readBoundedText(form.get("question"), MAX_QUESTION_CHARS) || "";
     const rawHistory = String(form.get("history") ?? "[]");
+    const locale = readLocale(form.get("locale") === null ? null : String(form.get("locale")));
     const directFiles = form.getAll("files").filter((value): value is File => value instanceof File);
     const legacyFile = form.get("file");
     const files = directFiles.length
@@ -67,6 +69,7 @@ export async function POST(request: Request) {
         text: [
           "You are a study tutor. Answer only from the supplied study material and current question.",
           "If the material does not support an answer, say so plainly. Do not invent facts.",
+          `Reply in ${generationLanguage(locale)}.`,
           `CURRENT QUESTION: ${JSON.stringify(question.data)}`,
           `CONVERSATION: ${JSON.stringify(historyResult.value)}`,
           `STUDENT: ${message}`,

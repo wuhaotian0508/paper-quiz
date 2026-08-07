@@ -2,6 +2,8 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { useLocale } from "@/hooks/use-locale";
+import type { MessageKey } from "@/lib/i18n";
 
 type AuthSession = { user: { email?: string | null } } | null;
 type AuthResult = { error: { message: string } | null };
@@ -39,11 +41,11 @@ type AuthMenuProps = {
 
 type SyncStatus = "idle" | "syncing" | "synced" | "error";
 
-const syncStatusLabels: Record<SyncStatus, string> = {
-  idle: "Sync ready",
-  syncing: "Syncing",
-  synced: "Synced",
-  error: "Sync error",
+const syncStatusLabels: Record<SyncStatus, MessageKey> = {
+  idle: "auth.syncIdle",
+  syncing: "auth.syncSyncing",
+  synced: "auth.syncSynced",
+  error: "auth.syncError",
 };
 
 export function AuthMenu({
@@ -52,6 +54,7 @@ export function AuthMenu({
   authError = false,
   onSignedOut,
 }: AuthMenuProps) {
+  const { t } = useLocale();
   const [authClient, setAuthClient] = useState<AuthClient | null>(client ?? null);
   const [configurationError, setConfigurationError] = useState(unavailableReason ?? "");
   const [email, setEmail] = useState("");
@@ -86,7 +89,9 @@ export function AuthMenu({
         resolvedClient = getSupabaseBrowserClient() as unknown as AuthClient;
       } catch (error) {
         if (active) {
-          setConfigurationError(error instanceof Error ? error.message : "Supabase is unavailable");
+          setConfigurationError(
+            error instanceof Error ? error.message : t("auth.supabaseUnavailable"),
+          );
         }
         return;
       }
@@ -109,7 +114,7 @@ export function AuthMenu({
       active = false;
       subscription.unsubscribe();
     };
-  }, [client, unavailableReason]);
+  }, [client, t, unavailableReason]);
 
   async function sendMagicLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -117,7 +122,7 @@ export function AuthMenu({
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setMessage("Enter your email address to receive a sign-in link.");
+      setMessage(t("auth.enterEmailForLink"));
       return;
     }
 
@@ -128,7 +133,7 @@ export function AuthMenu({
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
     setIsSubmitting(false);
-    setMessage(error ? error.message : "Check your inbox for a sign-in link.");
+    setMessage(error ? error.message : t("auth.checkInbox"));
   }
 
   async function signInWithGoogle() {
@@ -150,7 +155,7 @@ export function AuthMenu({
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
-      setMessage("Enter your email and password.");
+      setMessage(t("auth.enterEmailAndPassword"));
       return;
     }
 
@@ -168,8 +173,8 @@ export function AuthMenu({
       result.error
         ? result.error.message
         : isSignUp
-          ? "Account created. Check your inbox if email confirmation is required."
-          : "Logged in successfully.",
+          ? t("auth.accountCreated")
+          : t("auth.loggedIn"),
     );
   }
 
@@ -196,13 +201,13 @@ export function AuthMenu({
   if (configurationError) {
     return (
       <div className="auth-menu auth-menu-unavailable" role="status">
-        <strong>Sign-in unavailable</strong>
+        <strong>{t("auth.unavailable")}</strong>
         {authError ? (
           <span className="auth-error" role="alert">
-            Sign-in didn&apos;t finish. Please try again.
+            {t("auth.unfinished")}
           </span>
         ) : null}
-        <span>Configure Supabase to enable account sync.</span>
+        <span>{t("auth.configureSupabase")}</span>
       </div>
     );
   }
@@ -212,10 +217,10 @@ export function AuthMenu({
       <div className="auth-menu auth-menu-signed-in">
         <span title={userEmail}>{userEmail}</span>
         <span className={`auth-sync-status auth-sync-status-${syncStatus}`} role="status">
-          {syncStatusLabels[syncStatus]}
+          {t(syncStatusLabels[syncStatus])}
         </span>
         <button type="button" onClick={() => void signOut()} disabled={isSubmitting}>
-          Sign out
+          {t("auth.signOut")}
         </button>
       </div>
     );
@@ -225,17 +230,17 @@ export function AuthMenu({
     <div className="auth-menu">
       {authError ? (
         <span className="auth-error" role="alert">
-          Sign-in didn&apos;t finish. Please try again.
+          {t("auth.unfinished")}
         </span>
       ) : null}
       <button type="button" className="auth-trigger" onClick={() => setIsOpen((open) => !open)}>
-        Sign in
+        {t("auth.signIn")}
       </button>
       {isOpen ? (
         <div className="auth-panel">
-          <strong>Keep your study progress</strong>
-          <p>Sign in to sync your practice history and mistake book across devices.</p>
-          <div className="auth-method-switch" role="tablist" aria-label="Sign-in method">
+          <strong>{t("auth.panelTitle")}</strong>
+          <p>{t("auth.panelNote")}</p>
+          <div className="auth-method-switch" role="tablist" aria-label={t("auth.methodAria")}>
             <button
               type="button"
               role="tab"
@@ -243,7 +248,7 @@ export function AuthMenu({
               className={loginMethod === "password" ? "is-active" : ""}
               onClick={() => setLoginMethod("password")}
             >
-              Password
+              {t("auth.password")}
             </button>
             <button
               type="button"
@@ -252,7 +257,7 @@ export function AuthMenu({
               className={loginMethod === "magic-link" ? "is-active" : ""}
               onClick={() => setLoginMethod("magic-link")}
             >
-              Email link
+              {t("auth.emailLink")}
             </button>
           </div>
           <form
@@ -260,7 +265,7 @@ export function AuthMenu({
               void (loginMethod === "password" ? submitPassword(event) : sendMagicLink(event))
             }
           >
-            <label htmlFor="auth-email">Email address</label>
+            <label htmlFor="auth-email">{t("auth.emailAddress")}</label>
             <input
               id="auth-email"
               type="email"
@@ -271,7 +276,7 @@ export function AuthMenu({
             />
             {loginMethod === "password" ? (
               <>
-                <label htmlFor="auth-password">Password</label>
+                <label htmlFor="auth-password">{t("auth.password")}</label>
                 <input
                   id="auth-password"
                   type="password"
@@ -286,7 +291,11 @@ export function AuthMenu({
                   className="primary-button"
                   disabled={isSubmitting || !authClient}
                 >
-                  {isSubmitting ? "Working..." : isSignUp ? "Create account" : "Log in"}
+                  {isSubmitting
+                    ? t("auth.working")
+                    : isSignUp
+                      ? t("auth.createAccount")
+                      : t("auth.logIn")}
                 </button>
               </>
             ) : (
@@ -295,7 +304,7 @@ export function AuthMenu({
                 className="primary-button"
                 disabled={isSubmitting || !authClient}
               >
-                {isSubmitting ? "Sending..." : "Email me a sign-in link"}
+                {isSubmitting ? t("auth.sending") : t("auth.emailMeLink")}
               </button>
             )}
           </form>
@@ -305,17 +314,17 @@ export function AuthMenu({
               className="auth-text-button"
               onClick={() => setIsSignUp((value) => !value)}
             >
-              {isSignUp ? "Already have an account? Log in" : "New here? Create an account"}
+              {isSignUp ? t("auth.haveAccount") : t("auth.newHere")}
             </button>
           ) : null}
-          <div className="auth-divider">or</div>
+          <div className="auth-divider">{t("auth.or")}</div>
           <button
             type="button"
             className="auth-google-button"
             onClick={() => void signInWithGoogle()}
             disabled={isSubmitting || !authClient}
           >
-            Continue with Google
+            {t("auth.continueWithGoogle")}
           </button>
           {message ? (
             <p className="auth-message" role="status">

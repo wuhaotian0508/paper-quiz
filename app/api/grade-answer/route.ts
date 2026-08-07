@@ -16,6 +16,7 @@ import {
   parseSourceFileId,
   parseSourceFileIds,
 } from "@/lib/source-reference";
+import { generationLanguage, readLocale } from "@/lib/i18n";
 
 function error(message: string, status: number) {
   return Response.json({ error: message }, { status });
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
     const fileId = parseSourceFileId(form.get("fileId"));
     const fileIds = parseSourceFileIds(form.get("fileIds")) || [];
     const rawQuestion = readBoundedText(form.get("question"), MAX_QUESTION_CHARS) || "";
+    const locale = readLocale(form.get("locale") === null ? null : String(form.get("locale")));
     if (form.has("fileId") && !fileId)
       return error("The study material reference is invalid.", 400);
     if (form.has("fileIds") && !fileIds.length)
@@ -81,6 +83,7 @@ export async function POST(request: Request) {
               text: [
                 "Grade the student's answer only against the supplied lecture transcript and question.",
                 "Return correct, partial, or incorrect; score must be 0 to 1. Do not invent facts.",
+                `Write feedback and missingPoints in ${generationLanguage(locale)}.`,
                 `QUESTION: ${JSON.stringify(question.data)}`,
                 `STUDENT ANSWER: ${answer}`,
                 ...(transcript ? [`LECTURE TRANSCRIPT: ${transcript}`] : []),

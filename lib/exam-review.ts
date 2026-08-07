@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_LOCALE, generationLanguage, type Locale } from "@/lib/i18n";
 
 export const ExamReviewTopicSchema = z.object({
   topic: z.string().trim().min(1).max(120),
@@ -17,7 +18,8 @@ export const ExamReviewSheetSchema = z.object({
 
 export type ExamReviewSheet = z.infer<typeof ExamReviewSheetSchema>;
 
-export function buildExamReviewInstructions() {
+export function buildExamReviewInstructions(locale: Locale = DEFAULT_LOCALE) {
+  const language = generationLanguage(locale);
   return [
     "You are a precise exam tutor. Create a concise review sheet based only on the supplied study material.",
     "Cover 4 to 8 distinct high-value topics from across the material; do not repeat a topic.",
@@ -26,6 +28,6 @@ export function buildExamReviewInstructions() {
     "Return relatedMistakeIds only from the supplied mistake identifiers, and use an empty array with an empty mistakeFocus when no supplied mistake applies.",
     "Return exactly one JSON object with this shape: { title: string, topics: [{ topic: string, keyIdeas: string[], formulaOrProcedure: string, commonConfusion: string, sourceNote: string, relatedMistakeIds: string[], mistakeFocus: string }] }. Include 4 to 8 topics.",
     "Return JSON only, without Markdown headings or a code fence.",
-    "Write every user-visible field in English. Do not invent facts or imply this document is permitted during an exam.",
+    `Write every user-visible field in ${language}. Do not invent facts or imply this document is permitted during an exam.`,
   ].join("\n");
 }

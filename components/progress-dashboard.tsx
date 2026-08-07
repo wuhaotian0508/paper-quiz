@@ -8,6 +8,18 @@ import {
   sessionDateKey,
   type StudySession,
 } from "@/lib/study-history";
+import { useLocale } from "@/hooks/use-locale";
+import type { MessageKey } from "@/lib/i18n";
+
+const weekdayKeys: MessageKey[] = [
+  "progress.sun",
+  "progress.mon",
+  "progress.tue",
+  "progress.wed",
+  "progress.thu",
+  "progress.fri",
+  "progress.sat",
+];
 
 type Props = {
   sessions: StudySession[];
@@ -16,6 +28,7 @@ type Props = {
 };
 
 export function ProgressDashboard({ sessions, onBack, onOpen }: Props) {
+  const { locale, t } = useLocale();
   const initial = sessions[0]
     ? sessionDateKey(sessions[0].createdAt)
     : sessionDateKey(new Date().toISOString());
@@ -36,23 +49,21 @@ export function ProgressDashboard({ sessions, onBack, onOpen }: Props) {
     <section className="progress-page">
       <div className="progress-heading">
         <div>
-          <div className="eyebrow">Progress</div>
-          <h1>Practice tells a story.</h1>
-          <p className="muted-copy">
-            First-attempt results and daily study activity stored on this browser.
-          </p>
+          <div className="eyebrow">{t("progress.eyebrow")}</div>
+          <h1>{t("progress.heading")}</h1>
+          <p className="muted-copy">{t("progress.note")}</p>
         </div>
         <button
           className="primary-button"
           disabled={!sessions.length}
           onClick={() => downloadProgressPdf(sessions)}
         >
-          Export progress PDF
+          {t("progress.exportPdf")}
         </button>
       </div>
       <div className="progress-grid">
         <article className="progress-card">
-          <h2>Accuracy trend</h2>
+          <h2>{t("progress.accuracyTrend")}</h2>
           <div className="trend-chart">
             {recent.length ? (
               recent.map((session) => (
@@ -62,7 +73,7 @@ export function ProgressDashboard({ sessions, onBack, onOpen }: Props) {
                 </div>
               ))
             ) : (
-              <p className="muted-copy">Complete a quiz to start the curve.</p>
+              <p className="muted-copy">{t("progress.trendEmpty")}</p>
             )}
           </div>
         </article>
@@ -77,9 +88,14 @@ export function ProgressDashboard({ sessions, onBack, onOpen }: Props) {
                 )
               }
             >
-              Previous
+              {t("progress.previous")}
             </button>
-            <h2>{selected.toLocaleString("en", { month: "long", year: "numeric" })}</h2>
+            <h2>
+              {selected.toLocaleString(locale === "zh" ? "zh-CN" : "en", {
+                month: "long",
+                year: "numeric",
+              })}
+            </h2>
             <button
               onClick={() =>
                 setSelectedDate(
@@ -89,12 +105,12 @@ export function ProgressDashboard({ sessions, onBack, onOpen }: Props) {
                 )
               }
             >
-              Next
+              {t("progress.next")}
             </button>
           </div>
           <div className="calendar-week">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-              <span key={day}>{day}</span>
+            {weekdayKeys.map((key) => (
+              <span key={key}>{t(key)}</span>
             ))}
           </div>
           <div className="calendar-grid">
@@ -116,23 +132,23 @@ export function ProgressDashboard({ sessions, onBack, onOpen }: Props) {
         </article>
       </div>
       <article className="progress-card daily-sessions">
-        <h2>{selected.toLocaleDateString()} practice</h2>
+        <h2>{t("progress.dayPractice", { date: selected.toLocaleDateString() })}</h2>
         {(grouped[selectedDate] || []).length ? (
           grouped[selectedDate].map((session) => (
             <button className="session-card" key={session.id} onClick={() => onOpen(session)}>
               <span>
                 <strong>{session.title}</strong>
-                <small>{session.questions.length} questions</small>
+                <small>{t("progress.questionCount", { count: session.questions.length })}</small>
               </span>
               <b>{getSessionAccuracy(session)}%</b>
             </button>
           ))
         ) : (
-          <p className="muted-copy">No completed practice recorded for this day.</p>
+          <p className="muted-copy">{t("progress.dayEmpty")}</p>
         )}
       </article>
       <button className="text-button" onClick={onBack}>
-        Back to upload
+        {t("progress.back")}
       </button>
     </section>
   );

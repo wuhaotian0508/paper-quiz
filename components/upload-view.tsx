@@ -6,19 +6,21 @@ import { materialFromFile, type StudySession } from "@/lib/study-history";
 import type { StudyMaterial } from "@/lib/study-material";
 import type { StudyLibraryRecord } from "@/lib/study-library";
 import { ReviewLibrary } from "@/components/review-library";
+import { useLocale } from "@/hooks/use-locale";
+import type { MessageKey } from "@/lib/i18n";
 
 export type CustomDraft = { key: string; label: string; instructions: string; count: number };
 
 export const fixedTypes = [
-  ["multiple_choice", "Multiple-choice questions"],
-  ["fill_blank", "Fill-blank questions"],
-  ["short_answer", "Short-answer questions"],
-] as const;
+  ["multiple_choice", "upload.typeMultipleChoice"],
+  ["fill_blank", "upload.typeFillBlank"],
+  ["short_answer", "upload.typeShortAnswer"],
+] as const satisfies readonly (readonly [string, MessageKey])[];
 
-const difficultyCopy: Record<Difficulty, string> = {
-  basic: "Core review",
-  mixed: "Mixed practice",
-  challenging: "Challenge mode",
+const difficultyCopy: Record<Difficulty, MessageKey> = {
+  basic: "upload.difficultyBasic",
+  mixed: "upload.difficultyMixed",
+  challenging: "upload.difficultyChallenging",
 };
 
 export function UploadView({
@@ -68,6 +70,7 @@ export function UploadView({
   onOpenMaterial?: (material: StudyMaterial) => void;
   onStart: () => void;
 }) {
+  const { t } = useLocale();
   const needsTranscription = Boolean(files.length === 1 && isAudio(files[0]));
   const isCombinedPdfSet = files.length > 1;
   const studyDayCount = new Set(
@@ -86,9 +89,9 @@ export function UploadView({
       <section className="dashboard-upload-card" aria-labelledby="start-quiz-heading">
         <div className="dashboard-section-heading">
           <div>
-            <div className="eyebrow">Quiz lab</div>
-            <h2 id="start-quiz-heading">Start a new practice set.</h2>
-            <p>Upload one or more PDFs, or a lecture recording, then configure your quiz.</p>
+            <div className="eyebrow">{t("upload.eyebrow")}</div>
+            <h2 id="start-quiz-heading">{t("upload.heading")}</h2>
+            <p>{t("upload.subheading")}</p>
           </div>
         </div>
         <div className="upload-panel dashboard-upload-panel">
@@ -101,13 +104,13 @@ export function UploadView({
             }}
           >
             <input
-              aria-label="Choose a PDF or lecture recording"
+              aria-label={t("upload.chooseFileAria")}
               type="file"
               multiple
               accept="application/pdf,.pdf,audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/webm,video/mp4,.mp3,.m4a,.wav,.webm,.mp4"
               onChange={(event) => onAcceptFiles(event.target.files || undefined)}
             />
-            <span className="upload-icon">Upload</span>
+            <span className="upload-icon">{t("upload.uploadIcon")}</span>
             {files.length ? (
               <>
                 {files.map((file) => (
@@ -115,29 +118,29 @@ export function UploadView({
                 ))}
                 <span>
                   {isCombinedPdfSet
-                    ? `${files.length} PDFs ready to generate together`
-                    : `${formatBytes(files[0].size)} - Ready to generate`}
+                    ? t("upload.pdfsReady", { count: files.length })
+                    : t("upload.readyToGenerate", { size: formatBytes(files[0].size) })}
                 </span>
               </>
             ) : (
               <>
-                <strong>Drop in a PDF or lecture recording</strong>
-                <span>PDF, MP3, M4A, WAV, WebM, or MP4</span>
+                <strong>{t("upload.dropHere")}</strong>
+                <span>{t("upload.acceptedFormats")}</span>
               </>
             )}
           </label>
           {error && <div className="error-message">{error}</div>}
           <div className="settings-block">
             <div className="setting-heading">
-              <span>Question mix</span>
-              <small>Questions, answers, and explanations are generated in English.</small>
+              <span>{t("upload.questionMix")}</span>
+              <small>{t("upload.generationLanguageNote")}</small>
             </div>
             <div className="type-grid">
-              {fixedTypes.map(([type, label]) => (
+              {fixedTypes.map(([type, labelKey]) => (
                 <label key={type}>
-                  {label}
+                  {t(labelKey)}
                   <input
-                    aria-label={label}
+                    aria-label={t(labelKey)}
                     min="0"
                     max="15"
                     type="number"
@@ -155,9 +158,9 @@ export function UploadView({
             {custom.map((item) => (
               <div className="custom-row" key={item.key}>
                 <input
-                  aria-label="Custom question type name"
+                  aria-label={t("upload.customTypeNameAria")}
                   value={item.label}
-                  placeholder="Question type name"
+                  placeholder={t("upload.customTypeNamePlaceholder")}
                   onChange={(event) =>
                     onCustomChange((items) =>
                       items.map((value) =>
@@ -167,9 +170,9 @@ export function UploadView({
                   }
                 />
                 <input
-                  aria-label="Custom question requirements"
+                  aria-label={t("upload.customRequirementsAria")}
                   value={item.instructions}
-                  placeholder="Requirements"
+                  placeholder={t("upload.customRequirementsPlaceholder")}
                   onChange={(event) =>
                     onCustomChange((items) =>
                       items.map((value) =>
@@ -181,7 +184,7 @@ export function UploadView({
                   }
                 />
                 <input
-                  aria-label="Custom question count"
+                  aria-label={t("upload.customCountAria")}
                   min="1"
                   max="15"
                   type="number"
@@ -205,7 +208,7 @@ export function UploadView({
                     onCustomChange((items) => items.filter((value) => value.key !== item.key))
                   }
                 >
-                  Remove
+                  {t("upload.remove")}
                 </button>
               </div>
             ))}
@@ -218,7 +221,7 @@ export function UploadView({
                 ])
               }
             >
-              Add custom question type
+              {t("upload.addCustomType")}
             </button>
             <div className="segmented-control difficulty-control">
               {(Object.keys(difficultyCopy) as Difficulty[]).map((item) => (
@@ -227,7 +230,7 @@ export function UploadView({
                   className={difficulty === item ? "is-active" : ""}
                   onClick={() => onDifficultyChange(item)}
                 >
-                  {difficultyCopy[item]}
+                  {t(difficultyCopy[item])}
                 </button>
               ))}
             </div>
@@ -238,16 +241,12 @@ export function UploadView({
             onClick={onStart}
           >
             {needsTranscription
-              ? "Transcribe recording"
+              ? t("upload.transcribeRecording")
               : isCombinedPdfSet
-                ? "Generate combined quiz"
-                : "Generate quiz"}
+                ? t("upload.generateCombined")
+                : t("upload.generateQuiz")}
           </button>
-          <p className="privacy-note">
-            Large files pass through a temporary Vercel Blob and are deleted after processing. Your
-            lecture is sent to OpenAI to build the quiz; PDFs may stay there for up to 7 days so
-            grading and follow-up questions can reference them. Answers stay in this browser.
-          </p>
+          <p className="privacy-note">{t("upload.privacyNote")}</p>
         </div>
       </section>
 
@@ -258,14 +257,14 @@ export function UploadView({
         onViewAll={onOpenHistory}
       />
 
-      <section className="dashboard-shortcuts" aria-label="Study shortcuts">
+      <section className="dashboard-shortcuts" aria-label={t("upload.shortcutsAria")}>
         <button onClick={onOpenMistakes}>
           <span className="dashboard-shortcut-icon coral" aria-hidden="true">
             !
           </span>
           <span>
-            <strong>Mistake Book</strong>
-            <small>{mistakeCount} questions to revisit</small>
+            <strong>{t("nav.mistakeBook")}</strong>
+            <small>{t("upload.questionsToRevisit", { count: mistakeCount })}</small>
           </span>
           <b aria-hidden="true">-&gt;</b>
         </button>
@@ -274,8 +273,8 @@ export function UploadView({
             C
           </span>
           <span>
-            <strong>Calendar</strong>
-            <small>{studyDayCount} recorded study days</small>
+            <strong>{t("nav.calendar")}</strong>
+            <small>{t("upload.recordedStudyDays", { count: studyDayCount })}</small>
           </span>
           <b aria-hidden="true">-&gt;</b>
         </button>
@@ -284,8 +283,8 @@ export function UploadView({
             H
           </span>
           <span>
-            <strong>History</strong>
-            <small>{materialCount} PDFs with saved questions</small>
+            <strong>{t("nav.history")}</strong>
+            <small>{t("upload.pdfsWithSavedQuestions", { count: materialCount })}</small>
           </span>
           <b aria-hidden="true">-&gt;</b>
         </button>
@@ -294,9 +293,9 @@ export function UploadView({
       <section className="dashboard-details">
         <article className="dashboard-detail-card">
           <div className="dashboard-detail-heading">
-            <h2>Recent practice</h2>
+            <h2>{t("upload.recentPractice")}</h2>
             <button className="text-button" onClick={onOpenHistory}>
-              View all
+              {t("upload.viewAll")}
             </button>
           </div>
           {recentSessions.length ? (
@@ -306,7 +305,12 @@ export function UploadView({
                   <span>
                     <strong>{session.title}</strong>
                     <small>
-                      {session.questions.length} question{session.questions.length === 1 ? "" : "s"}
+                      {t(
+                        session.questions.length === 1
+                          ? "upload.questionCountOne"
+                          : "upload.questionCountOther",
+                        { count: session.questions.length },
+                      )}
                     </small>
                   </span>
                   <time dateTime={session.createdAt}>
@@ -316,23 +320,20 @@ export function UploadView({
               ))}
             </div>
           ) : (
-            <p className="dashboard-empty">Your completed quizzes will appear here.</p>
+            <p className="dashboard-empty">{t("upload.noSessions")}</p>
           )}
         </article>
         <article className="dashboard-detail-card calendar-summary-card">
           <div className="dashboard-detail-heading">
-            <h2>Your calendar</h2>
+            <h2>{t("upload.yourCalendar")}</h2>
             <button className="text-button" onClick={onOpenProgress}>
-              Open calendar
+              {t("upload.openCalendar")}
             </button>
           </div>
           <strong className="calendar-summary-number">{studyDayCount}</strong>
-          <p>
-            days with recorded practice. Your full calendar shows every study date and its saved
-            quizzes.
-          </p>
+          <p>{t("upload.calendarDaysNote")}</p>
           <button className="primary-button" onClick={onOpenProgress}>
-            View learning calendar
+            {t("upload.viewLearningCalendar")}
           </button>
         </article>
       </section>

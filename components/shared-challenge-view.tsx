@@ -8,6 +8,7 @@ import {
   submitSharedChallenge,
   type SharedChallengeClient,
 } from "@/lib/shared-challenge-client";
+import { useLocale } from "@/hooks/use-locale";
 
 const PublicQuestionSchema = z.discriminatedUnion("type", [
   z.object({
@@ -49,8 +50,9 @@ export function SharedChallengeView({ slug, client }: { slug: string; client?: S
   const [challenge, setChallenge] = useState<z.infer<typeof ChallengeSchema> | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [name, setName] = useState("");
+  const { t } = useLocale();
   const [result, setResult] = useState<z.infer<typeof ResultSchema> | null>(null);
-  const [message, setMessage] = useState("Loading challenge...");
+  const [message, setMessage] = useState(t("shared.loadingChallenge"));
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -63,14 +65,14 @@ export function SharedChallengeView({ slug, client }: { slug: string; client?: S
         setChallenge(data);
         setMessage("");
       } catch (cause) {
-        if (active) setMessage(cause instanceof Error ? cause.message : "This challenge is unavailable.");
+        if (active) setMessage(cause instanceof Error ? cause.message : t("shared.challengeUnavailable"));
       }
     }
     void load();
     return () => {
       active = false;
     };
-  }, [client, slug]);
+  }, [client, slug, t]);
 
   async function submit() {
     if (!challenge) return;
@@ -80,7 +82,7 @@ export function SharedChallengeView({ slug, client }: { slug: string; client?: S
       const resolvedClient = client ?? (getSupabaseBrowserClient() as unknown as SharedChallengeClient);
       setResult(ResultSchema.parse(await submitSharedChallenge(resolvedClient, challenge.slug, answers, name)));
     } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Your answers could not be submitted.");
+      setMessage(cause instanceof Error ? cause.message : t("shared.submitFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -92,28 +94,30 @@ export function SharedChallengeView({ slug, client }: { slug: string; client?: S
 
   return (
     <main className="shared-challenge-page">
-      <div className="eyebrow">Paper Plane Quiz challenge</div>
+      <div className="eyebrow">{t("shared.challengeEyebrow")}</div>
       <h1>{challenge.title}</h1>
       <p className="muted-copy">{challenge.summary}</p>
-      <p className="shared-challenge-note">This link shares questions only, never the original study file.</p>
+      <p className="shared-challenge-note">{t("shared.challengeNote")}</p>
       <div className="shared-link-actions">
         <a className="text-button framed-button" href={`/login?returnTo=${encodeURIComponent(`/challenge/${challenge.slug}`)}`}>
-          Sign in
+          {t("shared.signIn")}
         </a>
         <a className="primary-button" href="#shared-quiz">
-          Use this quiz
+          {t("shared.useThisQuiz")}
         </a>
       </div>
       {!result ? (
         <>
           <label className="shared-name">
-            Display name (optional)
-            <input value={name} maxLength={80} onChange={(event) => setName(event.target.value)} placeholder="Anonymous" />
+            {t("shared.displayName")}
+            <input value={name} maxLength={80} onChange={(event) => setName(event.target.value)} placeholder={t("shared.anonymous")} />
           </label>
           <div className="shared-question-list" id="shared-quiz">
             {challenge.quiz.questions.map((question, index) => (
               <section className="shared-question" key={question.id}>
-                <span className="question-kicker">QUESTION {String(index + 1).padStart(2, "0")}</span>
+                <span className="question-kicker">
+                  {t("shared.questionKicker")} {String(index + 1).padStart(2, "0")}
+                </span>
                 <h2>{question.prompt}</h2>
                 {question.type === "multiple_choice" ? (
                   <div className="option-list">
@@ -132,7 +136,7 @@ export function SharedChallengeView({ slug, client }: { slug: string; client?: S
                 ) : (
                   <textarea
                     className="written-answer"
-                    aria-label={`Answer for question ${index + 1}`}
+                    aria-label={t("shared.answerForAria", { number: index + 1 })}
                     value={answers[question.id] || ""}
                     onChange={(event) => setAnswers((old) => ({ ...old, [question.id]: event.target.value }))}
                     rows={question.type === "fill_blank" ? 3 : 6}
@@ -142,18 +146,30 @@ export function SharedChallengeView({ slug, client }: { slug: string; client?: S
             ))}
           </div>
           <button className="primary-button" disabled={submitting} onClick={() => void submit()}>
-            {submitting ? "Submitting..." : "Submit challenge"}
+            {submitting ? t("shared.submitting") : t("shared.submitChallenge")}
           </button>
           {message ? <p className="share-status" role="status">{message}</p> : null}
         </>
       ) : (
         <section className="shared-results">
-          <h2>{result.score === null || result.score === undefined ? "Answers submitted" : `Score: ${Math.round(result.score * 100)}%`}</h2>
+          <h2>
+            {result.score === null || result.score === undefined
+              ? t("shared.answersSubmitted")
+              : t("shared.score", { score: Math.round(result.score * 100) })}
+          </h2>
           {result.results.map((item) => (
             <article key={item.id} className="shared-result-item">
-              <strong>{item.status === "correct" ? "Correct" : item.status === "self_review" ? "Self review" : "Review this"}</strong>
+              <strong>
+                {item.status === "correct"
+                  ? t("shared.correct")
+                  : item.status === "self_review"
+                    ? t("shared.selfReview")
+                    : t("shared.reviewThis")}
+              </strong>
               <p>{item.feedback}</p>
-              {item.referenceAnswer ? <p>Reference answer: {item.referenceAnswer}</p> : null}
+              {item.referenceAnswer ? (
+                <p>{t("shared.referenceAnswer", { answer: item.referenceAnswer })}</p>
+              ) : null}
             </article>
           ))}
         </section>

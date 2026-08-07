@@ -91,4 +91,31 @@ describe("DashboardNavigation", () => {
     expect((onOpen.mock.calls[0][0] as CustomEvent<string>).detail).toBe("biology.pdf::1200");
     window.removeEventListener("paper-quiz-open-material", onOpen);
   });
+
+  it("starts in English and switches the sidebar to Chinese", () => {
+    render(<DashboardNavigation />);
+
+    expect(screen.getByRole("link", { name: "Dashboard" })).toBeInTheDocument();
+    expect(screen.getByText("Your Library")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "切换为中文" }));
+
+    expect(screen.getByRole("link", { name: "主页" })).toHaveAttribute("href", "#dashboard");
+    expect(screen.getByText("我的资料库")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Dashboard" })).not.toBeInTheDocument();
+    expect(window.localStorage.getItem("paper-quiz-locale")).toBe("zh");
+    expect(document.documentElement.lang).toBe("zh-CN");
+  });
+
+  it("restores the stored locale on mount and can switch back to English", () => {
+    window.localStorage.setItem("paper-quiz-locale", "zh");
+
+    render(<DashboardNavigation />);
+    expect(screen.getByRole("link", { name: "错题本" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Switch to English" }));
+
+    expect(screen.getByRole("link", { name: "Mistake Book" })).toBeInTheDocument();
+    expect(window.localStorage.getItem("paper-quiz-locale")).toBe("en");
+  });
 });

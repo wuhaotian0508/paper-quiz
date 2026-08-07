@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale } from "@/hooks/use-locale";
+
 export function TranscriptReviewView({
   transcript,
   onChange,
@@ -11,14 +13,15 @@ export function TranscriptReviewView({
   onBack: () => void;
   onGenerate: () => void;
 }) {
+  const { t } = useLocale();
   return (
     <section className="transcript-card">
-      <div className="eyebrow">Transcript review</div>
-      <h1>Check the lecture notes before building your quiz.</h1>
+      <div className="eyebrow">{t("transcript.eyebrow")}</div>
+      <h1>{t("transcript.heading")}</h1>
       <label className="transcript-field">
-        Lecture transcript
+        {t("transcript.label")}
         <textarea
-          aria-label="Lecture transcript"
+          aria-label={t("transcript.label")}
           value={transcript}
           onChange={(event) => onChange(event.target.value)}
           rows={15}
@@ -26,10 +29,10 @@ export function TranscriptReviewView({
       </label>
       <div className="quiz-actions">
         <button className="text-button" onClick={onBack}>
-          Choose another study file
+          {t("transcript.chooseAnother")}
         </button>
         <button className="primary-button" disabled={!transcript.trim()} onClick={onGenerate}>
-          Generate quiz from transcript
+          {t("transcript.generate")}
         </button>
       </div>
     </section>
