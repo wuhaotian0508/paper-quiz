@@ -4,17 +4,20 @@ import type { MistakeBookEntry } from "@/lib/mistake-book";
 import { useStudySync } from "./use-study-sync";
 
 type RemoteRow = { id: string; payload: object; updated_at: string };
+type SyncTable = "paper_quiz_sessions" | "paper_quiz_mistakes" | "paper_quiz_library";
 
 function fakeClient(
-  rows: { sessions?: RemoteRow[]; mistakes?: RemoteRow[] } = {},
+  rows: { sessions?: RemoteRow[]; mistakes?: RemoteRow[]; library?: RemoteRow[] } = {},
   initialUserId = "user-1",
 ) {
   let authCallback: ((event: string, session: { user: { id: string } } | null) => void) | undefined;
-  const select = vi.fn((table: "paper_quiz_sessions" | "paper_quiz_mistakes") => ({
-    eq: vi.fn().mockResolvedValue({
-      data: table === "paper_quiz_sessions" ? (rows.sessions ?? []) : (rows.mistakes ?? []),
-      error: null,
-    }),
+  const rowsFor: Record<SyncTable, RemoteRow[]> = {
+    paper_quiz_sessions: rows.sessions ?? [],
+    paper_quiz_mistakes: rows.mistakes ?? [],
+    paper_quiz_library: rows.library ?? [],
+  };
+  const select = vi.fn((table: SyncTable) => ({
+    eq: vi.fn().mockResolvedValue({ data: rowsFor[table], error: null }),
   }));
   const upsert = vi.fn().mockResolvedValue({ error: null });
   const remove = vi.fn(() => ({
@@ -29,7 +32,7 @@ function fakeClient(
         return { data: { subscription: { unsubscribe: vi.fn() } } };
       }),
     },
-    from: vi.fn((table: "paper_quiz_sessions" | "paper_quiz_mistakes") => ({
+    from: vi.fn((table: SyncTable) => ({
       select: () => select(table),
       upsert,
       delete: remove,
@@ -70,6 +73,7 @@ describe("useStudySync", () => {
         ready: false,
         sessions: [localSession],
         mistakes: [],
+        library: [],
         onHydrate: vi.fn(),
       }),
     );
@@ -92,6 +96,7 @@ describe("useStudySync", () => {
         ready: true,
         sessions: [localSession],
         mistakes: [],
+        library: [],
         onHydrate,
       }),
     );
@@ -107,6 +112,79 @@ describe("useStudySync", () => {
     ]);
   });
 
+  it("takes a subject assigned on another device over the local guess", async () => {
+    const localRecord = {
+      id: "lecture.pdf::100",
+      name: "lecture.pdf",
+      uploadedAt: "2026-08-01T10:00:00.000Z",
+      lastOpenedAt: "",
+      subject: "",
+      updatedAt: "2026-08-01T10:00:00.000Z",
+    };
+    const assignedElsewhere = { ...localRecord, subject: "UGBA 117" };
+    const client = fakeClient({
+      library: [
+        { id: localRecord.id, payload: assignedElsewhere, updated_at: "2026-08-05T10:00:00.000Z" },
+      ],
+    });
+    const onHydrate = vi.fn();
+
+    renderHook(() =>
+      useStudySync({
+        client: client as never,
+        ready: true,
+        sessions: [],
+        mistakes: [],
+        library: [localRecord],
+        onHydrate,
+      }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(onHydrate.mock.calls[0][0].library).toEqual([
+      { ...assignedElsewhere, updatedAt: "2026-08-05T10:00:00.000Z" },
+    ]);
+  });
+
+  it("uploads a locally assigned subject to the library table", async () => {
+    vi.useFakeTimers();
+    const assigned = {
+      id: "lecture.pdf::100",
+      name: "lecture.pdf",
+      uploadedAt: "2026-08-01T10:00:00.000Z",
+      lastOpenedAt: "",
+      subject: "MATH 1A",
+      updatedAt: "2026-08-06T10:00:00.000Z",
+    };
+    const client = fakeClient();
+
+    renderHook(() =>
+      useStudySync({
+        client: client as never,
+        ready: true,
+        sessions: [],
+        mistakes: [],
+        library: [assigned],
+        onHydrate: vi.fn(),
+      }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+
+    expect(client.from).toHaveBeenCalledWith("paper_quiz_library");
+    const uploaded = client.upsert.mock.calls.flatMap(([rows]) => rows as { payload: object }[]);
+    expect(uploaded).toContainEqual(expect.objectContaining({ payload: assigned }));
+  });
+
   it("keeps local state untouched when the initial remote read fails", async () => {
     const client = fakeClient();
     client.select.mockReturnValue({
@@ -119,6 +197,7 @@ describe("useStudySync", () => {
         ready: true,
         sessions: [localSession],
         mistakes: [],
+        library: [],
         onHydrate,
       }),
     );
@@ -160,7 +239,7 @@ describe("useStudySync", () => {
     const onHydrate = vi.fn();
     const { result, rerender } = renderHook(
       ({ mistakes }) =>
-        useStudySync({ client: client as never, ready: true, sessions: [], mistakes, onHydrate }),
+        useStudySync({ client: client as never, ready: true, sessions: [], mistakes, library: [], onHydrate }),
       { initialProps: { mistakes: [remoteMistake] } },
     );
 
@@ -215,6 +294,7 @@ describe("useStudySync", () => {
           ready: true,
           sessions: [],
           mistakes,
+          library: [],
           onHydrate: vi.fn(),
         }),
       { initialProps: { mistakes: [mistake] } },
@@ -269,6 +349,7 @@ describe("useStudySync", () => {
           ready: true,
           sessions: [],
           mistakes,
+          library: [],
           onHydrate: vi.fn(),
         }),
       { initialProps: { mistakes: [] as MistakeBookEntry[] } },
@@ -309,6 +390,7 @@ describe("useStudySync", () => {
         ready: true,
         sessions: [localSession],
         mistakes: [],
+        library: [],
         onHydrate,
       }),
     );
@@ -330,6 +412,7 @@ describe("useStudySync", () => {
         ready: true,
         sessions: [],
         mistakes: [],
+        library: [],
         onHydrate,
       }),
     );
@@ -356,7 +439,7 @@ describe("useStudySync", () => {
     const onHydrate = vi.fn();
     const { rerender } = renderHook(
       ({ sessions }) =>
-        useStudySync({ client: client as never, ready: true, sessions, mistakes: [], onHydrate }),
+        useStudySync({ client: client as never, ready: true, sessions, mistakes: [], library: [], onHydrate }),
       { initialProps: { sessions: [] as (typeof localSession)[] } },
     );
 
@@ -384,7 +467,7 @@ describe("useStudySync", () => {
     });
     const onHydrate = vi.fn();
     renderHook(() =>
-      useStudySync({ client: client as never, ready: true, sessions: [], mistakes: [], onHydrate }),
+      useStudySync({ client: client as never, ready: true, sessions: [], mistakes: [], library: [], onHydrate }),
     );
 
     await waitFor(() => expect(onHydrate).toHaveBeenCalledTimes(1));
@@ -425,7 +508,7 @@ describe("useStudySync", () => {
     });
     const onHydrate = vi.fn();
     renderHook(() =>
-      useStudySync({ client: client as never, ready: true, sessions: [], mistakes: [], onHydrate }),
+      useStudySync({ client: client as never, ready: true, sessions: [], mistakes: [], library: [], onHydrate }),
     );
 
     await waitFor(() => expect(onHydrate).toHaveBeenCalledTimes(1));
@@ -447,6 +530,7 @@ describe("useStudySync", () => {
         ready: true,
         sessions: [localSession],
         mistakes: [],
+        library: [],
         onHydrate,
       }),
     );
@@ -455,3 +539,6 @@ describe("useStudySync", () => {
     expect(onHydrate).not.toHaveBeenCalled();
   });
 });
+
+
+

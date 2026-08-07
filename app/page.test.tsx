@@ -38,13 +38,12 @@ describe("Home", () => {
   it("provides a pre-addressed feedback email link", async () => {
     await renderHome();
     expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "#dashboard");
-    expect(screen.getByRole("link", { name: "Quiz Lab" })).toHaveAttribute("href", "#quiz-lab");
+    expect(screen.getByRole("link", { name: "Library" })).toHaveAttribute("href", "#library");
     expect(screen.getByRole("link", { name: "Mistake Book" })).toHaveAttribute(
       "href",
       "#mistake-book",
     );
     expect(screen.getByRole("link", { name: "Calendar" })).toHaveAttribute("href", "#progress");
-    expect(screen.getByRole("link", { name: "History" })).toHaveAttribute("href", "#history");
     expect(screen.getByRole("link", { name: "Help" })).toHaveAttribute("href", "#help");
     const feedback = screen.getByRole("link", { name: "Feedback" });
     expect(feedback).toHaveAttribute(

@@ -17,6 +17,13 @@ import {
   type MistakeBookEntry,
 } from "@/lib/mistake-book";
 import {
+  buildMemoryContext,
+  captureMemory,
+  LEARNER_MEMORY_KEY,
+  readMemories,
+  type LearnerMemoryEntry,
+} from "@/lib/learner-memory";
+import {
   addSession,
   boundSource,
   EMPTY_SOURCE,
@@ -27,21 +34,27 @@ import {
   type PersistedSource,
   type StudySession,
 } from "@/lib/study-history";
-import { findStudyMaterial, groupStudyMaterials, mergeStudyLibraryMaterials } from "@/lib/study-material";
 import {
+  findStudyMaterial,
+  groupStudyMaterials,
+  mergeStudyLibraryMaterials,
+} from "@/lib/study-material";
+import {
+  createLibraryRecord,
   readStudyLibrary,
+  setLibrarySubject,
   STUDY_LIBRARY_KEY,
   STUDY_LIBRARY_UPDATED_EVENT,
   STUDY_MATERIAL_OPEN_EVENT,
   upsertStudyLibrary,
   type StudyLibraryRecord,
 } from "@/lib/study-library";
+import { buildDailyReviewPapers } from "@/lib/daily-review";
 import { ProgressDashboard } from "@/components/progress-dashboard";
 import { ReadOnlyReview } from "@/components/read-only-review";
 import { MistakeBookView } from "@/components/mistake-book-view";
-import { HistoryView } from "@/components/history-view";
+import { LibraryView } from "@/components/library-view";
 import { MaterialDetailView } from "@/components/material-detail-view";
-import { ReviewLibrary } from "@/components/review-library";
 import { LoadingView } from "@/components/loading-view";
 import { ResultsView } from "@/components/results-view";
 import { TranscriptReviewView } from "@/components/transcript-review-view";
@@ -68,13 +81,12 @@ type View =
   | "quiz"
   | "results"
   | "mistakes"
-  | "history"
+  | "library"
   | "progress"
   | "session-review"
   | "material-detail"
   | "help"
-  | "review-sheet"
-  | "review-sheets";
+  | "review-sheet";
 
 export function QuizWorkspace() {
   const { locale, t } = useLocale();
@@ -113,24 +125,33 @@ export function QuizWorkspace() {
   const [chatInput, setChatInput] = useState("");
   const [chatting, setChatting] = useState(false);
   const [storageReady, setStorageReady] = useState(false);
+  /** Local only for now: not synced to Supabase until the injection proves itself. */
+  const [memories, setMemories] = useState<LearnerMemoryEntry[]>([]);
 
   useEffect(() => {
     setMistakes(readMistakes(window.localStorage.getItem(MISTAKE_BOOK_KEY)));
     setSessions(readSessions(window.localStorage.getItem(STUDY_HISTORY_KEY)));
     setLibrary(readStudyLibrary(window.localStorage.getItem(STUDY_LIBRARY_KEY)));
+    setMemories(readMemories(window.localStorage.getItem(LEARNER_MEMORY_KEY)));
     setStorageReady(true);
   }, []);
   useEffect(() => {
     const openFromHash = () => {
-      if (window.location.hash === "#dashboard" || window.location.hash === "#quiz-lab")
-        setView("upload");
+      if (window.location.hash === "#dashboard") setView("upload");
       if (window.location.hash === "#mistake-book") setView("mistakes");
       if (window.location.hash === "#progress") setView("progress");
-      if (window.location.hash === "#history") setView("history");
-      if (window.location.hash === "#review-sheets") setView("review-sheets");
-      // Older shared links used #materials before PDF groups became the History view.
-      if (window.location.hash === "#materials") setView("history");
+      if (window.location.hash === "#library") setView("library");
       if (window.location.hash === "#help") setView("help");
+      // Retired entries kept as redirects so existing links and bookmarks still land
+      // somewhere sensible: Quiz Lab was the dashboard, and Review Sheets, History and
+      // the older #materials all listed the same materials the library now owns.
+      if (window.location.hash === "#quiz-lab") setView("upload");
+      if (
+        window.location.hash === "#history" ||
+        window.location.hash === "#review-sheets" ||
+        window.location.hash === "#materials"
+      )
+        setView("library");
     };
     window.addEventListener("hashchange", openFromHash);
     openFromHash();
@@ -150,18 +171,29 @@ export function QuizWorkspace() {
     () => mergeStudyLibraryMaterials(groupStudyMaterials(sessions, mistakes), library),
     [library, mistakes, sessions],
   );
+  /** Today's review papers, one per course. Empty until something the student missed comes due. */
+  const dailyPapers = useMemo(
+    () => buildDailyReviewPapers(mistakes, library),
+    [library, mistakes],
+  );
   const hydrateStudyState = useCallback(
     ({
       sessions: mergedSessions,
       mistakes: mergedMistakes,
+      library: mergedLibrary,
     }: {
       sessions: StudySession[];
       mistakes: MistakeBookEntry[];
+      library: StudyLibraryRecord[];
     }) => {
       setSessions(mergedSessions);
       setMistakes(mergedMistakes);
+      setLibrary(mergedLibrary);
       safeStorageSet(STUDY_HISTORY_KEY, JSON.stringify(mergedSessions));
       safeStorageSet(MISTAKE_BOOK_KEY, JSON.stringify(mergedMistakes));
+      safeStorageSet(STUDY_LIBRARY_KEY, JSON.stringify(mergedLibrary));
+      // The sidebar reads the library straight from storage, so it has to be told.
+      window.dispatchEvent(new Event(STUDY_LIBRARY_UPDATED_EVENT));
     },
     [],
   );
@@ -173,6 +205,7 @@ export function QuizWorkspace() {
     ready: storageReady,
     sessions,
     mistakes,
+    library,
     onHydrate: hydrateStudyState,
   });
   useEffect(() => {
@@ -188,13 +221,22 @@ export function QuizWorkspace() {
     else if (files[0]) form.set("file", files[0]);
   };
 
+  /**
+   * Every graded answer now reaches the mistake book, not only the wrong ones: a correct
+   * answer to a question already in the book advances it along the Ebbinghaus ladder, and
+   * clearing the last box removes it. `addMistake` returns the same array when there is
+   * nothing to record, which is the common case of getting a fresh question right.
+   */
   const saveMistake = (question: Question, userAnswer: string, grade: GradeResult) => {
-    if (grade.status === "correct") return;
-    setMistakes((previous) => {
-      const next = addMistake(previous, question, userAnswer, grade, source);
-      safeStorageSet(MISTAKE_BOOK_KEY, JSON.stringify(next));
-      return next;
-    });
+    const next = addMistake(mistakes, question, userAnswer, grade, source);
+    if (next === mistakes) return;
+    // A card that graduated has to leave the synced copy too, or the next merge restores it.
+    const graduated = mistakes
+      .filter((entry) => !next.some((item) => item.id === entry.id))
+      .map((entry) => entry.id);
+    setMistakes(next);
+    safeStorageSet(MISTAKE_BOOK_KEY, JSON.stringify(next));
+    if (graduated.length) requestMistakeDeletion(graduated);
   };
 
   const recordGrade = (question: Question, userAnswer: string, grade: GradeResult) => {
@@ -215,17 +257,15 @@ export function QuizWorkspace() {
       return setError(t("error.chooseStudyFile"));
     setError("");
     const uploadedAt = new Date().toISOString();
-    const nextLibrary: StudyLibraryRecord[] = selected
-      .filter(isPdf)
-      .map((file) => {
-        const nextMaterial = materialFromFile(file);
-        return {
-          id: nextMaterial.materialId,
-          name: nextMaterial.materialName,
-          uploadedAt,
-          lastOpenedAt: "",
-        };
+    const nextLibrary: StudyLibraryRecord[] = selected.filter(isPdf).map((file) => {
+      const nextMaterial = materialFromFile(file);
+      // The course is guessed from the file name here, at first sight of the upload.
+      return createLibraryRecord({
+        id: nextMaterial.materialId,
+        name: nextMaterial.materialName,
+        uploadedAt,
       });
+    });
     if (nextLibrary.length) {
       setLibrary((previous) => {
         const merged = nextLibrary.reduce(upsertStudyLibrary, previous);
@@ -365,6 +405,10 @@ export function QuizWorkspace() {
       const form = new FormData();
       form.set("question", JSON.stringify(current));
       form.set("answer", answer);
+      // The question itself is the retrieval query, so only memories about this topic ride
+      // along. An empty result sends no field at all rather than an empty one.
+      const memoryContext = buildMemoryContext(memories, `${current.prompt} ${current.sourceNote}`);
+      if (memoryContext) form.set("memory", memoryContext);
       attachSource(form);
       const response = await postForm("/api/grade-answer", form, {
         timeoutMessage: t("error.gradeTimeout"),
@@ -418,6 +462,13 @@ export function QuizWorkspace() {
     setChat((items) => [...items, { role: "user", content: message }]);
     setChatInput("");
     setChatting(true);
+    // Capture before the request, not after: what the student said is worth keeping whether
+    // or not the tutor answers, and a message matching no rule leaves the book untouched.
+    setMemories((previous) => {
+      const next = captureMemory(previous, message);
+      if (next !== previous) safeStorageSet(LEARNER_MEMORY_KEY, JSON.stringify(next));
+      return next;
+    });
     try {
       const form = new FormData();
       form.set("question", JSON.stringify(current));
@@ -543,23 +594,43 @@ export function QuizWorkspace() {
     }
   };
 
-  const openMaterial = useCallback((material: { id: string; name: string; lastPracticedAt: string }) => {
-    const openedAt = new Date().toISOString();
+  /**
+   * Assigns a course to a material. Written straight to storage and announced, so the
+   * sidebar picks it up, and left for the sync hook to upload on its next debounce.
+   */
+  const assignSubject = useCallback((materialId: string, subject: string) => {
     setLibrary((previous) => {
-      const existing = previous.find((item) => item.id === material.id);
-      const next = upsertStudyLibrary(previous, {
-        id: material.id,
-        name: material.name,
-        uploadedAt: existing?.uploadedAt || material.lastPracticedAt || openedAt,
-        lastOpenedAt: openedAt,
-      });
+      const next = setLibrarySubject(previous, materialId, subject);
       safeStorageSet(STUDY_LIBRARY_KEY, JSON.stringify(next));
       window.dispatchEvent(new Event(STUDY_LIBRARY_UPDATED_EVENT));
       return next;
     });
-    setOpenMaterialId(material.id);
-    setView("material-detail");
   }, []);
+
+  const openMaterial = useCallback(
+    (material: { id: string; name: string; lastPracticedAt: string }) => {
+      const openedAt = new Date().toISOString();
+      setLibrary((previous) => {
+        const existing = previous.find((item) => item.id === material.id);
+        const next = upsertStudyLibrary(previous, {
+          ...createLibraryRecord({
+            id: material.id,
+            name: material.name,
+            uploadedAt: existing?.uploadedAt || material.lastPracticedAt || openedAt,
+            // An existing subject wins; `upsertStudyLibrary` keeps it when this is empty.
+            subject: existing?.subject,
+          }),
+          lastOpenedAt: openedAt,
+        });
+        safeStorageSet(STUDY_LIBRARY_KEY, JSON.stringify(next));
+        window.dispatchEvent(new Event(STUDY_LIBRARY_UPDATED_EVENT));
+        return next;
+      });
+      setOpenMaterialId(material.id);
+      setView("material-detail");
+    },
+    [],
+  );
 
   useEffect(() => {
     const handleMaterialOpen = (event: Event) => {
@@ -585,11 +656,13 @@ export function QuizWorkspace() {
     return (
       <ProgressDashboard
         sessions={sessions}
+        mistakes={mistakes}
         onBack={reset}
         onOpen={(session) => {
           setReviewSession(session);
           setView("session-review");
         }}
+        onReview={practiceMistakes}
       />
     );
   if (view === "session-review" && reviewSession)
@@ -603,35 +676,33 @@ export function QuizWorkspace() {
         onPractice={practiceMistakes}
       />
     );
-  if (view === "history")
+  if (view === "library")
     return (
-      <HistoryView
+      <LibraryView
         materials={materials}
+        library={library}
+        onAssignSubject={assignSubject}
         onBack={reset}
-        onOpen={(item) => {
-          openMaterial(item);
-        }}
+        onOpen={openMaterial}
       />
-    );
-  if (view === "review-sheets")
-    return (
-      <section className="dashboard-page" aria-label={t("workspace.reviewSheetsAria")}>
-        <ReviewLibrary
-          materials={materials}
-          library={library}
-          onOpen={openMaterial}
-          onViewAll={() => setView("history")}
-        />
-      </section>
     );
   if (view === "material-detail") {
     const open = openMaterialId === null ? undefined : findStudyMaterial(materials, openMaterialId);
     // Its last mistake may have been cleared while the detail view was open.
-    if (!open) return <HistoryView materials={materials} onBack={reset} onOpen={() => {}} />;
+    if (!open)
+      return (
+        <LibraryView
+          materials={materials}
+          library={library}
+          onAssignSubject={assignSubject}
+          onBack={reset}
+          onOpen={openMaterial}
+        />
+      );
     return (
       <MaterialDetailView
         material={open}
-        onBack={() => setView("history")}
+        onBack={() => setView("library")}
         onPractice={practiceMistakes}
         onOpenSession={openSession}
       />
@@ -709,19 +780,16 @@ export function QuizWorkspace() {
         sessionCount={sessions.length}
         materialCount={materials.length}
         sessions={sessions}
-        reviewFocusMaterials={materials}
-        library={library}
+        papers={dailyPapers}
         onAcceptFiles={acceptFiles}
         onCountsChange={setCounts}
         onCustomChange={setCustom}
         onDifficultyChange={setDifficulty}
         onOpenMistakes={() => setView("mistakes")}
         onOpenProgress={() => setView("progress")}
-        onOpenHistory={() => setView("history")}
+        onOpenLibrary={() => setView("library")}
         onOpenSession={openSession}
-        onOpenMaterial={(material) => {
-          openMaterial(material);
-        }}
+        onSitPaper={practiceMistakes}
         onStart={() => {
           if (files.length === 1 && isAudio(files[0])) void transcribe();
           else void generateQuiz();

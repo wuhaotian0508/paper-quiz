@@ -2,16 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { correctAnswerText, questionTypeLabel } from "@/lib/quiz";
-import {
-  downloadExamReviewPdf,
-  downloadMistakesPdf,
-  downloadQuizPdf,
-} from "@/lib/pdf-export";
+import { downloadExamReviewPdf, downloadMistakesPdf, downloadQuizPdf } from "@/lib/pdf-export";
 import type { MistakeBookEntry } from "@/lib/mistake-book";
 import type { StudyMaterial } from "@/lib/study-material";
 import type { StudySession } from "@/lib/study-history";
 import { hasSource } from "@/lib/study-history";
 import { ExamReviewSheetSchema, type ExamReviewSheet } from "@/lib/exam-review";
+import { ReviewSheetSections } from "@/components/review-sheet-sections";
 import { postForm } from "@/lib/api-client";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { createSharedReview } from "@/lib/shared-review-client";
@@ -115,7 +112,9 @@ export function MaterialDetailView({
     ...material.sessions.map((session) => session.source),
     ...material.mistakes.map((mistake) => mistake.source),
   ].find(hasSource);
-  const hasReviewContext = Boolean(reviewSource || material.questions.length || material.mistakes.length);
+  const hasReviewContext = Boolean(
+    reviewSource || material.questions.length || material.mistakes.length,
+  );
   const savedQuestionContext = material.questions
     .slice(0, 40)
     .map((question) =>
@@ -188,16 +187,17 @@ export function MaterialDetailView({
     try {
       const created = await createSharedReview(getSupabaseBrowserClient(), examReview, {
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        sourcePages: reviewSourcePages.map(({ pageNumber, imageUrl }) => ({ pageNumber, imageUrl })),
+        sourcePages: reviewSourcePages.map(({ pageNumber, imageUrl }) => ({
+          pageNumber,
+          imageUrl,
+        })),
       });
       const url = getSharedReviewUrl(window.location.origin, created.slug);
       setReviewShareUrl(url);
       if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
       setReviewShareStatus(t("material.reviewLinkCopied"));
     } catch (cause) {
-      setReviewShareStatus(
-        cause instanceof Error ? cause.message : t("material.reviewLinkFailed"),
-      );
+      setReviewShareStatus(cause instanceof Error ? cause.message : t("material.reviewLinkFailed"));
     } finally {
       setReviewShareLoading(false);
     }
@@ -216,8 +216,11 @@ export function MaterialDetailView({
   const reviewSourcePages = useMemo(() => {
     if (!examReview) return [];
     const pageNumbers = new Set(
-      examReview.topics
-        .map((topic) => extractPageNumber(topic.sourceNote))
+      [
+        ...(examReview.topics ?? []).map((topic) => topic.sourceNote),
+        ...(examReview.sourceNote ? [examReview.sourceNote] : []),
+      ]
+        .map(extractPageNumber)
         .filter((page): page is number => page !== null),
     );
     return dedupeSourcePages(sourcePages.filter((page) => pageNumbers.has(page.pageNumber)));
@@ -238,11 +241,7 @@ export function MaterialDetailView({
       void storeSourcePdf(file, material.id, transcript);
       setAttachedSourceTranscript(transcript);
       setAttachedSourceStatus(
-        t(
-          transcript
-            ? "material.attachReadyWithTranscript"
-            : "material.attachReadyNoTranscript",
-        ),
+        t(transcript ? "material.attachReadyWithTranscript" : "material.attachReadyNoTranscript"),
       );
     });
   };
@@ -283,7 +282,7 @@ export function MaterialDetailView({
           <button
             className="text-button framed-button"
             disabled={!material.questions.length}
-            onClick={() => downloadQuizPdf(asQuiz, "answer_key")}
+            onClick={() => void downloadQuizPdf(asQuiz, "answer_key", locale)}
           >
             {t("material.exportAll")}
           </button>
@@ -320,9 +319,7 @@ export function MaterialDetailView({
             disabled={!hasReviewContext || examReviewLoading}
             onClick={() => void generateExamReview()}
           >
-            {examReviewLoading
-              ? t("material.generatingReview")
-              : t("material.generateReview")}
+            {examReviewLoading ? t("material.generatingReview") : t("material.generateReview")}
           </button>
           <button
             aria-label={t("material.openMistakesAria")}
@@ -399,7 +396,7 @@ export function MaterialDetailView({
             <div className="mistake-primary-actions">
               <button
                 className="text-button framed-button"
-                onClick={() => downloadExamReviewPdf(examReview)}
+                onClick={() => void downloadExamReviewPdf(examReview, locale)}
               >
                 {t("material.exportReviewPdf")}
               </button>
@@ -433,9 +430,14 @@ export function MaterialDetailView({
               <small>{t("material.reviewSharePrivacy")}</small>
             </div>
           ) : null}
-          {reviewShareStatus ? <p className="share-status" role="status">{reviewShareStatus}</p> : null}
+          {reviewShareStatus ? (
+            <p className="share-status" role="status">
+              {reviewShareStatus}
+            </p>
+          ) : null}
+          <ReviewSheetSections sheet={examReview} />
           <div className="review-sheet-list">
-            {examReview.topics.map((topic, index) => {
+            {(examReview.topics ?? []).map((topic, index) => {
               const pageNumber = extractPageNumber(topic.sourceNote);
               const sourcePage = pageNumber
                 ? sourcePages.find((page) => page.pageNumber === pageNumber)
@@ -444,21 +446,22 @@ export function MaterialDetailView({
                 <article className="review-sheet-item" key={`${topic.topic}-${index}`}>
                   <span>{String(index + 1).padStart(2, "0")}</span>
                   <div>
-                  <h2>{topic.topic}</h2>
-                  <p>{topic.keyIdeas.join(" ")}</p>
-                  {topic.formulaOrProcedure && (
+                    <h2>{topic.topic}</h2>
+                    <p>{topic.keyIdeas.join(" ")}</p>
+                    {topic.formulaOrProcedure && (
+                      <p>
+                        <strong>{t("material.formulaOrProcedure")}</strong>{" "}
+                        {topic.formulaOrProcedure}
+                      </p>
+                    )}
                     <p>
-                      <strong>{t("material.formulaOrProcedure")}</strong> {topic.formulaOrProcedure}
+                      <strong>{t("material.commonConfusion")}</strong> {topic.commonConfusion}
                     </p>
-                  )}
-                  <p>
-                    <strong>{t("material.commonConfusion")}</strong> {topic.commonConfusion}
-                  </p>
-                  {topic.mistakeFocus ? (
-                    <p>
-                      <strong>{t("material.yourFocus")}</strong> {topic.mistakeFocus}
-                    </p>
-                  ) : null}
+                    {topic.mistakeFocus ? (
+                      <p>
+                        <strong>{t("material.yourFocus")}</strong> {topic.mistakeFocus}
+                      </p>
+                    ) : null}
                     <small>{t("material.sourceLabel", { note: topic.sourceNote })}</small>
                   </div>
                   <aside
@@ -494,7 +497,13 @@ export function MaterialDetailView({
                     <button
                       className="text-button"
                       disabled={!sourcePdfUrl || !pageNumber}
-                      onClick={() => window.open(`${sourcePdfUrl}#page=${pageNumber}`, "_blank", "noopener,noreferrer")}
+                      onClick={() =>
+                        window.open(
+                          `${sourcePdfUrl}#page=${pageNumber}`,
+                          "_blank",
+                          "noopener,noreferrer",
+                        )
+                      }
                     >
                       {sourcePdfUrl && pageNumber
                         ? t("material.openPdf")
@@ -509,13 +518,23 @@ export function MaterialDetailView({
       )}
 
       {previewPage ? (
-        <div className="source-page-lightbox" role="dialog" aria-modal="true" aria-label={t("material.pagePreviewAria", { page: previewPage.pageNumber })} onClick={() => setPreviewPage(null)}>
+        <div
+          className="source-page-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t("material.pagePreviewAria", { page: previewPage.pageNumber })}
+          onClick={() => setPreviewPage(null)}
+        >
           <div className="source-page-lightbox-card" onClick={(event) => event.stopPropagation()}>
             <div>
               <div className="eyebrow">{t("material.pdfSource")}</div>
               <h2>{t("material.pageLabel", { page: previewPage.pageNumber })}</h2>
             </div>
-            <button className="text-button" aria-label={t("material.closePreviewAria")} onClick={() => setPreviewPage(null)}>
+            <button
+              className="text-button"
+              aria-label={t("material.closePreviewAria")}
+              onClick={() => setPreviewPage(null)}
+            >
               {t("material.close")}
             </button>
             {/* Local IndexedDB previews are data URLs; next/image cannot optimize them. */}
@@ -527,7 +546,13 @@ export function MaterialDetailView({
             <button
               className="primary-button"
               disabled={!sourcePdfUrl}
-              onClick={() => window.open(`${sourcePdfUrl}#page=${previewPage.pageNumber}`, "_blank", "noopener,noreferrer")}
+              onClick={() =>
+                window.open(
+                  `${sourcePdfUrl}#page=${previewPage.pageNumber}`,
+                  "_blank",
+                  "noopener,noreferrer",
+                )
+              }
             >
               {t("material.openPdfAtPage")}
             </button>
@@ -541,18 +566,20 @@ export function MaterialDetailView({
             className={tab === "questions" ? "is-active" : ""}
             onClick={() => setTab("questions")}
           >
-            {t("material.allQuestions")}<span>{material.questions.length}</span>
+            {t("material.allQuestions")}
+            <span>{material.questions.length}</span>
           </button>
           <button
             className={tab === "mistakes" ? "is-active" : ""}
             onClick={() => setTab("mistakes")}
           >
-            {t("material.mistakesTab")}<span>{material.mistakes.length}</span>
+            {t("material.mistakesTab")}
+            <span>{material.mistakes.length}</span>
           </button>
         </div>
         {tab === "mistakes" && material.mistakes.length > 0 && (
           <div className="selection-actions">
-            <button onClick={() => downloadMistakesPdf(material.mistakes)}>
+            <button onClick={() => void downloadMistakesPdf(material.mistakes)}>
               {t("material.exportMistakes")}
             </button>
           </div>

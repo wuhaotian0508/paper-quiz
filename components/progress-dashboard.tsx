@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { downloadProgressPdf } from "@/lib/pdf-export";
+import type { MistakeBookEntry } from "@/lib/mistake-book";
+import { dueEntries, forecastDueCounts, reviewDateKey } from "@/lib/review-schedule";
 import {
   getSessionAccuracy,
   groupSessionsByDate,
@@ -23,18 +25,28 @@ const weekdayKeys: MessageKey[] = [
 
 type Props = {
   sessions: StudySession[];
+  mistakes: MistakeBookEntry[];
   onBack: () => void;
   onOpen: (session: StudySession) => void;
+  onReview: (entries: MistakeBookEntry[]) => void;
 };
 
-export function ProgressDashboard({ sessions, onBack, onOpen }: Props) {
+export function ProgressDashboard({ sessions, mistakes, onBack, onOpen, onReview }: Props) {
   const { locale, t } = useLocale();
-  const initial = sessions[0]
-    ? sessionDateKey(sessions[0].createdAt)
-    : sessionDateKey(new Date().toISOString());
-  const [selectedDate, setSelectedDate] = useState(initial);
+  // Opens on today rather than the newest session: the calendar now answers "what do I owe",
+  // and that question is always about today. Pinned for the component's lifetime so the
+  // memos below are not invalidated by a fresh `Date` on every render.
+  const today = useMemo(() => new Date(), []);
+  const todayKey = reviewDateKey(today);
+  const [selectedDate, setSelectedDate] = useState(todayKey);
   const selected = new Date(`${selectedDate}T12:00:00`);
   const grouped = useMemo(() => groupSessionsByDate(sessions), [sessions]);
+  /** What is scheduled, by day. Past-due cards all land on today's cell. */
+  const dueByDate = useMemo(() => forecastDueCounts(mistakes, today), [mistakes, today]);
+  const dueOnSelected = useMemo(
+    () => (selectedDate === todayKey ? dueEntries(mistakes, today) : []),
+    [mistakes, selectedDate, today, todayKey],
+  );
   const firstDay = new Date(selected.getFullYear(), selected.getMonth(), 1);
   const daysInMonth = new Date(selected.getFullYear(), selected.getMonth() + 1, 0).getDate();
   const cells = [
@@ -56,7 +68,7 @@ export function ProgressDashboard({ sessions, onBack, onOpen }: Props) {
         <button
           className="primary-button"
           disabled={!sessions.length}
-          onClick={() => downloadProgressPdf(sessions)}
+          onClick={() => void downloadProgressPdf(sessions)}
         >
           {t("progress.exportPdf")}
         </button>
@@ -114,24 +126,47 @@ export function ProgressDashboard({ sessions, onBack, onOpen }: Props) {
             ))}
           </div>
           <div className="calendar-grid">
-            {cells.map((day, index) =>
-              day ? (
+            {cells.map((day, index) => {
+              if (!day) return <span key={`blank-${index}`} />;
+              const key = dateKey(day);
+              const practised = grouped[key]?.length ?? 0;
+              const due = dueByDate[key] ?? 0;
+              return (
                 <button
-                  className={`${selectedDate === dateKey(day) ? "is-selected" : ""} ${grouped[dateKey(day)] ? "has-practice" : ""}`}
-                  key={dateKey(day)}
-                  onClick={() => setSelectedDate(dateKey(day))}
+                  className={[
+                    selectedDate === key ? "is-selected" : "",
+                    practised ? "has-practice" : "",
+                    due ? "has-due" : "",
+                    key === todayKey ? "is-today" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  key={key}
+                  onClick={() => setSelectedDate(key)}
                 >
                   <strong>{day}</strong>
-                  {grouped[dateKey(day)] && <span>{grouped[dateKey(day)].length}</span>}
+                  {/* Two separate layers: what was practised, and what is owed. */}
+                  {practised ? <span className="calendar-practised">{practised}</span> : null}
+                  {due ? (
+                    <span className="calendar-due" title={t("progress.dueCount", { count: due })}>
+                      {due}
+                    </span>
+                  ) : null}
                 </button>
-              ) : (
-                <span key={`blank-${index}`} />
-              ),
-            )}
+              );
+            })}
           </div>
         </article>
       </div>
       <article className="progress-card daily-sessions">
+        {dueOnSelected.length ? (
+          <div className="progress-due-banner">
+            <span>{t("progress.dueToday", { count: dueOnSelected.length })}</span>
+            <button className="primary-button" onClick={() => onReview(dueOnSelected)}>
+              {t("progress.startReview")}
+            </button>
+          </div>
+        ) : null}
         <h2>{t("progress.dayPractice", { date: selected.toLocaleDateString() })}</h2>
         {(grouped[selectedDate] || []).length ? (
           grouped[selectedDate].map((session) => (

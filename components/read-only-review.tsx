@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { downloadReviewPdf } from "@/lib/pdf-export";
+import { OptionAnalysis } from "@/components/option-analysis";
 import type { StudySession } from "@/lib/study-history";
 import { useLocale } from "@/hooks/use-locale";
 
@@ -18,7 +19,7 @@ export function ReadOnlyReview({ session, onBack }: { session: StudySession; onB
   return (
     <section className="quiz-shell">
       <div className="workspace-toolbar">
-        <button className="text-button" onClick={() => downloadReviewPdf(session)}>
+        <button className="text-button" onClick={() => void downloadReviewPdf(session)}>
           {t("readOnly.exportPdf")}
         </button>
       </div>
@@ -64,6 +65,7 @@ export function ReadOnlyReview({ session, onBack }: { session: StudySession; onB
             <strong>{t("readOnly.correctAnswer")}</strong> {correct}
           </p>
           <p>{grade?.feedback || question.explanation}</p>
+          <OptionAnalysis question={question} />
           <span className="source-note">
             {t("readOnly.sourceLabel", { note: question.sourceNote })}
           </span>

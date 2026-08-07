@@ -28,14 +28,22 @@ describe("DashboardNavigation", () => {
     expect(screen.getByRole("link", { name: "Dashboard" })).not.toHaveAttribute("aria-current");
   });
 
-  it("provides a dedicated Review Sheets sidebar destination", () => {
+  it("provides a single Library destination for saved materials", () => {
     render(<DashboardNavigation />);
 
-    const reviewSheets = screen.getByRole("link", { name: "Review Sheets" });
-    expect(reviewSheets).toHaveAttribute("href", "#review-sheets");
+    const library = screen.getByRole("link", { name: "Library" });
+    expect(library).toHaveAttribute("href", "#library");
 
-    fireEvent.click(reviewSheets);
-    expect(reviewSheets).toHaveAttribute("aria-current", "page");
+    fireEvent.click(library);
+    expect(library).toHaveAttribute("aria-current", "page");
+  });
+
+  it("no longer offers Quiz Lab, which pointed at the dashboard, or a second materials list", () => {
+    render(<DashboardNavigation />);
+
+    expect(screen.queryByRole("link", { name: "Quiz Lab" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Review Sheets" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "History" })).not.toBeInTheDocument();
   });
 
   it("lets a learner switch to dark mode and remembers the choice", () => {
@@ -65,8 +73,8 @@ describe("DashboardNavigation", () => {
     render(<DashboardNavigation />);
 
     expect(screen.getByRole("heading", { name: "Your Library" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Biology.pdf" })).toHaveAttribute("href", "#history");
-    expect(screen.getByRole("link", { name: "+ New" })).toHaveAttribute("href", "#quiz-lab");
+    expect(screen.getByRole("link", { name: "Biology.pdf" })).toHaveAttribute("href", "#library");
+    expect(screen.getByRole("link", { name: "+ New" })).toHaveAttribute("href", "#dashboard");
   });
 
   it("opens a specific library PDF instead of the all-history view", () => {

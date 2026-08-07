@@ -68,7 +68,9 @@ function toPublicQuestion(question: Question): SharedPublicQuestion {
       id: question.id,
       type: question.type,
       prompt: question.prompt,
-      options: question.options,
+      // Rebuild each option rather than passing it through: the stored option carries a
+      // per-option explanation that would hand the answer to whoever opens the link.
+      options: question.options.map((option) => ({ id: option.id, text: option.text })),
     };
   }
   if (question.type === "fill_blank") {

@@ -1,11 +1,30 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { create } = vi.hoisted(() => ({ create: vi.fn() }));
+
+vi.mock("openai", () => ({
+  default: class {
+    responses = { create };
+  },
+}));
+
 import { POST } from "./route";
 
 const originalKey = process.env.OPENAI_API_KEY;
 afterEach(() => {
   process.env.OPENAI_API_KEY = originalKey;
+  create.mockReset();
 });
+
+async function* textResponse(text: string) {
+  yield { type: "response.output_text.delta", delta: text };
+}
+
+/** The text part of the single user message the route builds. */
+function promptText() {
+  return create.mock.calls[0][0].input[0].content[0].text as string;
+}
 
 const writtenQuestion = JSON.stringify({
   id: "q1",
@@ -74,5 +93,59 @@ describe("POST /api/grade-answer", () => {
     );
     // Reaching the config check proves the file id satisfied the study-material requirement.
     expect(response.status).toBe(503);
+  });
+
+  describe("learner memory", () => {
+    const grade = JSON.stringify({
+      status: "partial",
+      score: 0.5,
+      feedback: "Name the retrieval step.",
+      missingPoints: ["retrieval"],
+    });
+
+    function gradingForm(memory?: string) {
+      const form = new FormData();
+      form.set("question", writtenQuestion);
+      form.set("answer", "It generates from documents.");
+      form.set("transcript", "Retrieval-augmented generation retrieves before generating.");
+      if (memory !== undefined) form.set("memory", memory);
+      return new Request("http://localhost/api/grade-answer", { method: "POST", body: form });
+    }
+
+    it("passes a supplied memory block through with its verdict guard", async () => {
+      process.env.OPENAI_API_KEY = "test-key";
+      create.mockResolvedValue(textResponse(grade));
+
+      const response = await POST(
+        gradingForm(
+          "LEARNER MEMORY:\n- [reported difficulty] I always mix up retrieval and ranking",
+        ),
+      );
+
+      expect(response.status).toBe(200);
+      expect(promptText()).toContain("I always mix up retrieval and ranking");
+      expect(promptText()).toContain("must not change the status or the score");
+    });
+
+    it("grades normally when no memory is supplied", async () => {
+      process.env.OPENAI_API_KEY = "test-key";
+      create.mockResolvedValue(textResponse(grade));
+
+      const response = await POST(gradingForm());
+
+      expect(response.status).toBe(200);
+      expect(promptText()).not.toContain("LEARNER MEMORY");
+    });
+
+    it("drops an oversized memory block instead of failing the grade", async () => {
+      process.env.OPENAI_API_KEY = "test-key";
+      create.mockResolvedValue(textResponse(grade));
+
+      // A corrupted or tampered book must not cost the student their grading.
+      const response = await POST(gradingForm("x".repeat(5_000)));
+
+      expect(response.status).toBe(200);
+      expect(promptText()).not.toContain("xxxx");
+    });
   });
 });

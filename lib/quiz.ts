@@ -3,12 +3,21 @@ import { z } from "zod";
 export const DifficultySchema = z.enum(["basic", "mixed", "challenging"]);
 export type Difficulty = z.infer<typeof DifficultySchema>;
 
-const OptionSchema = z.object({ id: z.enum(["a", "b", "c", "d"]), text: z.string().min(1) });
+const OptionSchema = z.object({
+  id: z.enum(["a", "b", "c", "d"]),
+  text: z.string().min(1),
+  // Every option carries its own "why this is right / wrong" note. Nullish so quizzes
+  // saved before per-option analysis existed still load.
+  explanation: z.string().min(1).nullish(),
+});
 const BaseQuestionSchema = z.object({
   id: z.string().min(1),
   prompt: z.string().min(1),
   explanation: z.string().min(1),
   sourceNote: z.string().min(1),
+  // Marks printed on the exported exam paper. Nullish for quizzes saved before the
+  // exam-paper layout; the exporter substitutes a default for the question type.
+  points: z.number().int().min(1).max(40).nullish(),
 });
 
 export const MultipleChoiceQuestionSchema = BaseQuestionSchema.extend({
@@ -34,9 +43,24 @@ export const QuestionSchema = z.discriminatedUnion("type", [
   WrittenQuestionSchema,
 ]);
 
+/**
+ * The exam-paper header the model fills in. Kept separate from `title` because the
+ * printed paper needs the course name on its own line, above the timing banner.
+ */
+export const ExamHeaderSchema = z.object({
+  courseTitle: z.string().min(1).max(80),
+  paperLabel: z.string().min(1).max(40),
+  durationMinutes: z.number().int().min(10).max(300),
+  scope: z.string().min(1).max(200),
+});
+export type ExamHeader = z.infer<typeof ExamHeaderSchema>;
+
 export const QuizSchema = z.object({
   title: z.string().min(1),
   summary: z.string().min(1),
+  // Nullish so quizzes saved before the exam-paper layout still load; the exporter
+  // falls back to the quiz title and a duration derived from the question mix.
+  examHeader: ExamHeaderSchema.nullish(),
   questions: z.array(QuestionSchema).min(1),
 });
 export type Question = z.infer<typeof QuestionSchema>;

@@ -28,17 +28,18 @@ export async function POST(request: Request) {
     const form = await request.formData();
     const answer = readBoundedText(form.get("answer"), MAX_ANSWER_CHARS);
     const transcript = readBoundedText(form.get("transcript"), MAX_TRANSCRIPT_CHARS) || "";
-    const directFiles = form.getAll("files").filter((value): value is File => value instanceof File);
+    const directFiles = form
+      .getAll("files")
+      .filter((value): value is File => value instanceof File);
     const legacyFile = form.get("file");
-    const files = directFiles.length
-      ? directFiles
-      : legacyFile instanceof File
-        ? [legacyFile]
-        : [];
+    const files = directFiles.length ? directFiles : legacyFile instanceof File ? [legacyFile] : [];
     const fileId = parseSourceFileId(form.get("fileId"));
     const fileIds = parseSourceFileIds(form.get("fileIds")) || [];
     const rawQuestion = readBoundedText(form.get("question"), MAX_QUESTION_CHARS) || "";
     const locale = readLocale(form.get("locale") === null ? null : String(form.get("locale")));
+    // Advisory and optional: an absent or oversized block is dropped rather than rejected, so a
+    // corrupted memory book degrades grading back to its previous behaviour instead of failing it.
+    const memory = readBoundedText(form.get("memory"), MAX_MEMORY_CHARS) || "";
     if (form.has("fileId") && !fileId)
       return error("The study material reference is invalid.", 400);
     if (form.has("fileIds") && !fileIds.length)
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
       !answer ||
       !rawQuestion ||
       (form.has("transcript") && transcript === "") ||
-       (!transcript && !fileId && !fileIds.length && !files.length)
+      (!transcript && !fileId && !fileIds.length && !files.length)
     )
       return error("Please provide an answer, question, and study material.", 400);
     let parsedQuestion: unknown;
@@ -86,6 +87,16 @@ export async function POST(request: Request) {
                 `Write feedback and missingPoints in ${generationLanguage(locale)}.`,
                 `QUESTION: ${JSON.stringify(question.data)}`,
                 `STUDENT ANSWER: ${answer}`,
+                // Deliberately downstream of the verdict: memory may only change how feedback
+                // is worded, never whether the answer is right. Letting it move the score would
+                // close the loop — a student recorded as weak at a topic would then be graded as
+                // weak at it, and the record would confirm itself.
+                ...(memory
+                  ? [
+                      memory,
+                      "Use that memory only to word feedback and missingPoints more usefully for this student. It must not change the status or the score.",
+                    ]
+                  : []),
                 ...(transcript ? [`LECTURE TRANSCRIPT: ${transcript}`] : []),
               ].join("\n\n"),
             },

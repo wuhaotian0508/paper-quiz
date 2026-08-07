@@ -22,7 +22,7 @@ export type AuthClient = {
     signUp: (options: {
       email: string;
       password: string;
-      options: { emailRedirectTo: string };
+      options: { emailRedirectTo: string; data?: Record<string, string> };
     }) => Promise<AuthResult>;
     signInWithOAuth: (options: {
       provider: "google";
@@ -30,6 +30,11 @@ export type AuthClient = {
     }) => Promise<AuthResult>;
     signOut: () => Promise<AuthResult>;
   };
+  /** Username lookups run through security-definer functions; see the profiles migration. */
+  rpc?: (
+    name: string,
+    params: Record<string, string>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>;
 };
 
 type AuthMenuProps = {

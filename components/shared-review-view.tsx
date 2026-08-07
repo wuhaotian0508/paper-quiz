@@ -5,20 +5,31 @@ import { z } from "zod";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { loadSharedReview, type SharedReviewClient } from "@/lib/shared-review-client";
 import { useLocale } from "@/hooks/use-locale";
+import { ExamReviewSectionSchema } from "@/lib/exam-review";
+import { ReviewSheetSections } from "@/components/review-sheet-sections";
 
 const ReviewSchema = z.object({
   slug: z.string().min(1),
   title: z.string().min(1),
-  topics: z.array(
-    z.object({
-      topic: z.string().min(1),
-      keyIdeas: z.array(z.string().min(1)),
-      formulaOrProcedure: z.string(),
-      commonConfusion: z.string().min(1),
-      sourceNote: z.string().min(1),
-      mistakeFocus: z.string(),
-    }),
-  ),
+  // The share RPC projects every field, so absent ones arrive as JSON null.
+  subject: z.string().nullish(),
+  scope: z.string().nullish(),
+  goal: z.string().nullish(),
+  sections: z.array(ExamReviewSectionSchema).nullish(),
+  // Links published before the two-column layout carry a flat topic list instead.
+  topics: z
+    .array(
+      z.object({
+        topic: z.string().min(1),
+        keyIdeas: z.array(z.string().min(1)),
+        formulaOrProcedure: z.string(),
+        commonConfusion: z.string().min(1),
+        sourceNote: z.string().min(1),
+        mistakeFocus: z.string(),
+      }),
+    )
+    .nullish()
+    .transform((value) => value ?? []),
   sourcePages: z
     .array(
       z.object({
@@ -38,13 +49,15 @@ export function SharedReviewView({ slug, client }: { slug: string; client?: Shar
     let active = true;
     async function load() {
       try {
-        const resolvedClient = client ?? (getSupabaseBrowserClient() as unknown as SharedReviewClient);
+        const resolvedClient =
+          client ?? (getSupabaseBrowserClient() as unknown as SharedReviewClient);
         const data = ReviewSchema.parse(await loadSharedReview(resolvedClient, slug));
         if (!active) return;
         setReview(data);
         setMessage("");
       } catch (cause) {
-        if (active) setMessage(cause instanceof Error ? cause.message : t("shared.reviewUnavailable"));
+        if (active)
+          setMessage(cause instanceof Error ? cause.message : t("shared.reviewUnavailable"));
       }
     }
     void load();
@@ -53,7 +66,12 @@ export function SharedReviewView({ slug, client }: { slug: string; client?: Shar
     };
   }, [client, slug, t]);
 
-  if (!review) return <main className="shared-challenge-page"><p role="status">{message}</p></main>;
+  if (!review)
+    return (
+      <main className="shared-challenge-page">
+        <p role="status">{message}</p>
+      </main>
+    );
 
   return (
     <main className="shared-challenge-page">
@@ -62,7 +80,10 @@ export function SharedReviewView({ slug, client }: { slug: string; client?: Shar
       <p className="muted-copy">{t("shared.reviewNote")}</p>
       <p className="shared-challenge-note">{t("shared.reviewPrivacy")}</p>
       <div className="shared-link-actions">
-        <a className="text-button framed-button" href={`/login?returnTo=${encodeURIComponent(`/review/${review.slug}`)}`}>
+        <a
+          className="text-button framed-button"
+          href={`/login?returnTo=${encodeURIComponent(`/review/${review.slug}`)}`}
+        >
           {t("shared.signIn")}
         </a>
         <a className="primary-button" href="#review-topics">
@@ -89,16 +110,29 @@ export function SharedReviewView({ slug, client }: { slug: string; client?: Shar
           </div>
         </section>
       ) : null}
-      <div className="review-sheet-list" id="review-topics">
+      <div id="review-topics">
+        <ReviewSheetSections sheet={review} />
+      </div>
+      <div className="review-sheet-list">
         {review.topics.map((topic, index) => (
           <article className="review-sheet-item" key={`${topic.topic}-${index}`}>
             <span>{String(index + 1).padStart(2, "0")}</span>
             <div>
               <h2>{topic.topic}</h2>
               <p>{topic.keyIdeas.join(" ")}</p>
-              {topic.formulaOrProcedure ? <p><strong>{t("shared.formulaOrProcedure")}</strong> {topic.formulaOrProcedure}</p> : null}
-              <p><strong>{t("shared.commonConfusion")}</strong> {topic.commonConfusion}</p>
-              {topic.mistakeFocus ? <p><strong>{t("shared.reviewFocus")}</strong> {topic.mistakeFocus}</p> : null}
+              {topic.formulaOrProcedure ? (
+                <p>
+                  <strong>{t("shared.formulaOrProcedure")}</strong> {topic.formulaOrProcedure}
+                </p>
+              ) : null}
+              <p>
+                <strong>{t("shared.commonConfusion")}</strong> {topic.commonConfusion}
+              </p>
+              {topic.mistakeFocus ? (
+                <p>
+                  <strong>{t("shared.reviewFocus")}</strong> {topic.mistakeFocus}
+                </p>
+              ) : null}
               <small>{t("shared.sourceLabel", { note: topic.sourceNote })}</small>
             </div>
           </article>

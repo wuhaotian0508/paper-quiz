@@ -21,6 +21,14 @@ const crsQuestionSchema = z.object({
   }),
   answer: optionId,
   explanation: z.string().min(1),
+  optionExplanations: z
+    .object({
+      a: z.string().min(1),
+      b: z.string().min(1),
+      c: z.string().min(1),
+      d: z.string().min(1),
+    })
+    .optional(),
   sourceNote: z.string().min(1).optional(),
 });
 
@@ -95,6 +103,7 @@ export function parseQuizOutput(output: string, fileName: string): Quiz {
       options: (["a", "b", "c", "d"] as const).map((id) => ({
         id,
         text: question.options[id],
+        explanation: question.optionExplanations?.[id] ?? null,
       })),
       correctOptionId: question.answer,
       explanation: question.explanation,

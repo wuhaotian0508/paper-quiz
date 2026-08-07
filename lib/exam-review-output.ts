@@ -1,4 +1,9 @@
-import { ExamReviewSheetSchema, type ExamReviewSheet } from "@/lib/exam-review";
+import {
+  ExamReviewSheetSchema,
+  REVIEW_SECTION_KINDS,
+  type ExamReviewSheet,
+  type ReviewSectionKind,
+} from "@/lib/exam-review";
 
 function stripCodeFence(output: string) {
   return output
@@ -11,7 +16,7 @@ function stripCodeFence(output: string) {
 function unwrapReview(value: unknown): unknown {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
   const record = value as Record<string, unknown>;
-  if ("title" in record && "topics" in record) return value;
+  if ("title" in record && ("sections" in record || "topics" in record)) return value;
   for (const key of ["exam_review", "examReview", "review", "data", "result", "output"]) {
     if (key in record) return unwrapReview(record[key]);
   }
@@ -31,7 +36,9 @@ function textValue(value: unknown, fallback: string) {
 
 function stringList(value: unknown, fallback: string[]) {
   if (Array.isArray(value)) {
-    const items = value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+    const items = value.filter(
+      (item): item is string => typeof item === "string" && item.trim().length > 0,
+    );
     if (items.length) return items.map((item) => item.trim());
   }
   if (typeof value === "string" && value.trim()) return [value.trim()];
@@ -52,9 +59,26 @@ function normalizeTopic(value: unknown, index: number) {
   }
   const record = value as Record<string, unknown>;
   return {
-    topic: textValue(firstValue(record, ["topic", "name", "concept", "knowledgePoint", "knowledge_point", "title"]), `Knowledge point ${index + 1}`),
+    topic: textValue(
+      firstValue(record, [
+        "topic",
+        "name",
+        "concept",
+        "knowledgePoint",
+        "knowledge_point",
+        "title",
+      ]),
+      `Knowledge point ${index + 1}`,
+    ),
     keyIdeas: stringList(
-      firstValue(record, ["keyIdeas", "key_ideas", "keyPoints", "key_points", "ideas", "mainIdeas"]),
+      firstValue(record, [
+        "keyIdeas",
+        "key_ideas",
+        "keyPoints",
+        "key_points",
+        "ideas",
+        "mainIdeas",
+      ]),
       ["Review the central idea from this section."],
     ),
     formulaOrProcedure: textValue(
@@ -74,21 +98,86 @@ function normalizeTopic(value: unknown, index: number) {
       [],
     ),
     mistakeFocus: textValue(
-      firstValue(record, ["mistakeFocus", "mistake_focus", "learningFocus", "learning_focus", "focus"]),
+      firstValue(record, [
+        "mistakeFocus",
+        "mistake_focus",
+        "learningFocus",
+        "learning_focus",
+        "focus",
+      ]),
       "",
     ),
+  };
+}
+
+/** True once the array carries the two-column section shape rather than legacy topics. */
+function looksLikeSections(value: unknown): value is Record<string, unknown>[] {
+  return (
+    Array.isArray(value) &&
+    value.some(
+      (item) =>
+        !!item &&
+        typeof item === "object" &&
+        !Array.isArray(item) &&
+        typeof (item as Record<string, unknown>).kind === "string" &&
+        REVIEW_SECTION_KINDS.includes((item as Record<string, unknown>).kind as ReviewSectionKind),
+    )
+  );
+}
+
+function normalizeItem(value: unknown): { label: string; body: string } | null {
+  if (typeof value === "string") return value.trim() ? { label: "", body: value.trim() } : null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const body = textValue(firstValue(record, ["body", "text", "detail", "content", "value"]), "");
+  if (!body) return null;
+  return {
+    label: textValue(firstValue(record, ["label", "term", "name", "title"]), ""),
+    body,
+  };
+}
+
+function normalizeSection(value: unknown) {
+  const record = value as Record<string, unknown>;
+  const rawItems = firstValue(record, ["items", "points", "bullets", "entries", "list"]);
+  const items = (Array.isArray(rawItems) ? rawItems : [])
+    .map(normalizeItem)
+    .filter((item): item is { label: string; body: string } => item !== null);
+  return {
+    kind: record.kind,
+    heading: textValue(firstValue(record, ["heading", "title", "name"]), String(record.kind ?? "")),
+    items: items.length ? items : [{ label: "", body: "Review this section in the source." }],
   };
 }
 
 function normalizeReview(value: unknown): unknown {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
   const record = value as Record<string, unknown>;
-  const rawTopics = firstValue(record, ["topics", "sections", "knowledgePoints", "knowledge_points"]);
+  const title = textValue(
+    firstValue(record, ["title", "name", "heading", "reviewTitle", "review_title"]),
+    "Knowledge-Point Review",
+  );
+
+  const rawSections = firstValue(record, ["sections", "parts", "blocks"]);
+  if (looksLikeSections(rawSections)) {
+    return {
+      ...record,
+      title,
+      sections: rawSections
+        .filter((item) => REVIEW_SECTION_KINDS.includes(item.kind as ReviewSectionKind))
+        .map(normalizeSection),
+      topics: null,
+    };
+  }
+
+  const rawTopics = firstValue(record, [
+    "topics",
+    "sections",
+    "knowledgePoints",
+    "knowledge_points",
+  ]);
   if (!Array.isArray(rawTopics)) return value;
-  return {
-    title: textValue(firstValue(record, ["title", "name", "heading", "reviewTitle", "review_title"]), "Knowledge-Point Review"),
-    topics: rawTopics.map(normalizeTopic),
-  };
+  return { title, topics: rawTopics.map(normalizeTopic) };
 }
 
 export function parseExamReviewOutput(output: string): ExamReviewSheet {

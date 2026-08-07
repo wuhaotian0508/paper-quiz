@@ -6,10 +6,12 @@ import {
   getRemoteDeletionCandidates,
   mergeStudyRecords,
   toSyncMistakeBookEntry,
+  toSyncStudyLibraryRecord,
   toSyncStudySession,
   type SyncRecord,
 } from "@/lib/study-sync";
 import { boundSource, type StudySession } from "@/lib/study-history";
+import type { StudyLibraryRecord } from "@/lib/study-library";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 export type StudySyncStatus = "idle" | "syncing" | "synced" | "error";
@@ -28,7 +30,7 @@ export type StudySyncClient = {
       data: { subscription: { unsubscribe: () => void } };
     };
   };
-  from: (table: "paper_quiz_sessions" | "paper_quiz_mistakes") => {
+  from: (table: "paper_quiz_sessions" | "paper_quiz_mistakes" | "paper_quiz_library") => {
     select: (columns: string) => {
       eq: (column: string, value: string) => QueryResult<RemoteRow[]>;
     };
@@ -42,17 +44,23 @@ export type StudySyncClient = {
   };
 };
 
-type HydratedStudyState = { sessions: StudySession[]; mistakes: MistakeBookEntry[] };
+type HydratedStudyState = {
+  sessions: StudySession[];
+  mistakes: MistakeBookEntry[];
+  library: StudyLibraryRecord[];
+};
 type UseStudySyncOptions = {
   client?: StudySyncClient;
   ready: boolean;
   sessions: StudySession[];
   mistakes: MistakeBookEntry[];
+  library: StudyLibraryRecord[];
   onHydrate: (state: HydratedStudyState) => void;
 };
 
 const SESSION_TABLE = "paper_quiz_sessions" as const;
 const MISTAKE_TABLE = "paper_quiz_mistakes" as const;
+const LIBRARY_TABLE = "paper_quiz_library" as const;
 
 /**
  * Local storage is the offline source of truth. This hook only uploads records that are
@@ -64,6 +72,7 @@ export function useStudySync({
   ready,
   sessions,
   mistakes,
+  library,
   onHydrate,
 }: UseStudySyncOptions) {
   const [resolvedClient, setResolvedClient] = useState<StudySyncClient | null>(client ?? null);
@@ -81,6 +90,7 @@ export function useStudySync({
   const snapshots = useRef({
     sessions: new Map<string, Snapshot>(),
     mistakes: new Map<string, Snapshot>(),
+    library: new Map<string, Snapshot>(),
   });
   const userId = user?.id;
 
@@ -134,7 +144,7 @@ export function useStudySync({
     }
     pendingMistakeDeletes.current.clear();
     remoteMistakeIds.current.clear();
-    snapshots.current = { sessions: new Map(), mistakes: new Map() };
+    snapshots.current = { sessions: new Map(), mistakes: new Map(), library: new Map() };
     hydrationTokenRef.current += 1;
     setHydrationToken(hydrationTokenRef.current);
   }, [userId]);
@@ -156,16 +166,19 @@ export function useStudySync({
     async function hydrate() {
       setStatus("syncing");
       try {
-        const [sessionResult, mistakeResult] = await Promise.all([
+        const [sessionResult, mistakeResult, libraryResult] = await Promise.all([
           syncClient.from(SESSION_TABLE).select("id,payload,updated_at").eq("user_id", syncUser.id),
           syncClient.from(MISTAKE_TABLE).select("id,payload,updated_at").eq("user_id", syncUser.id),
+          syncClient.from(LIBRARY_TABLE).select("id,payload,updated_at").eq("user_id", syncUser.id),
         ]);
         if (!active) return;
         if (
           sessionResult.error ||
           mistakeResult.error ||
+          libraryResult.error ||
           !sessionResult.data ||
-          !mistakeResult.data
+          !mistakeResult.data ||
+          !libraryResult.data
         ) {
           setStatus("error");
           return;
@@ -173,6 +186,7 @@ export function useStudySync({
 
         const remoteSessions = sessionResult.data.map(toRemoteSession);
         const remoteMistakes = mistakeResult.data.map(toRemoteMistake);
+        const remoteLibrary = libraryResult.data.map(toRemoteLibraryRecord);
         // Keep snapshots of what was actually read remotely, not the merged output.
         snapshots.current.sessions = new Map(
           remoteSessions.map((record) => [
@@ -186,6 +200,12 @@ export function useStudySync({
             { payload: serialiseMistake(record), updatedAt: record.updatedAt },
           ]),
         );
+        snapshots.current.library = new Map(
+          remoteLibrary.map((record) => [
+            record.id,
+            { payload: serialiseLibraryRecord(record), updatedAt: record.updatedAt },
+          ]),
+        );
         remoteMistakeIds.current = new Set(mistakeResult.data.map((row) => row.id));
 
         const nextSessions = mergeLocal
@@ -194,7 +214,10 @@ export function useStudySync({
         const nextMistakes = mergeLocal
           ? mergeStudyRecords(mistakes.map(toSyncMistakeBookEntry), remoteMistakes)
           : remoteMistakes;
-        onHydrate({ sessions: nextSessions, mistakes: nextMistakes });
+        const nextLibrary = mergeLocal
+          ? mergeStudyRecords(library.map(toSyncStudyLibraryRecord), remoteLibrary)
+          : remoteLibrary;
+        onHydrate({ sessions: nextSessions, mistakes: nextMistakes, library: nextLibrary });
         setHydratedToken(hydrationToken);
       } catch {
         if (active) setStatus("error");
@@ -205,7 +228,17 @@ export function useStudySync({
     return () => {
       active = false;
     };
-  }, [hydratedToken, hydrationToken, mistakes, onHydrate, ready, resolvedClient, sessions, user]);
+  }, [
+    hydratedToken,
+    hydrationToken,
+    library,
+    mistakes,
+    onHydrate,
+    ready,
+    resolvedClient,
+    sessions,
+    user,
+  ]);
 
   useEffect(() => {
     if (!ready || !resolvedClient || !user || hydratedToken !== hydrationToken) return;
@@ -229,6 +262,16 @@ export function useStudySync({
           toChangedRow(syncUser.id, mistake, snapshots.current.mistakes, serialiseMistake),
         )
         .filter((row): row is SyncRow => row !== null);
+      const libraryRows = library
+        .map((record) =>
+          toChangedRow(
+            syncUser.id,
+            toSyncStudyLibraryRecord(record),
+            snapshots.current.library,
+            serialiseLibraryRecord,
+          ),
+        )
+        .filter((row): row is SyncRow => row !== null);
       // Re-adding an entry before the debounce expires cancels its earlier user deletion.
       for (const mistake of mistakes) pendingMistakeDeletes.current.delete(mistake.id);
       const explicitDeletes = getRemoteDeletionCandidates(
@@ -245,6 +288,10 @@ export function useStudySync({
         if (mistakeRows.length)
           operations.push(
             syncClient.from(MISTAKE_TABLE).upsert(mistakeRows, { onConflict: "user_id,id" }),
+          );
+        if (libraryRows.length)
+          operations.push(
+            syncClient.from(LIBRARY_TABLE).upsert(libraryRows, { onConflict: "user_id,id" }),
           );
         if (explicitDeletes.length)
           operations.push(
@@ -274,6 +321,11 @@ export function useStudySync({
           });
           remoteMistakeIds.current.add(row.id);
         }
+        for (const row of libraryRows)
+          snapshots.current.library.set(row.id, {
+            payload: JSON.stringify(row.payload),
+            updatedAt: row.updated_at,
+          });
         for (const id of explicitDeletes) {
           pendingMistakeDeletes.current.delete(id);
           remoteMistakeIds.current.delete(id);
@@ -291,6 +343,7 @@ export function useStudySync({
   }, [
     hydratedToken,
     hydrationToken,
+    library,
     mistakes,
     mutationVersion,
     ready,
@@ -352,6 +405,19 @@ function toRemoteMistake(row: RemoteRow): SyncRecord<MistakeBookEntry> {
     updatedAt: row.updated_at,
     source: withoutDeviceFileReferences(mistake.source),
   };
+}
+
+function toRemoteLibraryRecord(row: RemoteRow): SyncRecord<StudyLibraryRecord> {
+  const record = row.payload as StudyLibraryRecord;
+  return { ...record, id: row.id, updatedAt: row.updated_at };
+}
+
+/**
+ * Library records hold no device-bound file references, so unlike sessions and mistakes
+ * they travel whole.
+ */
+function serialiseLibraryRecord(record: SyncRecord<StudyLibraryRecord>) {
+  return JSON.stringify(record);
 }
 
 function serialiseSession(session: StudySession | SyncRecord<StudySession>) {

@@ -7,6 +7,7 @@ import { MISTAKE_BOOK_KEY, readMistakes } from "@/lib/mistake-book";
 import { readSessions, STUDY_HISTORY_KEY } from "@/lib/study-history";
 import { groupStudyMaterials } from "@/lib/study-material";
 import {
+  createLibraryRecord,
   readStudyLibrary,
   STUDY_LIBRARY_KEY,
   STUDY_LIBRARY_UPDATED_EVENT,
@@ -17,13 +18,16 @@ import { safeStorageSet } from "@/lib/request-validation";
 import { useLocale } from "@/hooks/use-locale";
 import { localeLabels, nextLocale, type MessageKey } from "@/lib/i18n";
 
+/**
+ * One entry per destination. `quiz-lab` used to sit here pointing at the same view as
+ * `dashboard`, and `review-sheets`/`history` rendered the same materials twice in two
+ * skins; both pairs are now single entries.
+ */
 const navigationItems = [
   { id: "dashboard", labelKey: "nav.dashboard", icon: "D" },
-  { id: "quiz-lab", labelKey: "nav.quizLab", icon: "Q" },
-  { id: "review-sheets", labelKey: "nav.reviewSheets", icon: "R" },
+  { id: "library", labelKey: "nav.library", icon: "L" },
   { id: "mistake-book", labelKey: "nav.mistakeBook", icon: "!" },
   { id: "progress", labelKey: "nav.calendar", icon: "C" },
-  { id: "history", labelKey: "nav.history", icon: "H" },
 ] as const satisfies readonly { id: string; labelKey: MessageKey; icon: string }[];
 
 type NavigationId = (typeof navigationItems)[number]["id"];
@@ -61,12 +65,13 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
         readMistakes(window.localStorage.getItem(MISTAKE_BOOK_KEY)),
       )
         .filter((material) => material.id && !knownIds.has(material.id))
-        .map((material) => ({
-          id: material.id,
-          name: material.name,
-          uploadedAt: material.lastPracticedAt || new Date().toISOString(),
-          lastOpenedAt: "",
-        }));
+        .map((material) =>
+          createLibraryRecord({
+            id: material.id,
+            name: material.name,
+            uploadedAt: material.lastPracticedAt || new Date().toISOString(),
+          }),
+        );
       const next = [...stored, ...derived].slice(0, 50);
       if (derived.length) safeStorageSet(STUDY_LIBRARY_KEY, JSON.stringify(next));
       setLibrary(next);
@@ -123,7 +128,7 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
       <section className="sidebar-library" aria-labelledby="sidebar-library-heading">
         <div className="sidebar-library-heading">
           <h2 id="sidebar-library-heading">{t("nav.yourLibrary")}</h2>
-          <a href="#quiz-lab" aria-label={t("nav.new")}>
+          <a href="#dashboard" aria-label={t("nav.new")}>
             {t("nav.new")}
           </a>
         </div>
@@ -131,7 +136,7 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
           <div className="sidebar-library-list">
             {library.slice(0, 4).map((item) => (
               <a
-                href="#history"
+                href="#library"
                 key={item.id}
                 onClick={(event) => {
                   event.preventDefault();
@@ -144,7 +149,7 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
               </a>
             ))}
             {library.length > 4 ? (
-              <a className="sidebar-library-view-all" href="#history">
+              <a className="sidebar-library-view-all" href="#library">
                 {t("nav.viewAll")}
               </a>
             ) : null}
@@ -185,3 +190,4 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
     </aside>
   );
 }
+

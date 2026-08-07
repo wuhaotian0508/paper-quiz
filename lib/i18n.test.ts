@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { en } from "@/lib/i18n-en";
 import { zh } from "@/lib/i18n-zh";
-import {
-  DEFAULT_LOCALE,
-  generationLanguage,
-  nextLocale,
-  readLocale,
-  translate,
-} from "@/lib/i18n";
+import { DEFAULT_LOCALE, generationLanguage, nextLocale, readLocale, translate } from "@/lib/i18n";
 import { buildQuizInstructions } from "@/lib/quiz-prompt";
 import { buildExamReviewInstructions } from "@/lib/exam-review";
 
@@ -56,6 +50,7 @@ it("keeps both dictionaries in step", () => {
     "nav.brand",
     "nav.switchToChinese",
     "nav.switchToEnglish",
+    "auth.usernamePlaceholder",
     "login.emailPlaceholder",
   ]);
 });
@@ -76,9 +71,7 @@ describe("generation language", () => {
     expect(buildQuizInstructions({ ...settings, locale: "zh" })).toContain(
       "Write every user-visible field in Simplified Chinese",
     );
-    expect(buildQuizInstructions(settings)).toContain(
-      "Write every user-visible field in English",
-    );
+    expect(buildQuizInstructions(settings)).toContain("Write every user-visible field in English");
   });
 
   it("carries the locale into the review-sheet prompt", () => {

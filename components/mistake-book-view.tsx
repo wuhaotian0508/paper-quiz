@@ -64,12 +64,16 @@ export function MistakeBookView({ entries, onBack, onChange, onPractice, onRevie
           <button
             className="text-button framed-button"
             disabled={!entries.length}
-            onClick={() => downloadMistakesPdf(entries)}
+            onClick={() => void downloadMistakesPdf(entries)}
           >
             {t("mistakes.exportPdf")}
           </button>
           {onReview ? (
-            <button className="text-button framed-button" disabled={!entries.length} onClick={onReview}>
+            <button
+              className="text-button framed-button"
+              disabled={!entries.length}
+              onClick={onReview}
+            >
               {t("mistakes.buildReviewSheet")}
             </button>
           ) : null}
@@ -95,7 +99,10 @@ export function MistakeBookView({ entries, onBack, onChange, onPractice, onRevie
           <button disabled={!selected.length} onClick={() => onPractice(selectedEntries)}>
             {t("mistakes.practiceSelected")}
           </button>
-          <button disabled={!selected.length} onClick={() => downloadMistakesPdf(selectedEntries)}>
+          <button
+            disabled={!selected.length}
+            onClick={() => void downloadMistakesPdf(selectedEntries)}
+          >
             {t("mistakes.exportSelected")}
           </button>
         </div>

@@ -55,9 +55,10 @@ function buildProductMap(locale: Locale) {
   const label = (key: MessageKey) => `“${translate(locale, key)}”`;
   return `
 Verified navigation and buttons:
-- Dashboard / Quiz Lab: use ${label("upload.chooseFileAria")}, then configure ${label("upload.questionMix")}, select ${label("upload.difficultyBasic")}, ${label("upload.difficultyMixed")}, or ${label("upload.difficultyChallenging")}, and click ${label("upload.generateQuiz")} (or ${label("upload.transcribeRecording")} for one recording).
+- Dashboard: use ${label("upload.chooseFileAria")}, then configure ${label("upload.questionMix")}, select ${label("upload.difficultyBasic")}, ${label("upload.difficultyMixed")}, or ${label("upload.difficultyChallenging")}, and click ${label("upload.generateQuiz")} (or ${label("upload.transcribeRecording")} for one recording).
+- Daily review: the dashboard shows ${label("daily.heading")}, one paper per course scheduled by the forgetting curve. Click ${label("daily.start")} to sit one.
 - Mistake review: click ${label("nav.mistakeBook")}, then use ${label("mistakes.practiceSelected")}, ${label("mistakes.practiceAgain")}, ${label("mistakes.viewDetails")}, or ${label("mistakes.buildReviewSheet")} when those controls are visible.
-- Past work: click ${label("nav.calendar")} for dated practice sessions or ${label("nav.history")} for saved material. A material detail page includes ${label("material.continueLatest")}, ${label("material.exportAll")}, and ${label("material.generateReview")} when source material is available.
+- Past work: click ${label("nav.calendar")} for dated practice sessions and upcoming review dates, or ${label("nav.library")} for saved material grouped by course. A material detail page includes ${label("material.continueLatest")}, ${label("material.exportAll")}, and ${label("material.generateReview")} when source material is available.
 - During a quiz: use ${label("quiz.submitAnswer")}, ${label("quiz.nextQuestion")}, ${label("results.openMistakeBook")}, ${label("quiz.studentCopy")}, and ${label("quiz.answerKey")} when shown.
 - Results: use ${label("quiz.studentCopy")}, ${label("quiz.answerKey")}, ${label("results.openMistakeBook")}, ${label("results.createShareLink")}, or ${label("results.uploadAnother")}.
 - Support: ${label("nav.feedback")} opens the product feedback form. Do not claim that an action exists unless it is listed above.

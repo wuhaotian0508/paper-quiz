@@ -128,6 +128,8 @@ describe("groupStudyMaterials", () => {
         name: "new.pdf",
         uploadedAt: "2026-07-28T10:00:00",
         lastOpenedAt: "",
+        subject: "",
+        updatedAt: "2026-07-28T10:00:00",
       },
     ];
 
@@ -149,11 +151,20 @@ describe("groupStudyMaterials", () => {
     const materials = mergeStudyLibraryMaterials(
       [],
       [
-        { id: "", name: "", uploadedAt: "", lastOpenedAt: "" },
-        { id: "pdf-1", name: "biology.pdf", uploadedAt: "2026-08-05T10:00:00.000Z", lastOpenedAt: "" },
+        { id: "", name: "", uploadedAt: "", lastOpenedAt: "", subject: "", updatedAt: "" },
+        {
+          id: "pdf-1",
+          name: "biology.pdf",
+          uploadedAt: "2026-08-05T10:00:00.000Z",
+          lastOpenedAt: "",
+          subject: "",
+          updatedAt: "2026-08-05T10:00:00.000Z",
+        },
       ],
     );
 
     expect(materials.map((material) => material.id)).toEqual(["pdf-1"]);
   });
 });
+
+

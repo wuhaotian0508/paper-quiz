@@ -16,7 +16,12 @@ describe("parseExamReviewOutput", () => {
     const payload = {
       exam_review: {
         title: "Business Model Review",
-        topics: [topic, { ...topic, topic: "Value propositions" }, { ...topic, topic: "Channels" }, { ...topic, topic: "Revenue" }],
+        topics: [
+          topic,
+          { ...topic, topic: "Value propositions" },
+          { ...topic, topic: "Channels" },
+          { ...topic, topic: "Revenue" },
+        ],
       },
     };
 
@@ -26,10 +31,17 @@ describe("parseExamReviewOutput", () => {
   it("strips a JSON code fence before parsing", () => {
     const payload = {
       title: "Business Model Review",
-      topics: [topic, { ...topic, topic: "Value propositions" }, { ...topic, topic: "Channels" }, { ...topic, topic: "Revenue" }],
+      topics: [
+        topic,
+        { ...topic, topic: "Value propositions" },
+        { ...topic, topic: "Channels" },
+        { ...topic, topic: "Revenue" },
+      ],
     };
 
-    expect(parseExamReviewOutput(`\`\`\`json\n${JSON.stringify(payload)}\n\`\`\``)).toEqual(payload);
+    expect(parseExamReviewOutput(`\`\`\`json\n${JSON.stringify(payload)}\n\`\`\``)).toEqual(
+      payload,
+    );
   });
 
   it("normalizes snake-case topic fields returned by a gateway", () => {
@@ -45,7 +57,7 @@ describe("parseExamReviewOutput", () => {
       ),
     };
 
-    expect(parseExamReviewOutput(JSON.stringify(payload)).topics[0]).toMatchObject({
+    expect(parseExamReviewOutput(JSON.stringify(payload)).topics?.[0]).toMatchObject({
       topic: "Customer segments",
       keyIdeas: ["Understand Customer segments."],
       formulaOrProcedure: "",

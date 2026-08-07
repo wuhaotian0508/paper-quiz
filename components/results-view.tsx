@@ -27,7 +27,7 @@ export function ResultsView({
   onOpenMistakes: () => void;
   onRestart: () => void;
 }) {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const correct = Object.values(grades).filter((grade) => grade.status === "correct").length;
 
   return (
@@ -44,10 +44,16 @@ export function ResultsView({
       <div className="results-action-groups">
         <div className="quiz-actions">
           <h2>{t("results.downloads")}</h2>
-          <button className="text-button" onClick={() => downloadQuizPdf(quiz, "student")}>
+          <button
+            className="text-button"
+            onClick={() => void downloadQuizPdf(quiz, "student", locale)}
+          >
             {t("quiz.studentCopy")}
           </button>
-          <button className="text-button" onClick={() => downloadQuizPdf(quiz, "answer_key")}>
+          <button
+            className="text-button"
+            onClick={() => void downloadQuizPdf(quiz, "answer_key", locale)}
+          >
             {t("quiz.answerKey")}
           </button>
         </div>

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { AuthClient } from "@/components/auth-menu";
+import { normalizeUsername, usernameError } from "@/lib/auth-username";
 import { useLocale } from "@/hooks/use-locale";
 
 type LoginViewProps = {
@@ -13,6 +14,7 @@ type LoginViewProps = {
   onAuthenticated?: (destination: string) => void;
 };
 
+type AuthMode = "login" | "register";
 type LoginMethod = "password" | "magic-link";
 
 export function LoginView({
@@ -25,10 +27,11 @@ export function LoginView({
   const { t } = useLocale();
   const [authClient, setAuthClient] = useState<AuthClient | null>(client ?? null);
   const [configurationError, setConfigurationError] = useState(unavailableReason ?? "");
+  const [mode, setMode] = useState<AuthMode>("login");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("password");
-  const [isSignUp, setIsSignUp] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -41,6 +44,12 @@ export function LoginView({
       setConfigurationError(error instanceof Error ? error.message : t("auth.supabaseUnavailable"));
     }
   }, [client, t, unavailableReason]);
+
+  const switchMode = (next: AuthMode) => {
+    setMode(next);
+    setMessage("");
+    if (next === "register") setLoginMethod("password");
+  };
 
   async function sendMagicLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,10 +71,56 @@ export function LoginView({
     setMessage(error ? error.message : t("auth.checkInbox"));
   }
 
-  async function submitPassword(event: FormEvent<HTMLFormElement>) {
+  async function logIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!authClient) return;
 
+    const name = normalizeUsername(username);
+    if (!name || !password) {
+      setMessage(t("auth.enterUsernameAndPassword"));
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage("");
+    // The account is keyed by email in Supabase Auth, so resolve the username first.
+    // The function only answers once the password checks out, so a wrong password and
+    // an unknown username are indistinguishable from here.
+    const lookup = await authClient.rpc?.("paper_quiz_email_for_login", {
+      p_username: name,
+      p_password: password,
+    });
+    const resolvedEmail = typeof lookup?.data === "string" ? lookup.data : "";
+    if (lookup?.error || !resolvedEmail) {
+      setIsSubmitting(false);
+      setMessage(lookup?.error?.message || t("auth.usernameNotFound"));
+      return;
+    }
+
+    const { error } = await authClient.auth.signInWithPassword({
+      email: resolvedEmail,
+      password,
+    });
+    setIsSubmitting(false);
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    (onAuthenticated ?? ((destination: string) => window.location.assign(destination)))(
+      safeReturnTo(returnTo),
+    );
+  }
+
+  async function register(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!authClient) return;
+
+    const invalid = usernameError(username);
+    if (invalid) {
+      setMessage(t(invalid));
+      return;
+    }
+    const name = normalizeUsername(username);
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
       setMessage(t("auth.enterEmailAndPassword"));
@@ -74,23 +129,25 @@ export function LoginView({
 
     setIsSubmitting(true);
     setMessage("");
-    const result = isSignUp
-      ? await authClient.auth.signUp({
-          email: trimmedEmail,
-          password,
-          options: { emailRedirectTo: authRedirectUrl(returnTo) },
-        })
-      : await authClient.auth.signInWithPassword({ email: trimmedEmail, password });
-    setIsSubmitting(false);
-    if (result.error) {
-      setMessage(result.error.message);
-    } else if (isSignUp) {
-      setMessage(t("auth.accountCreated"));
-    } else {
-      (onAuthenticated ?? ((destination: string) => window.location.assign(destination)))(
-        safeReturnTo(returnTo),
-      );
+    // Checked up front so the common collision produces a clear message rather than a
+    // unique-constraint failure from the trigger that creates the profile row.
+    const availability = await authClient.rpc?.("paper_quiz_username_available", {
+      p_username: name,
+    });
+    if (availability?.data === false) {
+      setIsSubmitting(false);
+      setMessage(t("auth.usernameTaken"));
+      return;
     }
+
+    const { error } = await authClient.auth.signUp({
+      email: trimmedEmail,
+      password,
+      options: { emailRedirectTo: authRedirectUrl(returnTo), data: { username: name } },
+    });
+    setIsSubmitting(false);
+    setMessage(error ? error.message : t("auth.accountCreated"));
+    if (!error) setMode("login");
   }
 
   async function signInWithGoogle() {
@@ -106,12 +163,21 @@ export function LoginView({
     if (error) setMessage(error.message);
   }
 
+  const registering = mode === "register";
+  const submitLabel = isSubmitting
+    ? loginMethod === "magic-link"
+      ? t("auth.sending")
+      : t("auth.working")
+    : registering
+      ? t("auth.createAccount")
+      : t("auth.logIn");
+
   return (
     <div className="login-form-panel">
       <div className="login-form-heading">
         <p className="login-kicker">{t("login.kicker")}</p>
-        <h1>{t("login.heading")}</h1>
-        <p>{t("login.subheading")}</p>
+        <h1>{registering ? t("auth.registerHeading") : t("login.heading")}</h1>
+        <p>{registering ? t("auth.registerSubheading") : t("login.subheading")}</p>
       </div>
       {authError ? (
         <p className="login-alert" role="alert">
@@ -125,43 +191,91 @@ export function LoginView({
         </div>
       ) : (
         <>
-          <div className="login-method-switch" role="tablist" aria-label={t("auth.methodAria")}>
+          <div className="login-mode-switch" role="tablist" aria-label={t("auth.tabsAria")}>
             <button
               type="button"
               role="tab"
-              aria-selected={loginMethod === "password"}
-              className={loginMethod === "password" ? "is-active" : ""}
-              onClick={() => setLoginMethod("password")}
+              aria-selected={!registering}
+              className={!registering ? "is-active" : ""}
+              onClick={() => switchMode("login")}
             >
-              {t("auth.password")}
+              {t("auth.tabLogIn")}
             </button>
             <button
               type="button"
               role="tab"
-              aria-selected={loginMethod === "magic-link"}
-              className={loginMethod === "magic-link" ? "is-active" : ""}
-              onClick={() => setLoginMethod("magic-link")}
+              aria-selected={registering}
+              className={registering ? "is-active" : ""}
+              onClick={() => switchMode("register")}
             >
-              {t("auth.emailLink")}
+              {t("auth.tabRegister")}
             </button>
           </div>
+          {!registering ? (
+            <div className="login-method-switch" role="tablist" aria-label={t("auth.methodAria")}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={loginMethod === "password"}
+                className={loginMethod === "password" ? "is-active" : ""}
+                onClick={() => setLoginMethod("password")}
+              >
+                {t("auth.password")}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={loginMethod === "magic-link"}
+                className={loginMethod === "magic-link" ? "is-active" : ""}
+                onClick={() => setLoginMethod("magic-link")}
+              >
+                {t("auth.emailLink")}
+              </button>
+            </div>
+          ) : null}
           <form
             className="login-form"
             onSubmit={(event) =>
-              void (loginMethod === "password" ? submitPassword(event) : sendMagicLink(event))
+              void (registering
+                ? register(event)
+                : loginMethod === "password"
+                  ? logIn(event)
+                  : sendMagicLink(event))
             }
           >
-            <label htmlFor="login-email">{t("login.email")}</label>
-            <input
-              id="login-email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-              placeholder={t("login.emailPlaceholder")}
-              required
-            />
-            {loginMethod === "password" ? (
+            {registering || loginMethod === "password" ? (
+              <>
+                <label htmlFor="login-username">{t("auth.username")}</label>
+                <input
+                  id="login-username"
+                  type="text"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  autoComplete="username"
+                  placeholder={t("auth.usernamePlaceholder")}
+                  required
+                />
+                {registering ? <p className="login-field-note">{t("auth.usernameNote")}</p> : null}
+              </>
+            ) : null}
+            {registering || loginMethod === "magic-link" ? (
+              <>
+                <label htmlFor="login-email">{t("login.email")}</label>
+                <input
+                  id="login-email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                  placeholder={t("login.emailPlaceholder")}
+                  required
+                />
+                {registering ? (
+                  <p className="login-field-note">{t("auth.emailForRecovery")}</p>
+                ) : null}
+              </>
+            ) : null}
+            {registering || loginMethod === "password" ? (
               <>
                 <label htmlFor="login-password">{t("auth.password")}</label>
                 <input
@@ -169,7 +283,7 @@ export function LoginView({
                   type="password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  autoComplete={isSignUp ? "new-password" : "current-password"}
+                  autoComplete={registering ? "new-password" : "current-password"}
                   minLength={6}
                   required
                 />
@@ -183,24 +297,9 @@ export function LoginView({
               className="login-primary-button"
               disabled={isSubmitting || !authClient}
             >
-              {isSubmitting
-                ? loginMethod === "magic-link"
-                  ? t("auth.sending")
-                  : t("auth.working")
-                : isSignUp
-                  ? t("auth.createAccount")
-                  : t("auth.logIn")}
+              {submitLabel}
             </button>
           </form>
-          {loginMethod === "password" ? (
-            <button
-              type="button"
-              className="login-text-button"
-              onClick={() => setIsSignUp((value) => !value)}
-            >
-              {isSignUp ? t("auth.haveAccount") : t("auth.newHere")}
-            </button>
-          ) : null}
           <div className="login-divider" aria-hidden="true">
             <span>{t("login.orContinueWith")}</span>
           </div>

@@ -15,7 +15,9 @@ describe("buildQuizInstructions", () => {
     expect(instructions).not.toContain("uploaded PDF");
     expect(instructions).toContain("Write every user-visible field in English");
     expect(instructions).toContain(
-      "title, summary, prompt, option text, explanation, and sourceNote",
+      "title, summary, examHeader, prompt, option text, per-option explanation, explanation, and sourceNote",
     );
+    expect(instructions).toContain("Give every multiple-choice option its own explanation");
+    expect(instructions).toContain("Fill in examHeader with courseTitle");
   });
 });

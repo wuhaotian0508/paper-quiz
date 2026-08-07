@@ -38,7 +38,9 @@ export async function POST(request: Request) {
     const locale = readLocale(form.get("locale") === null ? null : String(form.get("locale")));
     const rawMistakes = form.get("mistakes");
     const parsedMistakes =
-      rawMistakes === null ? { ok: true as const, value: [] } : parseReviewMistakeContext(rawMistakes);
+      rawMistakes === null
+        ? { ok: true as const, value: [] }
+        : parseReviewMistakeContext(rawMistakes);
 
     if (attachedPdf) {
       const validation = validatePdfFile(attachedPdf);
@@ -80,7 +82,7 @@ export async function POST(request: Request) {
           ? `${buildExamReviewInstructions(locale)}\n\n<lecture_transcript>\n${transcript}\n</lecture_transcript>${mistakeContext}`
           : questionContext
             ? `${buildExamReviewInstructions(locale)}\n\n<saved_quiz_questions>\n${questionContext}\n</saved_quiz_questions>${mistakeContext}`
-          : `${buildExamReviewInstructions(locale)}\n\nCreate the review from all attached PDF sources.${mistakeContext}`,
+            : `${buildExamReviewInstructions(locale)}\n\nCreate the review from all attached PDF sources.${mistakeContext}`,
       },
     ];
     const stream = await client.responses.create({
@@ -101,14 +103,18 @@ export async function POST(request: Request) {
     const allowedMistakeIds = new Set(parsedMistakes.value.map((mistake) => mistake.id));
     return Response.json({
       ...review,
-      topics: review.topics.map((topic) => {
-        const relatedMistakeIds = topic.relatedMistakeIds.filter((id) => allowedMistakeIds.has(id));
-        return {
-          ...topic,
-          relatedMistakeIds,
-          mistakeFocus: relatedMistakeIds.length ? topic.mistakeFocus : "",
-        };
-      }),
+      // Legacy topic sheets cite learner mistakes by id; drop any the model invented.
+      topics:
+        review.topics?.map((topic) => {
+          const relatedMistakeIds = topic.relatedMistakeIds.filter((id) =>
+            allowedMistakeIds.has(id),
+          );
+          return {
+            ...topic,
+            relatedMistakeIds,
+            mistakeFocus: relatedMistakeIds.length ? topic.mistakeFocus : "",
+          };
+        }) ?? null,
     });
   } catch (error) {
     console.error(

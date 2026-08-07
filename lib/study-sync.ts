@@ -1,5 +1,6 @@
 import type { MistakeBookEntry } from "./mistake-book";
 import type { StudySession } from "./study-history";
+import type { StudyLibraryRecord } from "./study-library";
 
 export type SyncRecord<T extends object = object> = T & {
   id: string;
@@ -19,6 +20,17 @@ export function toSyncStudySession(session: SyncableStudySession): SyncRecord<St
 
 export function toSyncMistakeBookEntry(entry: MistakeBookEntry): SyncRecord<MistakeBookEntry> {
   return entry;
+}
+
+/**
+ * Library records written before subjects existed have no `updatedAt`. Falling back to when
+ * the material was last opened, then to its upload time, gives the merge a real ordering
+ * instead of letting every legacy record tie at the empty string.
+ */
+export function toSyncStudyLibraryRecord(
+  record: StudyLibraryRecord,
+): SyncRecord<StudyLibraryRecord> {
+  return { ...record, updatedAt: record.updatedAt || record.lastOpenedAt || record.uploadedAt };
 }
 
 /**

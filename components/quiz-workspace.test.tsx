@@ -60,13 +60,17 @@ describe("QuizWorkspace", () => {
   });
 
   it("shows saved practice on the progress calendar", async () => {
+    // The calendar now opens on today, because it also answers what is due next, so the
+    // session has to be dated today for its card to be the one on show.
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
     window.localStorage.setItem(
       "paper-plane-quiz-history-v1",
       JSON.stringify([
         {
           id: "s1",
           title: "Data Quiz",
-          createdAt: "2026-07-21T12:00:00",
+          createdAt: today.toISOString(),
           questions: [],
           answers: {},
           grades: {},
@@ -227,6 +231,133 @@ describe("QuizWorkspace", () => {
     expect(gradeBody.get("file")).toBeNull();
   });
 
+  it("remembers what a student says about themselves and cites it back when grading", async () => {
+    // Tutor chat only opens after an answer is graded, so a memory captured on one question
+    // is first usable on the next one.
+    const written = (id: string, prompt: string) => ({
+      id,
+      type: "short_answer",
+      prompt,
+      explanation: "Retrieval grounds the model.",
+      sourceNote: "Lecture 3",
+      referenceAnswer: "Retrieval-augmented generation",
+      gradingCriteria: ["mentions retrieval"],
+      customLabel: null,
+    });
+    const quiz = {
+      title: "RAG quiz",
+      summary: "A review.",
+      sourceFileId: "file-abc123",
+      questions: [
+        written("rag-1", "Explain retrieval augmentation."),
+        written("rag-2", "How does ranking differ from retrieval?"),
+      ],
+    };
+    const json = (body: object) =>
+      new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
+    const graded = { status: "correct", score: 1, feedback: "Right.", missingPoints: [] };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(json(quiz))
+      .mockResolvedValueOnce(json(graded))
+      .mockResolvedValueOnce(json({ reply: "They are different steps." }))
+      .mockResolvedValueOnce(json({ ...graded, feedback: "Correct again." }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<QuizWorkspace />);
+
+    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
+      target: { files: [new File(["%PDF-1.4"], "lecture.pdf", { type: "application/pdf" })] },
+    });
+    fireEvent.change(screen.getByLabelText("Multiple-choice questions"), {
+      target: { value: "0" },
+    });
+    fireEvent.change(screen.getByLabelText("Short-answer questions"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate quiz" }));
+
+    fireEvent.change(await screen.findByLabelText("Your answer"), {
+      target: { value: "It retrieves documents first." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit answer" }));
+    await screen.findByText("Right.");
+    // Nothing is known about the student yet.
+    expect((fetchMock.mock.calls[1][1].body as FormData).get("memory")).toBeNull();
+
+    fireEvent.change(await screen.findByLabelText("Ask a follow-up question"), {
+      target: { value: "I always mix up retrieval and ranking, can you explain?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    await screen.findByText("They are different steps.");
+
+    // Captured by rule from what the student said; no model call is involved.
+    expect(window.localStorage.getItem("paper-plane-quiz-memory-v1")).toContain(
+      "I always mix up retrieval and ranking",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Next question" }));
+    fireEvent.change(await screen.findByLabelText("Your answer"), {
+      target: { value: "Ranking orders what retrieval returned." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit answer" }));
+    await screen.findByText("Correct again.");
+
+    // Retrieval is keyed on the question, so a memory on this topic rides along.
+    expect((fetchMock.mock.calls[3][1].body as FormData).get("memory")).toContain(
+      "I always mix up retrieval and ranking",
+    );
+    // Four sequential round trips through the whole workspace; the 5s default is not enough
+    // headroom for this one under a loaded full-suite run.
+  }, 20_000);
+
+  it("sends no memory field when the student has said nothing about themselves", async () => {
+    const quiz = {
+      title: "RAG quiz",
+      summary: "A review.",
+      sourceFileId: "file-abc123",
+      questions: [
+        {
+          id: "rag-1",
+          type: "short_answer",
+          prompt: "Explain retrieval augmentation.",
+          explanation: "Retrieval grounds the model.",
+          sourceNote: "Lecture 3",
+          referenceAnswer: "Retrieval-augmented generation",
+          gradingCriteria: ["mentions retrieval"],
+          customLabel: null,
+        },
+      ],
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(quiz), { headers: { "content-type": "application/json" } }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ status: "correct", score: 1, feedback: "Right.", missingPoints: [] }),
+          { headers: { "content-type": "application/json" } },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    render(<QuizWorkspace />);
+
+    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
+      target: { files: [new File(["%PDF-1.4"], "lecture.pdf", { type: "application/pdf" })] },
+    });
+    fireEvent.change(screen.getByLabelText("Multiple-choice questions"), {
+      target: { value: "0" },
+    });
+    fireEvent.change(screen.getByLabelText("Short-answer questions"), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate quiz" }));
+
+    fireEvent.change(await screen.findByLabelText("Your answer"), {
+      target: { value: "It retrieves documents first." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit answer" }));
+
+    await screen.findByText("Right.");
+    expect((fetchMock.mock.calls[1][1].body as FormData).get("memory")).toBeNull();
+  });
+
   it("grades a combined quiz against every stored PDF source", async () => {
     const quiz = {
       title: "Combined quiz",
@@ -373,8 +504,10 @@ describe("QuizWorkspace", () => {
       ]),
     );
     render(<QuizWorkspace />);
-    fireEvent.click(await screen.findByRole("button", { name: /History/ }));
-    fireEvent.click(await screen.findByRole("button", { name: "Open PDF" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Library/ }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Open Earlier practice (no source recorded)" }),
+    );
     fireEvent.click(await screen.findByRole("button", { name: "Continue latest practice" }));
 
     fireEvent.change(await screen.findByLabelText("Your answer"), {
@@ -517,9 +650,9 @@ describe("QuizWorkspace", () => {
     fireEvent.click(await screen.findByRole("button", { name: "View results" }));
     fireEvent.click(await screen.findByRole("button", { name: "Upload another lecture" }));
 
-    fireEvent.click(await screen.findByRole("button", { name: /History/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Library/ }));
     expect(await screen.findByText("forces-lecture.pdf")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Open PDF" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open forces-lecture.pdf" }));
 
     expect(await screen.findByRole("heading", { name: "forces-lecture.pdf" })).toBeInTheDocument();
     expect(

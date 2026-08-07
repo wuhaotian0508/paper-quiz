@@ -7,7 +7,6 @@ import {
   getExamReviewPdfBlocks,
   getPdfHeaderTitleLines,
   getProgressPdfBlocks,
-  getQuestionTypeBadgeLines,
   getQuizExportFileName,
   getQuizPdfBlocks,
   getReviewPdfBlocks,
@@ -18,23 +17,53 @@ import type { Quiz } from "./quiz";
 import type { MaterialReviewSheet } from "./material-review-sheet";
 import type { ExamReviewSheet } from "./exam-review";
 
+const gravityQuestion: Quiz["questions"][number] = {
+  id: "force-1",
+  type: "multiple_choice",
+  points: 3,
+  prompt: "Which force pulls objects toward Earth?",
+  options: [
+    {
+      id: "a",
+      text: "Friction",
+      explanation: "Friction opposes motion; it does not pull downward.",
+    },
+    { id: "b", text: "Gravity", explanation: "Gravity is the attraction between masses." },
+    { id: "c", text: "Magnetism", explanation: "Magnetism only acts on magnetic materials." },
+    { id: "d", text: "Tension", explanation: "Tension acts along a rope, not toward Earth." },
+  ],
+  correctOptionId: "b",
+  explanation: "Gravity attracts objects with mass.",
+  sourceNote: "Forces handout",
+};
+
 const sampleQuiz: Quiz = {
   title: "Forces and motion",
   summary: "A quick science review.",
+  questions: [gravityQuestion],
+};
+
+const examQuiz: Quiz = {
+  title: "Computer architecture review",
+  summary: "A mock final.",
+  examHeader: {
+    courseTitle: "Computer Architecture",
+    paperLabel: "Mock Final A",
+    durationMinutes: 90,
+    scope: "Chapters 1-4",
+  },
   questions: [
+    gravityQuestion,
     {
-      id: "force-1",
-      type: "multiple_choice",
-      prompt: "Which force pulls objects toward Earth?",
-      options: [
-        { id: "a", text: "Friction" },
-        { id: "b", text: "Gravity" },
-        { id: "c", text: "Magnetism" },
-        { id: "d", text: "Tension" },
-      ],
-      correctOptionId: "b",
-      explanation: "Gravity attracts objects with mass.",
-      sourceNote: "Forces handout",
+      id: "amat-1",
+      type: "short_answer",
+      points: 14,
+      prompt: "Derive the average memory access time.",
+      referenceAnswer: "AMAT = hit time + miss rate x miss penalty.",
+      gradingCriteria: ["States the formula"],
+      customLabel: null,
+      explanation: "AMAT combines hit time with the cost of misses.",
+      sourceNote: "Cache chapter",
     },
   ],
 };
@@ -48,23 +77,80 @@ describe("quiz PDF export contract", () => {
     expect(getQuizExportFileName("answer_key")).toBe("paper-quiz-answer-key.pdf");
   });
 
+  it("prints the quiz on A4 portrait, the way an exam paper is set", () => {
+    const pdf = createQuizPdf(sampleQuiz, "student");
+
+    expect(pdf.internal.pageSize.getWidth()).toBeCloseTo(210, 1);
+    expect(pdf.internal.pageSize.getHeight()).toBeCloseTo(297, 1);
+  });
+
+  it("lays the student copy out as an exam paper with a marks table", () => {
+    const content = getQuizPdfBlocks(examQuiz, "student").join("\n");
+
+    expect(content).toContain("Computer Architecture Mock Final A");
+    expect(content).toContain("Time: 90 minutes    Total: 17 marks    Scope: Chapters 1-4");
+    expect(content).toContain("Part I — Multiple Choice (3 marks each, 3 marks total)");
+    expect(content).toContain("Part II — Short Answer (14 marks each, 14 marks total)");
+    expect(content).toContain("1. [Single] Which force pulls objects toward Earth?");
+    expect(content).toContain("2. Derive the average memory access time.");
+    expect(content).toContain("Answer:");
+  });
+
+  it("numbers questions by section rather than by generation order", () => {
+    const shuffled: Quiz = {
+      ...examQuiz,
+      questions: [examQuiz.questions[1], examQuiz.questions[0]],
+    };
+
+    const content = getQuizPdfBlocks(shuffled, "student").join("\n");
+
+    expect(content).toContain("1. [Single] Which force pulls objects toward Earth?");
+    expect(content).toContain("2. Derive the average memory access time.");
+  });
+
   it("builds student-copy blocks without the answers or explanations", () => {
     const content = getQuizPdfBlocks(sampleQuiz, "student").join("\n");
 
-    expect(content).toContain("PAPER QUIZ AI / STUDENT COPY");
     expect(content).toContain("Which force pulls objects toward Earth?");
-    expect(content).not.toContain("ANSWER + EXPLANATION");
+    expect(content).not.toContain("Answer Key");
     expect(content).not.toContain("Gravity attracts objects with mass.");
     expect(content).not.toContain("Correct answer: Gravity");
+    expect(content).not.toContain("Friction opposes motion; it does not pull downward.");
   });
 
   it("builds answer-key blocks with the answers and explanations", () => {
     const content = getQuizPdfBlocks(sampleQuiz, "answer_key").join("\n");
 
-    expect(content).toContain("PAPER QUIZ AI / ANSWER KEY");
-    expect(content).toContain("ANSWER + EXPLANATION");
+    expect(content).toContain("Answer Key");
     expect(content).toContain("Correct answer: Gravity");
     expect(content).toContain("Gravity attracts objects with mass.");
+  });
+
+  it("prints an explanation for every option in the answer key", () => {
+    const content = getQuizPdfBlocks(sampleQuiz, "answer_key").join("\n");
+
+    expect(content).toContain("Option analysis");
+    expect(content).toContain("A. Friction opposes motion; it does not pull downward.");
+    expect(content).toContain("B. Gravity is the attraction between masses.");
+    expect(content).toContain("C. Magnetism only acts on magnetic materials.");
+    expect(content).toContain("D. Tension acts along a rope, not toward Earth.");
+  });
+
+  it("omits option analysis for quizzes saved before it existed", () => {
+    const legacy: Quiz = {
+      ...sampleQuiz,
+      questions: [
+        {
+          ...gravityQuestion,
+          options:
+            gravityQuestion.type === "multiple_choice"
+              ? gravityQuestion.options.map(({ id, text }) => ({ id, text }))
+              : [],
+        } as Quiz["questions"][number],
+      ],
+    };
+
+    expect(getQuizPdfBlocks(legacy, "answer_key").join("\n")).not.toContain("Option analysis");
   });
 
   it("gives saved mistake and review exports the Paper Quiz template headers", () => {
@@ -210,13 +296,11 @@ describe("quiz PDF export contract", () => {
     };
 
     expect(getPdfHeaderTitleLines(longTitle).join(" ")).toBe(longTitle);
-    expect(getQuestionTypeBadgeLines(customQuiz.questions[1]).join(" ")).toBe(
-      longCustomLabel.toUpperCase(),
-    );
     expect(getQuizPdfBlocks(customQuiz, "student").join("\n")).toContain(longOption);
+    expect(getQuizPdfBlocks(customQuiz, "student").join("\n")).toContain("Explain your evidence.");
   });
 
-  it("renders unbroken title, badge, and option tokens as width-safe text chunks", () => {
+  it("renders unbroken title and option tokens as width-safe text chunks", () => {
     const titleToken = "TITLE".repeat(70);
     const labelToken = "LABEL".repeat(55);
     const optionToken = "OPTION".repeat(60);
@@ -259,29 +343,33 @@ describe("quiz PDF export contract", () => {
     const textChunks = Array.from(pageCommands.matchAll(/\(([^()]*)\) Tj/g), (match) => match[1]);
     const chunksFor = (marker: string, token: string) => {
       const chunks = textChunks.filter((chunk) => chunk.includes(marker));
-      return chunks.join("") === token ? chunks : undefined;
+      for (let start = 0; start < chunks.length; start += 1) {
+        let joined = "";
+        for (let end = start; end < chunks.length; end += 1) {
+          joined += chunks[end];
+          if (joined === token) return chunks.slice(start, end + 1);
+          if (!token.startsWith(joined)) break;
+        }
+      }
+      return undefined;
     };
     const titleChunks = chunksFor("TITLE", titleToken);
-    const labelChunks = chunksFor("LABEL", labelToken);
-    const optionChunks = chunksFor("OPTION", optionToken);
+    // The exam layout prints the letter and the option text as one line.
+    const optionChunks = chunksFor("OPTION", `A. ${optionToken}`);
 
     expect(titleChunks).toBeDefined();
-    expect(labelChunks).toBeDefined();
     expect(optionChunks).toBeDefined();
+    // A4 portrait with 18mm margins, minus the option indent.
     const measure = new jsPDF();
     measure.setFont("helvetica", "bold");
-    measure.setFontSize(12);
+    measure.setFontSize(15);
     expect(
       Math.max(...titleChunks!.map((chunk) => measure.getTextWidth(chunk))),
-    ).toBeLessThanOrEqual(186);
-    measure.setFontSize(7.5);
-    expect(
-      Math.max(...labelChunks!.map((chunk) => measure.getTextWidth(chunk))),
-    ).toBeLessThanOrEqual(46);
+    ).toBeLessThanOrEqual(174);
     measure.setFont("helvetica", "normal");
-    measure.setFontSize(8);
+    measure.setFontSize(10);
     expect(
       Math.max(...optionChunks!.map((chunk) => measure.getTextWidth(chunk))),
-    ).toBeLessThanOrEqual(77);
+    ).toBeLessThanOrEqual(167);
   });
 });

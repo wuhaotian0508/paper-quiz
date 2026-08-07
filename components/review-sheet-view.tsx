@@ -37,7 +37,7 @@ export function ReviewSheetView({
           <button
             className="text-button framed-button"
             disabled={!sheet.items.length}
-            onClick={() => downloadWeaknessReviewPdf(sheet)}
+            onClick={() => void downloadWeaknessReviewPdf(sheet)}
           >
             {t("reviewSheet.exportOnePage")}
           </button>

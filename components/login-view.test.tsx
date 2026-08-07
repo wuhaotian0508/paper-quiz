@@ -18,6 +18,15 @@ function createClient(): AuthClient {
       signInWithOAuth: vi.fn().mockResolvedValue({ error: null }),
       signOut: vi.fn().mockResolvedValue({ error: null }),
     },
+    rpc: vi
+      .fn()
+      .mockImplementation((name: string) =>
+        Promise.resolve(
+          name === "paper_quiz_email_for_login"
+            ? { data: "student@example.com", error: null }
+            : { data: true, error: null },
+        ),
+      ),
   };
 }
 
@@ -30,30 +39,120 @@ it("renders a standalone sign-in form without workspace navigation", () => {
   render(<LoginView client={createClient()} />);
 
   expect(screen.getByRole("heading", { name: /welcome back/i })).toBeInTheDocument();
+  expect(screen.getByRole("tab", { name: "Log in" })).toBeInTheDocument();
+  expect(screen.getByRole("tab", { name: "Register" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Log in" })).toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "Dashboard" })).not.toBeInTheDocument();
 });
 
-it("logs in with an email and password", async () => {
+it("logs in with a username and password", async () => {
   const client = createClient();
   const assign = vi.fn();
   render(<LoginView client={client} returnTo="/review/review-123" onAuthenticated={assign} />);
 
+  fireEvent.change(screen.getByLabelText("Username"), { target: { value: "Study_Bear" } });
+  fireEvent.change(screen.getByLabelText("Password"), {
+    target: { value: "correct-horse-battery" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+
+  // The username is resolved to the account email before Supabase Auth sees it.
+  await waitFor(() =>
+    expect(client.rpc).toHaveBeenCalledWith("paper_quiz_email_for_login", {
+      p_username: "study_bear",
+      p_password: "correct-horse-battery",
+    }),
+  );
+  expect(client.auth.signInWithPassword).toHaveBeenCalledWith({
+    email: "student@example.com",
+    password: "correct-horse-battery",
+  });
+  expect(assign).toHaveBeenCalledWith("/review/review-123");
+});
+
+it("does not ask for an email on the password login tab", () => {
+  render(<LoginView client={createClient()} />);
+
+  expect(screen.getByLabelText("Username")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
+});
+
+it("reports an unknown username or wrong password without naming which", async () => {
+  const client = createClient();
+  client.rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+  render(<LoginView client={client} />);
+
+  fireEvent.change(screen.getByLabelText("Username"), { target: { value: "study_bear" } });
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "wrong-password" } });
+  fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+
+  await waitFor(() =>
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "No account matches that username and password.",
+    ),
+  );
+  expect(client.auth.signInWithPassword).not.toHaveBeenCalled();
+});
+
+it("registers with a username, an email, and a password", async () => {
+  const client = createClient();
+  render(<LoginView client={client} returnTo="/review/review-123" />);
+
+  fireEvent.click(screen.getByRole("tab", { name: "Register" }));
+  fireEvent.change(screen.getByLabelText("Username"), { target: { value: "study_bear" } });
   fireEvent.change(screen.getByLabelText("Email"), {
     target: { value: "student@example.com" },
   });
   fireEvent.change(screen.getByLabelText("Password"), {
     target: { value: "correct-horse-battery" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+  fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
   await waitFor(() =>
-    expect(client.auth.signInWithPassword).toHaveBeenCalledWith({
+    expect(client.auth.signUp).toHaveBeenCalledWith({
       email: "student@example.com",
       password: "correct-horse-battery",
+      options: {
+        emailRedirectTo: "http://localhost:3000/auth/callback?returnTo=%2Freview%2Freview-123",
+        data: { username: "study_bear" },
+      },
     }),
   );
-  expect(assign).toHaveBeenCalledWith("/review/review-123");
+});
+
+it("rejects a taken username before creating the account", async () => {
+  const client = createClient();
+  client.rpc = vi.fn().mockResolvedValue({ data: false, error: null });
+  render(<LoginView client={client} />);
+
+  fireEvent.click(screen.getByRole("tab", { name: "Register" }));
+  fireEvent.change(screen.getByLabelText("Username"), { target: { value: "study_bear" } });
+  fireEvent.change(screen.getByLabelText("Email"), { target: { value: "a@example.com" } });
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "long-enough" } });
+  fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+  await waitFor(() =>
+    expect(screen.getByRole("status")).toHaveTextContent("That username is already taken."),
+  );
+  expect(client.auth.signUp).not.toHaveBeenCalled();
+});
+
+it("rejects a username with unsupported characters", async () => {
+  const client = createClient();
+  render(<LoginView client={client} />);
+
+  fireEvent.click(screen.getByRole("tab", { name: "Register" }));
+  fireEvent.change(screen.getByLabelText("Username"), { target: { value: "no spaces!" } });
+  fireEvent.change(screen.getByLabelText("Email"), { target: { value: "a@example.com" } });
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "long-enough" } });
+  fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+  await waitFor(() =>
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Usernames use 3-32 lowercase letters, numbers, or underscores.",
+    ),
+  );
+  expect(client.auth.signUp).not.toHaveBeenCalled();
 });
 
 it("can send a magic link back to the shared artifact", async () => {

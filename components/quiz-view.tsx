@@ -2,6 +2,7 @@
 
 import type { GradeResult, Question, Quiz } from "@/lib/quiz";
 import { downloadQuizPdf } from "@/lib/pdf-export";
+import { OptionAnalysis } from "@/components/option-analysis";
 import { useLocale } from "@/hooks/use-locale";
 import type { MessageKey } from "@/lib/i18n";
 
@@ -60,7 +61,7 @@ export function QuizView({
   onExit: () => void;
   onOpenMistakes: () => void;
 }) {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const typeKey = questionTypeKeys[current.type];
   const label =
     current.type === "custom"
@@ -75,10 +76,16 @@ export function QuizView({
   return (
     <section className="quiz-shell">
       <div className="workspace-toolbar">
-        <button className="text-button" onClick={() => downloadQuizPdf(quiz, "student")}>
+        <button
+          className="text-button"
+          onClick={() => void downloadQuizPdf(quiz, "student", locale)}
+        >
           {t("quiz.studentCopy")}
         </button>
-        <button className="text-button" onClick={() => downloadQuizPdf(quiz, "answer_key")}>
+        <button
+          className="text-button"
+          onClick={() => void downloadQuizPdf(quiz, "answer_key", locale)}
+        >
           {t("quiz.answerKey")}
         </button>
         <button className="text-button" onClick={onOpenMistakes}>
@@ -128,9 +135,7 @@ export function QuizView({
             rows={current.type === "fill_blank" ? 3 : 7}
           />
         )}
-        {blocked && !submitted && (
-          <div className="error-message">{t("quiz.blockedNotice")}</div>
-        )}
+        {blocked && !submitted && <div className="error-message">{t("quiz.blockedNotice")}</div>}
         {error && <div className="error-message">{error}</div>}
         {submitted && grade && (
           <div className={`explanation ${grade.status === "correct" ? "is-correct" : "is-wrong"}`}>
@@ -151,6 +156,7 @@ export function QuizView({
                 <strong>{t("quiz.referenceAnswer")}</strong> {current.referenceAnswer}
               </p>
             )}
+            <OptionAnalysis question={current} />
             <span className="source-note">
               {t("quiz.sourceLabel", { note: current.sourceNote })}
             </span>

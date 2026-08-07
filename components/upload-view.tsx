@@ -1,11 +1,11 @@
 "use client";
 
 import type { Difficulty } from "@/lib/quiz";
-import { formatBytes, isAudio, isPdf } from "@/lib/study-file";
-import { materialFromFile, type StudySession } from "@/lib/study-history";
-import type { StudyMaterial } from "@/lib/study-material";
-import type { StudyLibraryRecord } from "@/lib/study-library";
-import { ReviewLibrary } from "@/components/review-library";
+import { formatBytes, isAudio } from "@/lib/study-file";
+import type { StudySession } from "@/lib/study-history";
+import type { DailyReviewPaper } from "@/lib/daily-review";
+import type { MistakeBookEntry } from "@/lib/mistake-book";
+import { DailyReviewPapers } from "@/components/daily-review-papers";
 import { useLocale } from "@/hooks/use-locale";
 import type { MessageKey } from "@/lib/i18n";
 
@@ -34,17 +34,16 @@ export function UploadView({
   sessionCount,
   materialCount,
   sessions,
-  reviewFocusMaterials = [],
-  library = [],
+  papers,
   onAcceptFiles,
   onCountsChange,
   onCustomChange,
   onDifficultyChange,
   onOpenMistakes,
   onOpenProgress,
-  onOpenHistory,
+  onOpenLibrary,
   onOpenSession,
-  onOpenMaterial,
+  onSitPaper,
   onStart,
 }: {
   files: File[];
@@ -57,17 +56,17 @@ export function UploadView({
   sessionCount: number;
   materialCount: number;
   sessions: StudySession[];
-  reviewFocusMaterials?: StudyMaterial[];
-  library?: StudyLibraryRecord[];
+  /** Today's per-course review papers, from the Ebbinghaus schedule. */
+  papers: DailyReviewPaper[];
   onAcceptFiles: (next?: FileList | File[]) => void;
   onCountsChange: (update: (previous: Record<string, number>) => Record<string, number>) => void;
   onCustomChange: (update: (previous: CustomDraft[]) => CustomDraft[]) => void;
   onDifficultyChange: (next: Difficulty) => void;
   onOpenMistakes: () => void;
   onOpenProgress: () => void;
-  onOpenHistory: () => void;
+  onOpenLibrary: () => void;
   onOpenSession: (session: StudySession) => void;
-  onOpenMaterial?: (material: StudyMaterial) => void;
+  onSitPaper: (entries: MistakeBookEntry[]) => void;
   onStart: () => void;
 }) {
   const { t } = useLocale();
@@ -77,12 +76,6 @@ export function UploadView({
     sessions.map((session) => new Date(session.createdAt).toLocaleDateString()),
   ).size;
   const recentSessions = sessions.slice(0, 4);
-  const selectedPdfIds = new Set(
-    files.filter(isPdf).map((file) => materialFromFile(file).materialId),
-  );
-  const visibleReviewMaterials = reviewFocusMaterials.filter(
-    (material) => !selectedPdfIds.has(material.id),
-  );
 
   return (
     <section className="dashboard-page">
@@ -250,12 +243,7 @@ export function UploadView({
         </div>
       </section>
 
-      <ReviewLibrary
-        materials={visibleReviewMaterials}
-        library={library}
-        onOpen={onOpenMaterial ?? (() => undefined)}
-        onViewAll={onOpenHistory}
-      />
+      <DailyReviewPapers papers={papers} onSit={onSitPaper} />
 
       <section className="dashboard-shortcuts" aria-label={t("upload.shortcutsAria")}>
         <button onClick={onOpenMistakes}>
@@ -278,12 +266,12 @@ export function UploadView({
           </span>
           <b aria-hidden="true">-&gt;</b>
         </button>
-        <button onClick={onOpenHistory}>
+        <button onClick={onOpenLibrary}>
           <span className="dashboard-shortcut-icon blue" aria-hidden="true">
-            H
+            L
           </span>
           <span>
-            <strong>{t("nav.history")}</strong>
+            <strong>{t("nav.library")}</strong>
             <small>{t("upload.pdfsWithSavedQuestions", { count: materialCount })}</small>
           </span>
           <b aria-hidden="true">-&gt;</b>
@@ -294,7 +282,7 @@ export function UploadView({
         <article className="dashboard-detail-card">
           <div className="dashboard-detail-heading">
             <h2>{t("upload.recentPractice")}</h2>
-            <button className="text-button" onClick={onOpenHistory}>
+            <button className="text-button" onClick={onOpenLibrary}>
               {t("upload.viewAll")}
             </button>
           </div>

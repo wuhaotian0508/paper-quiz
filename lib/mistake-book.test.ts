@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addMistake, readMistakes } from "./mistake-book";
+import { MASTERED_BOX } from "./review-schedule";
 import type { Question } from "./quiz";
 
 const question: Question = {
@@ -120,5 +121,85 @@ describe("mistake book", () => {
 
   it("ignores malformed saved data", () => {
     expect(readMistakes("not json")).toEqual([]);
+  });
+
+  it("promotes a card up the ladder when a saved mistake is answered correctly", () => {
+    const missed = addMistake(
+      [],
+      question,
+      "retrieval generation",
+      { status: "incorrect", score: 0, feedback: "Missing augmented.", missingPoints: [] },
+      undefined,
+      new Date("2026-08-03T09:00:00"),
+    );
+
+    const promoted = addMistake(
+      missed,
+      question,
+      "retrieval augmented generation",
+      { status: "correct", score: 1, feedback: "Correct.", missingPoints: [] },
+      undefined,
+      new Date("2026-08-04T09:00:00"),
+    );
+
+    expect(promoted).toHaveLength(1);
+    expect(promoted[0].review?.box).toBe(1);
+    // The wrong answer is what the entry is for, so it survives the promotion.
+    expect(promoted[0]).toMatchObject({ answer: "retrieval generation", status: "incorrect" });
+  });
+
+  it("removes a card that graduates from the last box", () => {
+    const nearlyMastered = addMistake(
+      [],
+      question,
+      "retrieval generation",
+      { status: "incorrect", score: 0, feedback: "Missing augmented.", missingPoints: [] },
+      undefined,
+      new Date("2026-08-03T09:00:00"),
+    ).map((entry) => ({ ...entry, review: { ...entry.review!, box: MASTERED_BOX - 1 } }));
+
+    const graduated = addMistake(
+      nearlyMastered,
+      question,
+      "retrieval augmented generation",
+      { status: "correct", score: 1, feedback: "Correct.", missingPoints: [] },
+      undefined,
+      new Date("2026-08-04T09:00:00"),
+    );
+
+    expect(graduated).toEqual([]);
+  });
+
+  it("records nothing when a question that was never missed is answered correctly", () => {
+    expect(
+      addMistake([], question, "retrieval augmented generation", {
+        status: "correct",
+        score: 1,
+        feedback: "Correct.",
+        missingPoints: [],
+      }),
+    ).toEqual([]);
+  });
+
+  it("sends a repeat mistake back to the first box and counts the lapse", () => {
+    const advanced = addMistake(
+      [],
+      question,
+      "retrieval generation",
+      { status: "incorrect", score: 0, feedback: "Missing augmented.", missingPoints: [] },
+      undefined,
+      new Date("2026-08-03T09:00:00"),
+    ).map((entry) => ({ ...entry, review: { ...entry.review!, box: 3 } }));
+
+    const relapsed = addMistake(
+      advanced,
+      question,
+      "generation",
+      { status: "incorrect", score: 0, feedback: "Still missing it.", missingPoints: [] },
+      undefined,
+      new Date("2026-08-10T09:00:00"),
+    );
+
+    expect(relapsed[0].review).toMatchObject({ box: 0, lapses: 1 });
   });
 });
