@@ -17,6 +17,15 @@ export const ExamReviewSheetSchema = z.object({
 
 export type ExamReviewSheet = z.infer<typeof ExamReviewSheetSchema>;
 
+export function parseExamReviewOutput(output: string): ExamReviewSheet {
+  const json = output
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+  return ExamReviewSheetSchema.parse(JSON.parse(json));
+}
+
 export function buildExamReviewInstructions() {
   return [
     "You are a precise exam tutor. Create a concise review sheet based only on the supplied study material.",
@@ -24,6 +33,7 @@ export function buildExamReviewInstructions() {
     "For each topic, state essential ideas, include a formula or procedure only when the source contains one, name one common confusion, and cite the supporting page, section, or transcript topic.",
     "The supplied PDF or transcript is the sole factual authority. Learner mistakes only determine which source-grounded concepts deserve emphasis.",
     "Return relatedMistakeIds only from the supplied mistake identifiers, and use an empty array with an empty mistakeFocus when no supplied mistake applies.",
+    "Return JSON only, without Markdown headings or a code fence.",
     "Write every user-visible field in English. Do not invent facts or imply this document is permitted during an exam.",
   ].join("\n");
 }

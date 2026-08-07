@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildExamReviewInstructions, ExamReviewSheetSchema } from "./exam-review";
+import {
+  buildExamReviewInstructions,
+  ExamReviewSheetSchema,
+  parseExamReviewOutput,
+} from "./exam-review";
 
 describe("ExamReviewSheetSchema", () => {
   it("accepts a source-grounded set of compact review topics", () => {
@@ -54,5 +58,20 @@ describe("ExamReviewSheetSchema", () => {
   it("requires source facts and supplied mistake ids to remain separate", () => {
     expect(buildExamReviewInstructions()).toContain("sole factual authority");
     expect(buildExamReviewInstructions()).toContain("supplied mistake identifiers");
+  });
+
+  it("accepts a JSON response wrapped in a Markdown code fence", () => {
+    const topics = Array.from({ length: 4 }, (_, index) => ({
+      topic: `Topic ${index + 1}`,
+      keyIdeas: ["Source-grounded idea."],
+      formulaOrProcedure: "",
+      commonConfusion: "A common confusion.",
+      sourceNote: "Transcript section.",
+      relatedMistakeIds: [],
+      mistakeFocus: "",
+    }));
+
+    expect(parseExamReviewOutput(`\`\`\`json\n${JSON.stringify({ title: "Review", topics })}\n\`\`\``))
+      .toMatchObject({ title: "Review", topics });
   });
 });

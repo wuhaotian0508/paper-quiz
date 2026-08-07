@@ -1,6 +1,10 @@
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
-import { ExamReviewSheetSchema, buildExamReviewInstructions } from "@/lib/exam-review";
+import {
+  ExamReviewSheetSchema,
+  buildExamReviewInstructions,
+  parseExamReviewOutput,
+} from "@/lib/exam-review";
 import { getOpenAIClientOptions, getOpenAIModel } from "@/lib/openai-config";
 import { collectResponse } from "@/lib/openai-stream";
 import {
@@ -69,7 +73,7 @@ export async function POST(request: Request) {
     if (stoppedEarlyBecause || !text)
       return jsonError("AI did not return a usable exam review. Please try again.", 502);
 
-    const review = ExamReviewSheetSchema.parse(JSON.parse(text));
+    const review = parseExamReviewOutput(text);
     const allowedMistakeIds = new Set(parsedMistakes.value.map((mistake) => mistake.id));
     return Response.json({
       ...review,
