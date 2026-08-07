@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
-import { getOpenAIClientOptions, getOpenAIModel } from "@/lib/openai-config";
+import { getOpenAIClientOptions } from "@/lib/openai-config";
 import {
   buildProductHelpInstructions,
   parseProductHelpReply,
@@ -9,6 +9,7 @@ import {
 } from "@/lib/product-help";
 
 export const maxDuration = 60;
+const PRODUCT_HELP_MODEL = "gpt-4o-mini";
 
 function error(message: string, status: number) {
   return Response.json({ error: message }, { status });
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
     if (!options) return error("The server has not been configured with an OpenAI API key.", 503);
 
     const response = await new OpenAI(options).responses.create({
-      model: getOpenAIModel(),
+      model: PRODUCT_HELP_MODEL,
       max_output_tokens: 700,
       input: [
         { role: "developer", content: buildProductHelpInstructions() },
