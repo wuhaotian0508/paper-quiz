@@ -46,13 +46,73 @@ describe("MaterialDetailView", () => {
     expect(screen.getByRole("article")).toHaveClass("is-question");
   });
 
-  it("waits for the learner to generate a review sheet for this PDF", () => {
+  it("shows this PDF's generated practice sets and a clear source-grounded review action", () => {
     render(
       <MaterialDetailView
         material={{
           id: "m1",
           name: "Lecture.pdf",
-          questions: [],
+          questions: [
+            {
+              id: "q1",
+              type: "fill_blank",
+              prompt: "A source is ___.",
+              acceptedAnswers: ["evidence"],
+              referenceAnswer: "evidence",
+              explanation: "It grounds review.",
+              sourceNote: "Saved PDF question context",
+            },
+          ],
+          mistakes: [],
+          sessions: [
+            {
+              id: "s1",
+              title: "Lecture quiz 1",
+              createdAt: "2026-08-05T10:00:00.000Z",
+              questions: [],
+              answers: {},
+              grades: {},
+              chat: {},
+              source: {
+                fileId: "file-lecture123",
+                transcript: "",
+                materialId: "m1",
+                materialName: "Lecture.pdf",
+              },
+            },
+          ],
+          lastPracticedAt: "2026-08-05T10:00:00.000Z",
+        }}
+        onBack={vi.fn()}
+        onPractice={vi.fn()}
+        onOpenSession={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Practice sets from this PDF" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Lecture quiz 1" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Generate knowledge-point review sheet" }),
+    ).toHaveTextContent("Generate knowledge-point review sheet");
+  });
+
+  it("places a knowledge-point review builder before the raw question history", () => {
+    render(
+      <MaterialDetailView
+        material={{
+          id: "m1",
+          name: "Lecture.pdf",
+          questions: [
+            {
+              id: "q1",
+              type: "fill_blank",
+              prompt: "A source-grounded review should cover ___.",
+              acceptedAnswers: ["key concepts"],
+              referenceAnswer: "key concepts",
+              explanation: "A review sheet synthesizes concepts, not just answers.",
+              sourceNote: "Page 1",
+            },
+          ],
           mistakes: [],
           sessions: [],
           lastPracticedAt: "",
@@ -62,10 +122,93 @@ describe("MaterialDetailView", () => {
       />,
     );
 
-    expect(screen.queryByText("Lecture.pdf Review Sheet")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Show practice summary" }));
-    expect(screen.getByText("Lecture.pdf Review Sheet")).toBeInTheDocument();
-    expect(screen.getByText("No saved questions for this material yet.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Build your AI Review Sheet" })).toBeInTheDocument();
+    expect(screen.getByText("Key concepts, common confusions, and targeted recall from this PDF.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate knowledge-point review sheet" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open this PDF's mistakes" })).toBeInTheDocument();
+  });
+
+  it("can generate a review from saved quiz questions when the original PDF source expired", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            title: "Saved-question review",
+            topics: Array.from({ length: 4 }, (_, index) => ({
+              topic: `Topic ${index + 1}`,
+              keyIdeas: ["Use the saved PDF question evidence."],
+              formulaOrProcedure: "",
+              commonConfusion: "Do not confuse the concepts.",
+              sourceNote: "Saved quiz question",
+              relatedMistakeIds: [],
+              mistakeFocus: "",
+            })),
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
+      ),
+    );
+
+    render(
+      <MaterialDetailView
+        material={{
+          id: "m1",
+          name: "Lecture.pdf",
+          questions: [
+            {
+              id: "q1",
+              type: "fill_blank",
+              prompt: "Evidence comes from ___.",
+              acceptedAnswers: ["sources"],
+              referenceAnswer: "sources",
+              explanation: "The PDF grounds the answer.",
+              sourceNote: "Page 1",
+            },
+          ],
+          mistakes: [],
+          sessions: [],
+          lastPracticedAt: "",
+        }}
+        onBack={vi.fn()}
+        onPractice={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate knowledge-point review sheet" }));
+
+    expect(await screen.findByText("Saved-question review")).toBeInTheDocument();
+    const form = (vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as FormData;
+    expect(String(form.get("questionContext"))).toContain("Evidence comes from");
+  });
+
+  it("lets the learner attach the original PDF when saved question context has no page references", () => {
+    render(
+      <MaterialDetailView
+        material={{
+          id: "m1",
+          name: "Lecture.pdf",
+          questions: [
+            {
+              id: "q1",
+              type: "fill_blank",
+              prompt: "A source is ___.",
+              acceptedAnswers: ["evidence"],
+              referenceAnswer: "evidence",
+              explanation: "It grounds review.",
+              sourceNote: "Saved PDF question context",
+            },
+          ],
+          mistakes: [],
+          sessions: [],
+          lastPracticedAt: "",
+        }}
+        onBack={vi.fn()}
+        onPractice={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText("Attach original PDF for source pages")).toBeInTheDocument();
   });
 
   it("keeps this PDF's saved mistakes visible when its old question list has expired", () => {
@@ -110,10 +253,9 @@ describe("MaterialDetailView", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Show practice summary" }));
-
+    fireEvent.click(screen.getByRole("button", { name: "Open this PDF's mistakes" }));
+    expect(screen.getByRole("button", { name: "Mistakes 1" })).toHaveClass("is-active");
     expect(screen.getByText("A durable advantage can come from ___.")).toBeInTheDocument();
-    expect(screen.getByText("No saved questions for this material yet.")).toBeInTheDocument();
   });
 
   it("generates a source-grounded exam review from the material's saved source", async () => {
@@ -198,7 +340,7 @@ describe("MaterialDetailView", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Generate personalized review sheet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate knowledge-point review sheet" }));
 
     expect(await screen.findByText("Lecture Exam Review")).toBeInTheDocument();
     expect(screen.getByText("Retrieve context before generating.")).toBeInTheDocument();
@@ -280,16 +422,16 @@ describe("MaterialDetailView", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Generate personalized review sheet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate knowledge-point review sheet" }));
 
     await screen.findByText("Lecture Review");
     const form = fetchMock.mock.calls[0][1].body as FormData;
     expect(JSON.parse(String(form.get("mistakes")))).toEqual([
       expect.objectContaining({ id: "mistake-1", answer: "training", referenceAnswer: "generation" }),
     ]);
-    expect(screen.getByText("Your missed question")).toBeInTheDocument();
+    expect(screen.queryByText("Your missed question")).not.toBeInTheDocument();
     expect(screen.getByText("Retrieve before generating.")).toBeInTheDocument();
-    expect(screen.getByText("Review the retrieval sequence.")).toBeInTheDocument();
+    expect(screen.queryByText("Review the retrieval sequence.")).not.toBeInTheDocument();
   });
 
   it("creates a seven-day share link for the generated review", async () => {
@@ -345,7 +487,7 @@ describe("MaterialDetailView", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Generate personalized review sheet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate knowledge-point review sheet" }));
     await screen.findByText("Lecture Review");
     fireEvent.click(screen.getByRole("button", { name: "Share review link" }));
 

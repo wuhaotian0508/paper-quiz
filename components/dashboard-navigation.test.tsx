@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DashboardNavigation } from "./dashboard-navigation";
 
 afterEach(() => {
@@ -28,6 +28,16 @@ describe("DashboardNavigation", () => {
     expect(screen.getByRole("link", { name: "Dashboard" })).not.toHaveAttribute("aria-current");
   });
 
+  it("provides a dedicated Review Sheets sidebar destination", () => {
+    render(<DashboardNavigation />);
+
+    const reviewSheets = screen.getByRole("link", { name: "Review Sheets" });
+    expect(reviewSheets).toHaveAttribute("href", "#review-sheets");
+
+    fireEvent.click(reviewSheets);
+    expect(reviewSheets).toHaveAttribute("aria-current", "page");
+  });
+
   it("lets a learner switch to dark mode and remembers the choice", () => {
     render(<DashboardNavigation />);
 
@@ -37,5 +47,48 @@ describe("DashboardNavigation", () => {
     expect(document.documentElement).toHaveAttribute("data-theme", "dark");
     expect(window.localStorage.getItem("paper-quiz-theme")).toBe("dark");
     expect(screen.getByRole("button", { name: "Switch to light theme" })).toBeInTheDocument();
+  });
+
+  it("shows uploaded PDFs in the Your Library sidebar", () => {
+    window.localStorage.setItem(
+      "paper-plane-quiz-library-v1",
+      JSON.stringify([
+        {
+          id: "biology.pdf::1200",
+          name: "Biology.pdf",
+          uploadedAt: "2026-08-05T10:00:00.000Z",
+          lastOpenedAt: "",
+        },
+      ]),
+    );
+
+    render(<DashboardNavigation />);
+
+    expect(screen.getByRole("heading", { name: "Your Library" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Biology.pdf" })).toHaveAttribute("href", "#history");
+    expect(screen.getByRole("link", { name: "+ New" })).toHaveAttribute("href", "#quiz-lab");
+  });
+
+  it("opens a specific library PDF instead of the all-history view", () => {
+    window.localStorage.setItem(
+      "paper-plane-quiz-library-v1",
+      JSON.stringify([
+        {
+          id: "biology.pdf::1200",
+          name: "Biology.pdf",
+          uploadedAt: "2026-08-05T10:00:00.000Z",
+          lastOpenedAt: "",
+        },
+      ]),
+    );
+    const onOpen = vi.fn();
+    window.addEventListener("paper-quiz-open-material", onOpen);
+
+    render(<DashboardNavigation />);
+    fireEvent.click(screen.getByRole("link", { name: "Biology.pdf" }));
+
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect((onOpen.mock.calls[0][0] as CustomEvent<string>).detail).toBe("biology.pdf::1200");
+    window.removeEventListener("paper-quiz-open-material", onOpen);
   });
 });

@@ -18,6 +18,14 @@ const ReviewSchema = z.object({
       mistakeFocus: z.string(),
     }),
   ),
+  sourcePages: z
+    .array(
+      z.object({
+        pageNumber: z.number().int().positive(),
+        imageUrl: z.string().url().or(z.string().startsWith("data:image/")),
+      }),
+    )
+    .optional(),
 });
 
 export function SharedReviewView({ slug, client }: { slug: string; client?: SharedReviewClient }) {
@@ -50,7 +58,7 @@ export function SharedReviewView({ slug, client }: { slug: string; client?: Shar
       <div className="eyebrow">Paper Plane Quiz review</div>
       <h1>{review.title}</h1>
       <p className="muted-copy">A read-only review sheet generated from the shared study material.</p>
-      <p className="shared-challenge-note">This link shares review notes only, never the original PDF or private answer records.</p>
+      <p className="shared-challenge-note">This link shares review notes and selected page previews, never the original PDF or private answer records.</p>
       <div className="shared-link-actions">
         <a className="text-button framed-button" href={`/login?returnTo=${encodeURIComponent(`/review/${review.slug}`)}`}>
           Sign in
@@ -59,6 +67,22 @@ export function SharedReviewView({ slug, client }: { slug: string; client?: Shar
           Use this review
         </a>
       </div>
+      {review.sourcePages?.length ? (
+        <section className="review-source-pages" aria-label="Source pages">
+          <div className="eyebrow">Source pages</div>
+          <p className="muted-copy">The supporting PDF/PPT pages are shown in source order.</p>
+          <div className="review-source-page-grid">
+            {review.sourcePages.map((page) => (
+              <figure className="review-source-page" key={page.pageNumber}>
+                {/* Shared previews are data URLs created from the learner's source PDF. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={page.imageUrl} alt={`Source page ${page.pageNumber}`} loading="lazy" />
+                <figcaption>Page {page.pageNumber}</figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
+      ) : null}
       <div className="review-sheet-list" id="review-topics">
         {review.topics.map((topic, index) => (
           <article className="review-sheet-item" key={`${topic.topic}-${index}`}>

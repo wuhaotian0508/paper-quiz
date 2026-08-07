@@ -39,4 +39,20 @@ describe("shared review artifacts", () => {
       "https://paperquiz.test/review/review-123",
     );
   });
+
+  it("includes source page previews once and in page order", () => {
+    const shared = buildSharedReview(
+      { title: "Review", topics: [] as never[] },
+      [
+        { pageNumber: 3, imageUrl: "three" },
+        { pageNumber: 1, imageUrl: "one" },
+        { pageNumber: 3, imageUrl: "duplicate" },
+      ],
+    );
+
+    expect(shared.sourcePages).toEqual([
+      { pageNumber: 1, imageUrl: "one" },
+      { pageNumber: 3, imageUrl: "three" },
+    ]);
+  });
 });

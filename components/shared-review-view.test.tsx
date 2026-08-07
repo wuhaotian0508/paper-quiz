@@ -19,6 +19,7 @@ it("renders a read-only review with sign-in and use actions", async () => {
             mistakeFocus: "Review the sequence.",
           },
         ],
+        sourcePages: [{ pageNumber: 1, imageUrl: "data:image/jpeg;base64,preview" }],
       },
       error: null,
     }),
@@ -35,5 +36,9 @@ it("renders a read-only review with sign-in and use actions", async () => {
   expect(screen.getByRole("link", { name: "Use this review" })).toHaveAttribute(
     "href",
     "#review-topics",
+  );
+  expect(screen.getByRole("img", { name: "Source page 1" })).toHaveAttribute(
+    "src",
+    "data:image/jpeg;base64,preview",
   );
 });

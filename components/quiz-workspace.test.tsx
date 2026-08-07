@@ -529,7 +529,7 @@ describe("QuizWorkspace", () => {
     expect(
       screen.getByRole("heading", { name: "What pulls objects toward Earth?" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Practice its mistakes" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Open this PDF's mistakes" })).toBeEnabled();
   });
 
   it("accepts a dropped study file", () => {

@@ -17,15 +17,6 @@ export const ExamReviewSheetSchema = z.object({
 
 export type ExamReviewSheet = z.infer<typeof ExamReviewSheetSchema>;
 
-export function parseExamReviewOutput(output: string): ExamReviewSheet {
-  const json = output
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/, "")
-    .trim();
-  return ExamReviewSheetSchema.parse(JSON.parse(json));
-}
-
 export function buildExamReviewInstructions() {
   return [
     "You are a precise exam tutor. Create a concise review sheet based only on the supplied study material.",

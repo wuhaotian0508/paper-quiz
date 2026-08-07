@@ -5,6 +5,12 @@ export const MAX_ANSWER_CHARS = 12_000;
 export const MAX_MESSAGE_CHARS = 2_000;
 export const MAX_HISTORY_MESSAGES = 8;
 export const MAX_QUESTION_CHARS = 50_000;
+/**
+ * The learner-memory block is built client-side under a 600-character budget; the extra
+ * headroom covers the block's own heading without letting a tampered request use memory
+ * as a way to smuggle a large prompt past the other limits.
+ */
+export const MAX_MEMORY_CHARS = 1_200;
 export const MAX_REVIEW_MISTAKES = 20;
 const MAX_REVIEW_MISTAKE_CHARS = 2_000;
 

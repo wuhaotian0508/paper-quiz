@@ -35,6 +35,23 @@ describe("shared review client", () => {
     );
   });
 
+  it("refreshes the signed-in session before creating a review link", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { slug: "review-123" }, error: null });
+    const getSession = vi.fn().mockResolvedValue({ data: { session: { access_token: "fresh" } } });
+
+    await createSharedReview({ rpc, auth: { getSession } }, sheet, { slug: "review-123" });
+
+    expect(getSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks the learner to sign in instead of calling the protected RPC anonymously", async () => {
+    const rpc = vi.fn();
+    await expect(
+      createSharedReview({ rpc, auth: { getSession: vi.fn().mockResolvedValue({ data: { session: null } }) } }, sheet),
+    ).rejects.toThrow("Sign in before sharing a review.");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("loads only the public review artifact", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: { title: "Lecture Review", topics: [] },

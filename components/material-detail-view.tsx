@@ -1,15 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { correctAnswerText, questionTypeLabel } from "@/lib/quiz";
 import {
   downloadExamReviewPdf,
-  downloadMaterialReviewPdf,
   downloadMistakesPdf,
   downloadQuizPdf,
 } from "@/lib/pdf-export";
 import type { MistakeBookEntry } from "@/lib/mistake-book";
-import { buildMaterialReviewSheet } from "@/lib/material-review-sheet";
 import type { StudyMaterial } from "@/lib/study-material";
 import type { StudySession } from "@/lib/study-history";
 import { hasSource } from "@/lib/study-history";
@@ -18,6 +16,18 @@ import { postForm } from "@/lib/api-client";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { createSharedReview } from "@/lib/shared-review-client";
 import { getSharedReviewUrl } from "@/lib/shared-review";
+import { getSavedExamReview, saveExamReview } from "@/lib/saved-exam-review";
+import {
+  dedupeSourcePages,
+  extractPageNumber,
+  readSourcePdf,
+  readSourcePdfTranscript,
+  readSourcePageImages,
+  renderAndStorePdfPages,
+  SOURCE_PAGES_UPDATED_EVENT,
+  storeSourcePdf,
+  type SourcePageImage,
+} from "@/lib/source-pages";
 
 export function MaterialDetailView({
   material,
@@ -32,45 +42,107 @@ export function MaterialDetailView({
 }) {
   const [tab, setTab] = useState<"questions" | "mistakes">("questions");
   const [expanded, setExpanded] = useState<string[]>([]);
-  const [reviewGenerated, setReviewGenerated] = useState(false);
   const [examReview, setExamReview] = useState<ExamReviewSheet | null>(null);
+  const [examReviewSavedAt, setExamReviewSavedAt] = useState("");
   const [examReviewLoading, setExamReviewLoading] = useState(false);
   const [examReviewError, setExamReviewError] = useState("");
   const [reviewShareLoading, setReviewShareLoading] = useState(false);
   const [reviewShareStatus, setReviewShareStatus] = useState("");
   const [reviewShareUrl, setReviewShareUrl] = useState("");
+  const [sourcePages, setSourcePages] = useState<SourcePageImage[]>([]);
+  const [previewPage, setPreviewPage] = useState<SourcePageImage | null>(null);
+  const [attachedSourceFile, setAttachedSourceFile] = useState<File | null>(null);
+  const [sourcePdf, setSourcePdf] = useState<File | null>(null);
+  const [sourcePdfUrl, setSourcePdfUrl] = useState("");
+  const [attachedSourceTranscript, setAttachedSourceTranscript] = useState("");
+  const [attachedSourceStatus, setAttachedSourceStatus] = useState("");
+  useEffect(() => {
+    let active = true;
+    const load = () => {
+      void readSourcePageImages(material.id).then((pages) => {
+        if (active) setSourcePages(pages);
+      });
+      void readSourcePdf(material.id).then((file) => {
+        if (active && file) {
+          setSourcePdf(file);
+          setAttachedSourceFile(file);
+        }
+      });
+      void readSourcePdfTranscript(material.id).then((transcript) => {
+        if (active && transcript) setAttachedSourceTranscript(transcript);
+      });
+    };
+    load();
+    const handleUpdate = (event: Event) => {
+      if ((event as CustomEvent<string>).detail === material.id) load();
+    };
+    window.addEventListener(SOURCE_PAGES_UPDATED_EVENT, handleUpdate);
+    return () => {
+      active = false;
+      window.removeEventListener(SOURCE_PAGES_UPDATED_EVENT, handleUpdate);
+    };
+  }, [material.id]);
+  useEffect(() => {
+    const saved = getSavedExamReview(material.id);
+    setExamReview(saved?.review || null);
+    setExamReviewSavedAt(saved?.updatedAt || "");
+  }, [material.id]);
+  useEffect(() => {
+    if (!sourcePdf) {
+      setSourcePdfUrl("");
+      return;
+    }
+    const url = URL.createObjectURL(sourcePdf);
+    setSourcePdfUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [sourcePdf]);
+  useEffect(() => {
+    if (!previewPage) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreviewPage(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [previewPage]);
   const toggle = (id: string) =>
     setExpanded((values) =>
       values.includes(id) ? values.filter((value) => value !== id) : [...values, id],
     );
   const asQuiz = { title: material.name, summary: "", questions: material.questions };
-  const reviewSheet = buildMaterialReviewSheet(material);
-  const reviewMistakes = material.mistakes.filter((entry) =>
-    reviewSheet.weaknesses.some((weakness) => weakness.id === entry.id),
-  );
-  const examReviewMistakes = material.mistakes.filter((entry) =>
-    examReview?.topics.some((topic) => topic.relatedMistakeIds.includes(entry.id)),
-  );
-  const mistakesById = new Map(material.mistakes.map((entry) => [entry.id, entry]));
   const reviewSource = [
     ...material.sessions.map((session) => session.source),
     ...material.mistakes.map((mistake) => mistake.source),
   ].find(hasSource);
+  const hasReviewContext = Boolean(reviewSource || material.questions.length || material.mistakes.length);
+  const savedQuestionContext = material.questions
+    .slice(0, 40)
+    .map((question) =>
+      JSON.stringify({
+        prompt: question.prompt,
+        answer: correctAnswerText(question),
+        explanation: question.explanation,
+        sourceNote: question.sourceNote,
+      }),
+    )
+    .join("\n");
   const generateExamReview = async () => {
-    if (!reviewSource) return;
+    if (!hasReviewContext) return;
     setExamReviewLoading(true);
     setExamReviewError("");
     setReviewShareStatus("");
     setReviewShareUrl("");
     try {
       const form = new FormData();
-      const fileIds = reviewSource.fileIds?.length
+      const fileIds = reviewSource?.fileIds?.length
         ? reviewSource.fileIds
-        : reviewSource.fileId
+        : reviewSource?.fileId
           ? [reviewSource.fileId]
           : [];
-      if (fileIds.length) form.set("fileIds", JSON.stringify(fileIds));
-      else form.set("transcript", reviewSource.transcript);
+      if (attachedSourceTranscript) form.set("transcript", attachedSourceTranscript);
+      else if (attachedSourceFile) form.set("file", attachedSourceFile);
+      else if (fileIds.length) form.set("fileIds", JSON.stringify(fileIds));
+      else if (reviewSource?.transcript) form.set("transcript", reviewSource.transcript);
+      else form.set("questionContext", savedQuestionContext);
       form.set(
         "mistakes",
         JSON.stringify(
@@ -95,7 +167,10 @@ export function MaterialDetailView({
             ? String(payload.error)
             : "Exam review generation failed.",
         );
-      setExamReview(ExamReviewSheetSchema.parse(payload));
+      const review = ExamReviewSheetSchema.parse(payload);
+      setExamReview(review);
+      const saved = saveExamReview(material.id, review);
+      setExamReviewSavedAt(saved?.updatedAt || "");
     } catch (error) {
       setExamReviewError(error instanceof Error ? error.message : "Exam review generation failed.");
     } finally {
@@ -110,6 +185,7 @@ export function MaterialDetailView({
     try {
       const created = await createSharedReview(getSupabaseBrowserClient(), examReview, {
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        sourcePages: reviewSourcePages.map(({ pageNumber, imageUrl }) => ({ pageNumber, imageUrl })),
       });
       const url = getSharedReviewUrl(window.location.origin, created.slug);
       setReviewShareUrl(url);
@@ -132,6 +208,38 @@ export function MaterialDetailView({
     } else {
       setReviewShareStatus("Select the review link and copy it manually.");
     }
+  };
+
+  const reviewSourcePages = useMemo(() => {
+    if (!examReview) return [];
+    const pageNumbers = new Set(
+      examReview.topics
+        .map((topic) => extractPageNumber(topic.sourceNote))
+        .filter((page): page is number => page !== null),
+    );
+    return dedupeSourcePages(sourcePages.filter((page) => pageNumbers.has(page.pageNumber)));
+  }, [examReview, sourcePages]);
+
+  const attachOriginalPdf = (file: File | undefined) => {
+    if (!file) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setAttachedSourceStatus("Please choose the original PDF file.");
+      return;
+    }
+    setAttachedSourceFile(file);
+    setSourcePdf(file);
+    setAttachedSourceTranscript("");
+    setAttachedSourceStatus("Preparing PDF page previews. Generate the review again when ready.");
+    void storeSourcePdf(file, material.id);
+    void renderAndStorePdfPages(file, material.id).then((transcript) => {
+      void storeSourcePdf(file, material.id, transcript);
+      setAttachedSourceTranscript(transcript);
+      setAttachedSourceStatus(
+        transcript
+          ? "Original PDF attached. Generate the review to add page citations and previews."
+          : "PDF pages are ready. Generate the review to use the saved question context and show its cited pages.",
+      );
+    });
   };
 
   return (
@@ -157,121 +265,91 @@ export function MaterialDetailView({
             Continue latest practice
           </button>
           <button
-            className="primary-button"
-            disabled={!material.mistakes.length}
-            onClick={() => onPractice(material.mistakes)}
-          >
-            Practice its mistakes
-          </button>
-          <button
             className="text-button framed-button"
             disabled={!material.questions.length}
             onClick={() => downloadQuizPdf(asQuiz, "answer_key")}
           >
             Export all questions
           </button>
-          <button className="text-button framed-button" onClick={() => setReviewGenerated(true)}>
-            Show practice summary
-          </button>
-          <button
-            className="text-button framed-button"
-            disabled={!reviewSource || examReviewLoading}
-            onClick={() => void generateExamReview()}
-          >
-            {examReviewLoading
-              ? "Generating personalized review sheet..."
-              : "Generate personalized review sheet"}
-          </button>
         </div>
       </header>
+      {!reviewSource && hasReviewContext ? (
+        <div className="material-review-source-note">
+          <p>The original PDF source has expired, so this review will use the saved questions from this PDF plus its mistakes.</p>
+          <label className="text-button framed-button material-source-attach">
+            Attach original PDF
+            <input
+              aria-label="Attach original PDF for source pages"
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={(event) => attachOriginalPdf(event.target.files?.[0])}
+            />
+          </label>
+          {attachedSourceStatus ? <small>{attachedSourceStatus}</small> : null}
+        </div>
+      ) : !hasReviewContext ? (
+        <p className="material-review-source-note">Generate a quiz from this PDF first to create its review sheet.</p>
+      ) : null}
 
-      {reviewGenerated && (
-        <section className="material-review-sheet" aria-label={`${material.name} review sheet`}>
-          <div className="material-review-heading">
-            <div>
-              <div className="eyebrow">PDF review sheet</div>
-              <h2>{reviewSheet.title}</h2>
-              <p>
-                Built only from this PDF&apos;s saved questions, mistakes, and practice sessions.
-              </p>
-            </div>
-            <div className="mistake-primary-actions">
-              <button
-                className="primary-button"
-                disabled={!reviewMistakes.length}
-                onClick={() => onPractice(reviewMistakes)}
-              >
-                Practice these weaknesses
-              </button>
-              <button
-                className="text-button framed-button"
-                disabled={!reviewSheet.questionCount && !reviewSheet.mistakeCount}
-                onClick={() => downloadMaterialReviewPdf(reviewSheet)}
-              >
-                Export review sheet PDF
-              </button>
-            </div>
-          </div>
+      <section className="material-review-builder" aria-labelledby="knowledge-review-heading">
+        <div>
+          <div className="eyebrow">Knowledge-point review</div>
+          <h2 id="knowledge-review-heading">Build your AI Review Sheet</h2>
+          <p>Key concepts, common confusions, and targeted recall from this PDF.</p>
+        </div>
+        <div className="material-review-builder-actions">
+          <button
+            aria-label="Generate knowledge-point review sheet"
+            className="primary-button material-review-action"
+            disabled={!hasReviewContext || examReviewLoading}
+            onClick={() => void generateExamReview()}
+          >
+            {examReviewLoading ? "Generating knowledge-point review..." : "Generate knowledge-point review sheet"}
+          </button>
+          <button
+            aria-label="Open this PDF's mistakes"
+            className="text-button framed-button"
+            disabled={!material.mistakes.length}
+            onClick={() => setTab("mistakes")}
+          >
+            Open this PDF&apos;s mistakes ({material.mistakes.length})
+          </button>
+        </div>
+      </section>
 
-          <div className="material-review-snapshot">
-            <span>
-              <strong>{reviewSheet.questionCount}</strong> saved questions
-            </span>
-            <span>
-              <strong>{reviewSheet.mistakeCount}</strong> saved mistakes
-            </span>
-            <span>
-              <strong>{reviewSheet.sessionCount}</strong> practice sessions
-            </span>
-          </div>
-
-          {reviewSheet.questionCount === 0 && (
-            <p className="material-review-empty">No saved questions for this material yet.</p>
-          )}
-          <div className="material-review-grid">
-            <div>
-              <h3>Weaknesses to revisit</h3>
-              {reviewSheet.weaknesses.length ? (
-                <div className="review-sheet-list">
-                  {reviewSheet.weaknesses.map((item, index) => (
-                    <article className="review-sheet-item" key={item.id}>
-                      <span>{String(index + 1).padStart(2, "0")}</span>
-                      <div>
-                        <h2>{item.prompt}</h2>
-                        <p>
-                          <strong>Key answer:</strong> {item.keyAnswer}
-                        </p>
-                        <p>
-                          <strong>Remember:</strong> {item.remember}
-                        </p>
-                        <small>Source: {item.sourceNote || "Source section not recorded"}</small>
-                      </div>
-                    </article>
-                  ))}
+      <section className="material-session-history" aria-labelledby="material-session-heading">
+        <div>
+          <div className="eyebrow">Generated quizzes</div>
+          <h2 id="material-session-heading">Practice sets from this PDF</h2>
+          <p>Open any quiz created from this document, or use the review action above to revisit its source-grounded weak points.</p>
+        </div>
+        {material.sessions.length ? (
+          <div className="material-session-list">
+            {material.sessions.map((session) => (
+              <div className="material-session-card" key={session.id}>
+                <div>
+                  <strong>{session.title}</strong>
+                  <small>
+                    {new Date(session.createdAt).toLocaleDateString()} · {session.questions.length} question
+                    {session.questions.length === 1 ? "" : "s"}
+                  </small>
                 </div>
-              ) : (
-                <p className="material-review-empty">No saved mistakes for this material yet.</p>
-              )}
-            </div>
-            <div className="material-review-coverage">
-              <h3>Question coverage</h3>
-              <p>Generated questions grouped by their recorded source section.</p>
-              {reviewSheet.coverage.length ? (
-                <ul>
-                  {reviewSheet.coverage.map((item) => (
-                    <li key={item.sourceNote}>
-                      <span>{item.sourceNote}</span>
-                      <strong>{item.questionCount}</strong>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="material-review-empty">No source coverage is recorded yet.</p>
-              )}
-            </div>
+                <button
+                  aria-label={`Open ${session.title}`}
+                  className="text-button framed-button"
+                  disabled={!onOpenSession}
+                  onClick={() => onOpenSession?.(session)}
+                >
+                  Open quiz
+                </button>
+              </div>
+            ))}
           </div>
-        </section>
-      )}
+        ) : (
+          <p className="material-session-empty">No generated quiz is saved for this PDF yet.</p>
+        )}
+      </section>
+
       {examReviewError && (
         <p className="mistake-empty" role="alert">
           {examReviewError}
@@ -281,9 +359,12 @@ export function MaterialDetailView({
         <section className="material-review-sheet" aria-label={`${material.name} exam review`}>
           <div className="material-review-heading">
             <div>
-              <div className="eyebrow">Exam review</div>
+              <div className="eyebrow">Knowledge-point review</div>
               <h2>{examReview.title}</h2>
-              <p>Grounded in this material&apos;s saved source and prioritized by your mistakes.</p>
+              <p>Core concepts from this PDF, organized for fast review.</p>
+              {examReviewSavedAt ? (
+                <small className="material-review-saved">Saved in this browser · {new Date(examReviewSavedAt).toLocaleString()}</small>
+              ) : null}
             </div>
             <div className="mistake-primary-actions">
               <button
@@ -298,13 +379,6 @@ export function MaterialDetailView({
                 onClick={() => void shareExamReview()}
               >
                 {reviewShareLoading ? "Creating review link..." : "Share review link"}
-              </button>
-              <button
-                className="primary-button"
-                disabled={!examReviewMistakes.length}
-                onClick={() => onPractice(examReviewMistakes)}
-              >
-                Practice linked mistakes
               </button>
             </div>
           </div>
@@ -324,10 +398,15 @@ export function MaterialDetailView({
           ) : null}
           {reviewShareStatus ? <p className="share-status" role="status">{reviewShareStatus}</p> : null}
           <div className="review-sheet-list">
-            {examReview.topics.map((topic, index) => (
-              <article className="review-sheet-item" key={`${topic.topic}-${index}`}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <div>
+            {examReview.topics.map((topic, index) => {
+              const pageNumber = extractPageNumber(topic.sourceNote);
+              const sourcePage = pageNumber
+                ? sourcePages.find((page) => page.pageNumber === pageNumber)
+                : undefined;
+              return (
+                <article className="review-sheet-item" key={`${topic.topic}-${index}`}>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <div>
                   <h2>{topic.topic}</h2>
                   <p>{topic.keyIdeas.join(" ")}</p>
                   {topic.formulaOrProcedure && (
@@ -343,29 +422,63 @@ export function MaterialDetailView({
                       <strong>Your focus:</strong> {topic.mistakeFocus}
                     </p>
                   ) : null}
-                  {topic.relatedMistakeIds.map((mistakeId) => {
-                    const mistake = mistakesById.get(mistakeId);
-                    if (!mistake) return null;
-                    return (
-                      <div className="mistake-details" key={mistake.id}>
-                        <strong>Your missed question</strong>
-                        <p>{mistake.question.prompt}</p>
-                        <p>
-                          <strong>Your answer:</strong> {mistake.answer || "Skipped"}
-                        </p>
-                        <p>
-                          <strong>Feedback:</strong> {mistake.feedback}
-                        </p>
-                      </div>
-                    );
-                  })}
-                  <small>Source: {topic.sourceNote}</small>
-                </div>
-              </article>
-            ))}
+                    <small>Source: {topic.sourceNote}</small>
+                  </div>
+                  <aside className="review-topic-source" aria-label={`Source for ${topic.topic}`}>
+                    {sourcePage ? (
+                      <>
+                        <button
+                          className="review-topic-preview"
+                          aria-label={`Enlarge PDF page ${sourcePage.pageNumber} for ${topic.topic}`}
+                          onClick={() => setPreviewPage(sourcePage)}
+                        >
+                          {/* Local IndexedDB previews are data URLs; next/image cannot optimize them. */}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={sourcePage.imageUrl} alt={`PDF page ${sourcePage.pageNumber} for ${topic.topic}`} loading="lazy" />
+                        </button>
+                        <small>Page {sourcePage.pageNumber}</small>
+                      </>
+                    ) : (
+                      <small>Source page preview unavailable</small>
+                    )}
+                    <button
+                      className="text-button"
+                      disabled={!sourcePdfUrl || !pageNumber}
+                      onClick={() => window.open(`${sourcePdfUrl}#page=${pageNumber}`, "_blank", "noopener,noreferrer")}
+                    >
+                      {sourcePdfUrl && pageNumber ? "Open PDF" : "Attach PDF to open"}
+                    </button>
+                  </aside>
+                </article>
+              );
+            })}
           </div>
         </section>
       )}
+
+      {previewPage ? (
+        <div className="source-page-lightbox" role="dialog" aria-modal="true" aria-label={`PDF page ${previewPage.pageNumber} preview`} onClick={() => setPreviewPage(null)}>
+          <div className="source-page-lightbox-card" onClick={(event) => event.stopPropagation()}>
+            <div>
+              <div className="eyebrow">PDF source</div>
+              <h2>Page {previewPage.pageNumber}</h2>
+            </div>
+            <button className="text-button" aria-label="Close PDF page preview" onClick={() => setPreviewPage(null)}>
+              Close
+            </button>
+            {/* Local IndexedDB previews are data URLs; next/image cannot optimize them. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={previewPage.imageUrl} alt={`Enlarged PDF page ${previewPage.pageNumber}`} />
+            <button
+              className="primary-button"
+              disabled={!sourcePdfUrl}
+              onClick={() => window.open(`${sourcePdfUrl}#page=${previewPage.pageNumber}`, "_blank", "noopener,noreferrer")}
+            >
+              Open PDF at this page
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mistake-toolbar">
         <div className="filter-pills">

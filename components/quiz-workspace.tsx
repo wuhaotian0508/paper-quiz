@@ -27,12 +27,21 @@ import {
   type PersistedSource,
   type StudySession,
 } from "@/lib/study-history";
-import { findStudyMaterial, groupStudyMaterials } from "@/lib/study-material";
+import { findStudyMaterial, groupStudyMaterials, mergeStudyLibraryMaterials } from "@/lib/study-material";
+import {
+  readStudyLibrary,
+  STUDY_LIBRARY_KEY,
+  STUDY_LIBRARY_UPDATED_EVENT,
+  STUDY_MATERIAL_OPEN_EVENT,
+  upsertStudyLibrary,
+  type StudyLibraryRecord,
+} from "@/lib/study-library";
 import { ProgressDashboard } from "@/components/progress-dashboard";
 import { ReadOnlyReview } from "@/components/read-only-review";
 import { MistakeBookView } from "@/components/mistake-book-view";
 import { HistoryView } from "@/components/history-view";
 import { MaterialDetailView } from "@/components/material-detail-view";
+import { ReviewLibrary } from "@/components/review-library";
 import { LoadingView } from "@/components/loading-view";
 import { ResultsView } from "@/components/results-view";
 import { TranscriptReviewView } from "@/components/transcript-review-view";
@@ -44,6 +53,7 @@ import { safeStorageSet } from "@/lib/request-validation";
 import { postForm } from "@/lib/api-client";
 import { isAudio, isPdf } from "@/lib/study-file";
 import { attachStudyFile, attachStudyFiles } from "@/lib/study-upload";
+import { renderAndStorePdfPages } from "@/lib/source-pages";
 import { useStudySync } from "@/hooks/use-study-sync";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { createSharedChallenge } from "@/lib/shared-challenge-client";
@@ -62,7 +72,8 @@ type View =
   | "session-review"
   | "material-detail"
   | "help"
-  | "review-sheet";
+  | "review-sheet"
+  | "review-sheets";
 
 export function QuizWorkspace() {
   const [view, setView] = useState<View>("upload");
@@ -93,6 +104,7 @@ export function QuizWorkspace() {
   const [shareUrl, setShareUrl] = useState("");
   const [mistakes, setMistakes] = useState<MistakeBookEntry[]>([]);
   const [sessions, setSessions] = useState<StudySession[]>([]);
+  const [library, setLibrary] = useState<StudyLibraryRecord[]>([]);
   const [sessionId, setSessionId] = useState("");
   const [reviewSession, setReviewSession] = useState<StudySession | null>(null);
   const [chat, setChat] = useState<ChatMessage[]>([]);
@@ -103,6 +115,7 @@ export function QuizWorkspace() {
   useEffect(() => {
     setMistakes(readMistakes(window.localStorage.getItem(MISTAKE_BOOK_KEY)));
     setSessions(readSessions(window.localStorage.getItem(STUDY_HISTORY_KEY)));
+    setLibrary(readStudyLibrary(window.localStorage.getItem(STUDY_LIBRARY_KEY)));
     setStorageReady(true);
   }, []);
   useEffect(() => {
@@ -112,6 +125,7 @@ export function QuizWorkspace() {
       if (window.location.hash === "#mistake-book") setView("mistakes");
       if (window.location.hash === "#progress") setView("progress");
       if (window.location.hash === "#history") setView("history");
+      if (window.location.hash === "#review-sheets") setView("review-sheets");
       // Older shared links used #materials before PDF groups became the History view.
       if (window.location.hash === "#materials") setView("history");
       if (window.location.hash === "#help") setView("help");
@@ -130,7 +144,10 @@ export function QuizWorkspace() {
     ...material,
   });
   const sourceAvailable = hasSource(source) || files.length > 0;
-  const materials = useMemo(() => groupStudyMaterials(sessions, mistakes), [sessions, mistakes]);
+  const materials = useMemo(
+    () => mergeStudyLibraryMaterials(groupStudyMaterials(sessions, mistakes), library),
+    [library, mistakes, sessions],
+  );
   const hydrateStudyState = useCallback(
     ({
       sessions: mergedSessions,
@@ -194,10 +211,34 @@ export function QuizWorkspace() {
     )
       return setError("Choose a PDF, MP3, M4A, WAV, WebM, or MP4 study file.");
     setError("");
+    const uploadedAt = new Date().toISOString();
+    const nextLibrary: StudyLibraryRecord[] = selected
+      .filter(isPdf)
+      .map((file) => {
+        const nextMaterial = materialFromFile(file);
+        return {
+          id: nextMaterial.materialId,
+          name: nextMaterial.materialName,
+          uploadedAt,
+          lastOpenedAt: "",
+        };
+      });
+    if (nextLibrary.length) {
+      setLibrary((previous) => {
+        const merged = nextLibrary.reduce(upsertStudyLibrary, previous);
+        safeStorageSet(STUDY_LIBRARY_KEY, JSON.stringify(merged));
+        window.dispatchEvent(new Event(STUDY_LIBRARY_UPDATED_EVENT));
+        return merged;
+      });
+    }
     setSourceFileId(null);
     setSourceFileIds([]);
     setMaterial(materialFromFile(selected[0]));
     setFiles(selected);
+    selected.filter(isPdf).forEach((file) => {
+      const nextMaterial = materialFromFile(file);
+      void renderAndStorePdfPages(file, nextMaterial.materialId);
+    });
   };
 
   const config = (): QuestionConfiguration[] => [
@@ -508,6 +549,34 @@ export function QuizWorkspace() {
     }
   };
 
+  const openMaterial = useCallback((material: { id: string; name: string; lastPracticedAt: string }) => {
+    const openedAt = new Date().toISOString();
+    setLibrary((previous) => {
+      const existing = previous.find((item) => item.id === material.id);
+      const next = upsertStudyLibrary(previous, {
+        id: material.id,
+        name: material.name,
+        uploadedAt: existing?.uploadedAt || material.lastPracticedAt || openedAt,
+        lastOpenedAt: openedAt,
+      });
+      safeStorageSet(STUDY_LIBRARY_KEY, JSON.stringify(next));
+      window.dispatchEvent(new Event(STUDY_LIBRARY_UPDATED_EVENT));
+      return next;
+    });
+    setOpenMaterialId(material.id);
+    setView("material-detail");
+  }, []);
+
+  useEffect(() => {
+    const handleMaterialOpen = (event: Event) => {
+      const materialId = (event as CustomEvent<string>).detail;
+      const selected = materials.find((item) => item.id === materialId);
+      if (selected) openMaterial(selected);
+    };
+    window.addEventListener(STUDY_MATERIAL_OPEN_EVENT, handleMaterialOpen);
+    return () => window.removeEventListener(STUDY_MATERIAL_OPEN_EVENT, handleMaterialOpen);
+  }, [materials, openMaterial]);
+
   if (view === "transcribing" || view === "generating") return <LoadingView mode={view} />;
   if (view === "reviewing")
     return (
@@ -546,10 +615,20 @@ export function QuizWorkspace() {
         materials={materials}
         onBack={reset}
         onOpen={(item) => {
-          setOpenMaterialId(item.id);
-          setView("material-detail");
+          openMaterial(item);
         }}
       />
+    );
+  if (view === "review-sheets")
+    return (
+      <section className="dashboard-page" aria-label="Review sheets">
+        <ReviewLibrary
+          materials={materials}
+          library={library}
+          onOpen={openMaterial}
+          onViewAll={() => setView("history")}
+        />
+      </section>
     );
   if (view === "material-detail") {
     const open = openMaterialId === null ? undefined : findStudyMaterial(materials, openMaterialId);
@@ -636,7 +715,8 @@ export function QuizWorkspace() {
         sessionCount={sessions.length}
         materialCount={materials.length}
         sessions={sessions}
-        reviewFocusMaterials={materials.filter((material) => material.mistakes.length > 0)}
+        reviewFocusMaterials={materials}
+        library={library}
         onAcceptFiles={acceptFiles}
         onCountsChange={setCounts}
         onCustomChange={setCustom}
@@ -646,8 +726,7 @@ export function QuizWorkspace() {
         onOpenHistory={() => setView("history")}
         onOpenSession={openSession}
         onOpenMaterial={(material) => {
-          setOpenMaterialId(material.id);
-          setView("material-detail");
+          openMaterial(material);
         }}
         onStart={() => {
           if (files.length === 1 && isAudio(files[0])) void transcribe();

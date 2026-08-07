@@ -1,6 +1,7 @@
 import { questionKey, type Question } from "@/lib/quiz";
 import type { MistakeBookEntry } from "@/lib/mistake-book";
 import type { StudySession } from "@/lib/study-history";
+import type { StudyLibraryRecord } from "@/lib/study-library";
 
 /** Practice saved before per-material grouping existed, plus anything with no file name. */
 export const UNGROUPED_ID = "";
@@ -91,4 +92,25 @@ export function findStudyMaterial(
   id: string,
 ): StudyMaterial | undefined {
   return materials.find((material) => material.id === id);
+}
+
+/** Adds uploaded PDFs that do not have a saved session or mistake yet. */
+export function mergeStudyLibraryMaterials(
+  materials: StudyMaterial[],
+  library: StudyLibraryRecord[],
+): StudyMaterial[] {
+  const merged = new Map(materials.map((material) => [material.id, material]));
+  for (const item of library) {
+    if (!item.id) continue;
+    if (merged.has(item.id)) continue;
+    merged.set(item.id, {
+      id: item.id,
+      name: item.name,
+      sessions: [],
+      questions: [],
+      mistakes: [],
+      lastPracticedAt: "",
+    });
+  }
+  return [...merged.values()];
 }

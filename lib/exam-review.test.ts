@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildExamReviewInstructions,
-  ExamReviewSheetSchema,
-  parseExamReviewOutput,
-} from "./exam-review";
+import { buildExamReviewInstructions, ExamReviewSheetSchema } from "./exam-review";
+import { parseExamReviewOutput } from "./exam-review-output";
 
 describe("ExamReviewSheetSchema", () => {
   it("accepts a source-grounded set of compact review topics", () => {

@@ -3,10 +3,22 @@
 import { useEffect, useState } from "react";
 import { AuthMenu } from "@/components/auth-menu";
 import { createFeedbackHref } from "@/lib/feedback";
+import { MISTAKE_BOOK_KEY, readMistakes } from "@/lib/mistake-book";
+import { readSessions, STUDY_HISTORY_KEY } from "@/lib/study-history";
+import { groupStudyMaterials } from "@/lib/study-material";
+import {
+  readStudyLibrary,
+  STUDY_LIBRARY_KEY,
+  STUDY_LIBRARY_UPDATED_EVENT,
+  STUDY_MATERIAL_OPEN_EVENT,
+  type StudyLibraryRecord,
+} from "@/lib/study-library";
+import { safeStorageSet } from "@/lib/request-validation";
 
 const navigationItems = [
   { id: "dashboard", label: "Dashboard", icon: "D" },
   { id: "quiz-lab", label: "Quiz Lab", icon: "Q" },
+  { id: "review-sheets", label: "Review Sheets", icon: "R" },
   { id: "mistake-book", label: "Mistake Book", icon: "!" },
   { id: "progress", label: "Calendar", icon: "C" },
   { id: "history", label: "History", icon: "H" },
@@ -27,6 +39,7 @@ function selectedNavigationId(hash: string): NavigationId {
 export function DashboardNavigation({ authError = false }: { authError?: boolean }) {
   const [activeId, setActiveId] = useState<NavigationId>("dashboard");
   const [theme, setTheme] = useState<Theme | null>(null);
+  const [library, setLibrary] = useState<StudyLibraryRecord[]>([]);
 
   useEffect(() => {
     const syncWithLocation = () => setActiveId(selectedNavigationId(window.location.hash));
@@ -34,6 +47,34 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
     syncWithLocation();
     window.addEventListener("hashchange", syncWithLocation);
     return () => window.removeEventListener("hashchange", syncWithLocation);
+  }, []);
+
+  useEffect(() => {
+    const syncLibrary = () => {
+      const stored = readStudyLibrary(window.localStorage.getItem(STUDY_LIBRARY_KEY));
+      const knownIds = new Set(stored.map((item) => item.id));
+      const derived = groupStudyMaterials(
+        readSessions(window.localStorage.getItem(STUDY_HISTORY_KEY)),
+        readMistakes(window.localStorage.getItem(MISTAKE_BOOK_KEY)),
+      )
+        .filter((material) => material.id && !knownIds.has(material.id))
+        .map((material) => ({
+          id: material.id,
+          name: material.name,
+          uploadedAt: material.lastPracticedAt || new Date().toISOString(),
+          lastOpenedAt: "",
+        }));
+      const next = [...stored, ...derived].slice(0, 50);
+      if (derived.length) safeStorageSet(STUDY_LIBRARY_KEY, JSON.stringify(next));
+      setLibrary(next);
+    };
+    syncLibrary();
+    window.addEventListener("storage", syncLibrary);
+    window.addEventListener(STUDY_LIBRARY_UPDATED_EVENT, syncLibrary);
+    return () => {
+      window.removeEventListener("storage", syncLibrary);
+      window.removeEventListener(STUDY_LIBRARY_UPDATED_EVENT, syncLibrary);
+    };
   }, []);
 
   useEffect(() => {
@@ -76,6 +117,39 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
           </a>
         ))}
       </nav>
+      <section className="sidebar-library" aria-labelledby="sidebar-library-heading">
+        <div className="sidebar-library-heading">
+          <h2 id="sidebar-library-heading">Your Library</h2>
+          <a href="#quiz-lab" aria-label="+ New">
+            + New
+          </a>
+        </div>
+        {library.length ? (
+          <div className="sidebar-library-list">
+            {library.slice(0, 4).map((item) => (
+              <a
+                href="#history"
+                key={item.id}
+                onClick={(event) => {
+                  event.preventDefault();
+                  window.dispatchEvent(new CustomEvent(STUDY_MATERIAL_OPEN_EVENT, { detail: item.id }));
+                }}
+                title={`Open ${item.name} library`}
+              >
+                <span aria-hidden="true">PDF</span>
+                <strong>{item.name}</strong>
+              </a>
+            ))}
+            {library.length > 4 ? (
+              <a className="sidebar-library-view-all" href="#history">
+                View all
+              </a>
+            ) : null}
+          </div>
+        ) : (
+          <p className="sidebar-library-empty">Upload a PDF to start a library.</p>
+        )}
+      </section>
       <div className="sidebar-utilities">
         <a className="sidebar-utility-link" href="#help">
           <span aria-hidden="true">?</span> Help

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { groupStudyMaterials, UNGROUPED_NAME } from "./study-material";
+import { groupStudyMaterials, mergeStudyLibraryMaterials, UNGROUPED_NAME } from "./study-material";
 import { EMPTY_SOURCE, type PersistedSource, type StudySession } from "./study-history";
 import type { MistakeBookEntry } from "./mistake-book";
 import { questionKey, type Question } from "./quiz";
+import type { StudyLibraryRecord } from "./study-library";
 
 const source = (materialName: string): PersistedSource => ({
   fileId: "file-abc123",
@@ -118,5 +119,41 @@ describe("groupStudyMaterials", () => {
     expect(materials[0].name).toBe("deleted-quiz.pdf");
     expect(materials[0].questions).toEqual([]);
     expect(materials[0].mistakes).toHaveLength(1);
+  });
+
+  it("adds uploaded PDFs that do not have a quiz session yet", () => {
+    const library: StudyLibraryRecord[] = [
+      {
+        id: "new.pdf::200",
+        name: "new.pdf",
+        uploadedAt: "2026-07-28T10:00:00",
+        lastOpenedAt: "",
+      },
+    ];
+
+    const materials = mergeStudyLibraryMaterials([], library);
+
+    expect(materials).toEqual([
+      {
+        id: "new.pdf::200",
+        name: "new.pdf",
+        sessions: [],
+        questions: [],
+        mistakes: [],
+        lastPracticedAt: "",
+      },
+    ]);
+  });
+
+  it("does not add an invalid blank library record", () => {
+    const materials = mergeStudyLibraryMaterials(
+      [],
+      [
+        { id: "", name: "", uploadedAt: "", lastOpenedAt: "" },
+        { id: "pdf-1", name: "biology.pdf", uploadedAt: "2026-08-05T10:00:00.000Z", lastOpenedAt: "" },
+      ],
+    );
+
+    expect(materials.map((material) => material.id)).toEqual(["pdf-1"]);
   });
 });

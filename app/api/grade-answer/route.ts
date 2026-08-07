@@ -5,6 +5,7 @@ import { getOpenAIClientOptions, getOpenAIModel } from "@/lib/openai-config";
 import { collectResponse } from "@/lib/openai-stream";
 import {
   MAX_ANSWER_CHARS,
+  MAX_MEMORY_CHARS,
   MAX_QUESTION_CHARS,
   MAX_TRANSCRIPT_CHARS,
   readBoundedText,

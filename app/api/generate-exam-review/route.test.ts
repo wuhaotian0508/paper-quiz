@@ -37,6 +37,32 @@ describe("POST /api/generate-exam-review", () => {
     });
   });
 
+  it("accepts saved quiz question context when the original PDF source is unavailable", async () => {
+    process.env.OPENAI_API_KEY = "";
+    const form = new FormData();
+    form.set("questionContext", "Page 1: Retrieval grounds answers in evidence.");
+
+    const response = await POST(requestWith(form));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "The server has not been configured with an OpenAI API key.",
+    });
+  });
+
+  it("accepts a reattached PDF so review generation can recover page citations", async () => {
+    process.env.OPENAI_API_KEY = "";
+    const form = new FormData();
+    form.set("file", new File(["%PDF-1.4\n"], "lecture.pdf", { type: "application/pdf" }));
+
+    const response = await POST(requestWith(form));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "The server has not been configured with an OpenAI API key.",
+    });
+  });
+
   it("rejects malformed learner mistake context before calling OpenAI", async () => {
     process.env.OPENAI_API_KEY = "test-key";
     const form = new FormData();
