@@ -58,6 +58,9 @@ export async function POST(request: Request) {
         type: cause.type,
         message: cause.message,
       });
+      if (cause.status === 401) {
+        return error("The AI help service is not configured with a valid OpenAI API key.", 503);
+      }
     } else {
       console.error(
         "Product help failed",
