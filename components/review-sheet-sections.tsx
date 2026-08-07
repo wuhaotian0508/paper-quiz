@@ -2,10 +2,12 @@
 
 import { useLocale } from "@/hooks/use-locale";
 import {
+  orderedReviewSections,
   REVIEW_FULL_WIDTH,
   REVIEW_LEFT_COLUMN,
   REVIEW_RIGHT_COLUMN,
   reviewSectionsFor,
+  type ExamReviewSection,
   type ExamReviewSheet,
 } from "@/lib/exam-review";
 
@@ -41,51 +43,86 @@ export function ReviewSheetSections({
     sheet.goal ? { label: t("review.goal"), value: sheet.goal } : null,
   ].filter((entry): entry is { label: string; value: string } => entry !== null);
 
+  const bannerRow = banner.map((entry) => (
+    <span key={entry.label}>
+      <strong>{entry.label}</strong> {entry.value}
+    </span>
+  ));
+
+  const slideOf = (section: ExamReviewSection) =>
+    section.sourceNote ? slideFor?.(section.sourceNote) : undefined;
+
+  const slideFigure = (section: ExamReviewSection, slide: SectionSlide) => (
+    <figure className="review-section-slide">
+      <button
+        className="review-topic-preview"
+        disabled={!onPreviewSlide}
+        aria-label={t("review.enlargeSlideAria", {
+          page: slide.pageNumber,
+          heading: section.heading,
+        })}
+        onClick={() => onPreviewSlide?.(slide)}
+      >
+        {/* Slides are data URLs, from IndexedDB or a share payload; not optimizable. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={slide.imageUrl}
+          alt={t("review.slideAlt", { page: slide.pageNumber, heading: section.heading })}
+          loading="lazy"
+        />
+      </button>
+      <figcaption>{t("review.pageLabel", { page: slide.pageNumber })}</figcaption>
+    </figure>
+  );
+
+  const body = (section: ExamReviewSection, number: number) => (
+    <>
+      <h2>
+        <span className="review-sheet-number">{number}</span>
+        {section.heading}
+      </h2>
+      <ul>
+        {section.items.map((item, index) => (
+          <li key={index}>
+            {item.label ? <strong>{item.label}</strong> : null}
+            <span>{item.body}</span>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+
   const column = (kinds: typeof REVIEW_LEFT_COLUMN) =>
-    reviewSectionsFor(full, kinds).map(({ section, number }) => {
-      const slide = section.sourceNote ? slideFor?.(section.sourceNote) : undefined;
-      return (
-        <section className="review-sheet-section" key={section.kind}>
-          <h2>
-            <span className="review-sheet-number">{number}</span>
-            {section.heading}
-          </h2>
-          <ul>
-            {section.items.map((item, index) => (
-              <li key={index}>
-                {item.label ? <strong>{item.label}</strong> : null}
-                <span>{item.body}</span>
-              </li>
-            ))}
-          </ul>
-          {slide ? (
-            <figure className="review-section-slide">
-              <button
-                className="review-topic-preview"
-                disabled={!onPreviewSlide}
-                aria-label={t("review.enlargeSlideAria", {
-                  page: slide.pageNumber,
-                  heading: section.heading,
-                })}
-                onClick={() => onPreviewSlide?.(slide)}
-              >
-                {/* Slides are data URLs, from IndexedDB or a share payload; not optimizable. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={slide.imageUrl}
-                  alt={t("review.slideAlt", {
-                    page: slide.pageNumber,
-                    heading: section.heading,
-                  })}
-                  loading="lazy"
-                />
-              </button>
-              <figcaption>{t("review.pageLabel", { page: slide.pageNumber })}</figcaption>
-            </figure>
-          ) : null}
-        </section>
-      );
-    });
+    reviewSectionsFor(full, kinds).map(({ section, number }) => (
+      <section className="review-sheet-section" key={section.kind}>
+        {body(section, number)}
+      </section>
+    ));
+
+  // With slides available the sheet reads as pairs — a knowledge point, then the slide it came
+  // from — so it runs as one column. Two narrow columns would put each slide beside unrelated
+  // text instead of under its own point. Without slides the printed two-column layout stands.
+  const paired = orderedReviewSections(full)
+    .map((entry) => ({ ...entry, slide: slideOf(entry.section) }))
+    .filter((entry) => entry.slide);
+
+  if (paired.length)
+    return (
+      <div className="review-sheet-page">
+        {banner.length ? <div className="review-sheet-banner">{bannerRow}</div> : null}
+        <div className="review-sheet-paired">
+          {orderedReviewSections(full).map(({ section, number }) => {
+            const slide = slideOf(section);
+            return (
+              <section className="review-sheet-section" key={section.kind}>
+                {body(section, number)}
+                {slide ? slideFigure(section, slide) : null}
+              </section>
+            );
+          })}
+        </div>
+      </div>
+    );
 
   return (
     <div className="review-sheet-page">

@@ -572,7 +572,14 @@ describe("MaterialDetailView", () => {
 
     // Slides used to hang off `topics`, which the section layout always sets to null. Without
     // a per-section lookup the whole sheet renders with no previews at all.
-    expect(await screen.findByAltText("Source slide, page 2, for Heading 2")).toBeInTheDocument();
+    const slide = await screen.findByAltText("Source slide, page 2, for Heading 2");
+
+    // Each slide has to sit inside its own knowledge point, not in a separate strip, so the
+    // sheet reads as one point followed by the page it came from, repeating down the page.
+    const section = slide.closest("section.review-sheet-section");
+    expect(section).toHaveTextContent("Heading 2");
+    expect(section?.querySelector("figcaption")).toHaveTextContent("Page 2");
+    expect(document.querySelector(".review-sheet-paired")).not.toBeNull();
   });
 
   describe("practice share link", () => {

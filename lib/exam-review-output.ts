@@ -153,6 +153,16 @@ function normalizeSection(value: unknown) {
   };
 }
 
+/**
+ * Banner text the model routinely writes longer than the sheet's layout allows. Trimming it
+ * to fit keeps a wordy scope line from failing the whole generation, which is all a strict
+ * length limit ever achieved here.
+ */
+function clampText(value: unknown, max: number): string | undefined {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text ? text.slice(0, max) : undefined;
+}
+
 function normalizeReview(value: unknown): unknown {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
   const record = value as Record<string, unknown>;
@@ -160,12 +170,28 @@ function normalizeReview(value: unknown): unknown {
     firstValue(record, ["title", "name", "heading", "reviewTitle", "review_title"]),
     "Knowledge-Point Review",
   );
+  // Applied on every path, including the fall-through: a shape this function does not
+  // recognise still has to arrive with a title, or it fails validation on a missing field
+  // rather than on whatever was actually unusual about it.
+  const subject = clampText(firstValue(record, ["subject"]), 80);
+  const scope = clampText(firstValue(record, ["scope"]), 120);
+  const goal = clampText(firstValue(record, ["goal"]), 160);
+  const sourceNote = clampText(firstValue(record, ["sourceNote", "source_note"]), 300);
+  // Absent fields stay absent rather than becoming explicit nulls, so a legacy topic sheet
+  // still normalizes to exactly the title and topics it did before.
+  const banner = {
+    title,
+    ...(subject ? { subject } : {}),
+    ...(scope ? { scope } : {}),
+    ...(goal ? { goal } : {}),
+    ...(sourceNote ? { sourceNote } : {}),
+  };
 
   const rawSections = firstValue(record, ["sections", "parts", "blocks"]);
   if (looksLikeSections(rawSections)) {
     return {
       ...record,
-      title,
+      ...banner,
       sections: rawSections
         .filter((item) => REVIEW_SECTION_KINDS.includes(item.kind as ReviewSectionKind))
         .map(normalizeSection),
@@ -179,8 +205,8 @@ function normalizeReview(value: unknown): unknown {
     "knowledgePoints",
     "knowledge_points",
   ]);
-  if (!Array.isArray(rawTopics)) return value;
-  return { title, topics: rawTopics.map(normalizeTopic) };
+  if (!Array.isArray(rawTopics)) return { ...record, ...banner };
+  return { ...banner, topics: rawTopics.map(normalizeTopic) };
 }
 
 export function parseExamReviewOutput(output: string): ExamReviewSheet {

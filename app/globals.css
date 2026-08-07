@@ -3175,21 +3175,32 @@ h1 {
   gap: 6px;
   min-width: 0;
 }
+/* One knowledge point, then the slide it came from, repeating down the page. */
+.review-sheet-paired {
+  display: grid;
+  gap: 22px;
+}
 .review-section-slide {
-  margin: 10px 0 0;
+  margin: 14px 0 0;
 }
 .review-section-slide .review-topic-preview {
   display: block;
   width: 100%;
+  cursor: zoom-in;
+}
+.review-section-slide .review-topic-preview:disabled {
+  cursor: default;
 }
 .review-section-slide img {
+  display: block;
   width: 100%;
+  max-width: 620px;
   height: auto;
   border: 1px solid var(--surface-soft-line);
-  border-radius: 8px;
+  border-radius: 10px;
 }
 .review-section-slide figcaption {
-  margin-top: 4px;
+  margin-top: 5px;
   color: var(--muted);
   font-size: 11px;
 }
@@ -3449,9 +3460,49 @@ h1 {
 .sidebar-library-folder {
   display: grid;
   gap: 2px;
+  border-radius: 10px;
+}
+/* The folder a dragged PDF would land in. */
+.sidebar-library-folder.is-drop-target {
+  outline: 2px dashed var(--coral-deep);
+  outline-offset: 2px;
+  background: rgba(255, 231, 164, 0.28);
 }
 .sidebar-library-folder-name {
   margin: 0;
+}
+.sidebar-library-folder-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+}
+.sidebar-library-folder-edit input {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 4px 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--surface-soft);
+  font: inherit;
+  font-size: 12px;
+}
+.sidebar-library-folder-delete {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--coral-deep);
+  background: transparent;
+  font-size: 11px;
+  cursor: pointer;
+}
+.sidebar-library-folder-delete:hover {
+  background: rgba(255, 231, 164, 0.45);
+}
+.sidebar-library-list a[draggable="true"] {
+  cursor: grab;
 }
 .sidebar-library-folder-toggle {
   display: flex;

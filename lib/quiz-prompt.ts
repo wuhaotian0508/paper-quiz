@@ -30,7 +30,9 @@ export function buildQuizInstructions(settings: {
     "Every item needs id, type, prompt, points, explanation, sourceNote, and customLabel. Use customLabel only for custom questions; set it to null for every other type. Include the remaining fields appropriate for that type.",
     // The prose instruction above is not enough on its own: the model follows this field
     // contract, so an option shape that omits `explanation` gets quizzes with no per-option
-    // analysis, and the nullish schema accepts them silently.
-    'Each entry of a multiple-choice question\'s options array is an object with exactly three fields: id, text, and explanation. For example: {"id": "a", "text": "...", "explanation": "..."}. The explanation field is required on all four options.',
+    // analysis, and the nullish schema accepts them silently. Naming correctOptionId in the
+    // same breath is deliberate — describing only the option shape here once cost every
+    // question its correctOptionId, which fails the whole quiz.
+    'A multiple-choice question needs both correctOptionId and an options array. correctOptionId is "a", "b", "c", or "d". Each option is {"id": "a", "text": "...", "explanation": "..."}, and all four need their own explanation.',
   ].join("\n");
 }

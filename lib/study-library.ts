@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { inferSubject, MAX_SUBJECT_CHARS, normaliseSubject, UNASSIGNED_SUBJECT } from "@/lib/subject";
+import {
+  inferSubject,
+  MAX_SUBJECT_CHARS,
+  normaliseSubject,
+  UNASSIGNED_SUBJECT,
+} from "@/lib/subject";
 
 export const STUDY_LIBRARY_KEY = "paper-plane-quiz-library-v1";
 export const STUDY_LIBRARY_UPDATED_EVENT = "paper-quiz-library-updated";
@@ -112,6 +117,43 @@ export function setLibrarySubject(
   );
 }
 
+/**
+ * Renames a course everywhere it appears. Renaming onto a name already in use merges the
+ * two folders, which is what dropping one course's name onto another visibly means.
+ *
+ * An empty `to` unassigns instead, so rename and "remove this folder" are the same
+ * operation with different arguments.
+ */
+export function renameLibrarySubject(
+  records: StudyLibraryRecord[],
+  from: string,
+  to: string,
+  now: Date = new Date(),
+): StudyLibraryRecord[] {
+  const source = normaliseSubject(from);
+  const target = normaliseSubject(to);
+  if (source === target) return records;
+  return records.map((record) =>
+    normaliseSubject(record.subject) === source
+      ? { ...record, subject: target, updatedAt: now.toISOString() }
+      : record,
+  );
+}
+
+/**
+ * Removes a course, leaving its materials unassigned.
+ *
+ * Deliberately keeps the PDFs: the folder is a label the student applied, and a sidebar
+ * gesture that silently discarded uploaded material along with it would be unrecoverable.
+ */
+export function removeLibrarySubject(
+  records: StudyLibraryRecord[],
+  subject: string,
+  now: Date = new Date(),
+): StudyLibraryRecord[] {
+  return renameLibrarySubject(records, subject, UNASSIGNED_SUBJECT, now);
+}
+
 /** Every course currently in use, for the subject picker. */
 export function listSubjects(records: readonly StudyLibraryRecord[]): string[] {
   const subjects = new Set(
@@ -121,9 +163,7 @@ export function listSubjects(records: readonly StudyLibraryRecord[]): string[] {
 }
 
 /** Maps material id to subject, for grouping sessions and mistakes that only carry a material id. */
-export function subjectsByMaterial(
-  records: readonly StudyLibraryRecord[],
-): Map<string, string> {
+export function subjectsByMaterial(records: readonly StudyLibraryRecord[]): Map<string, string> {
   return new Map(records.map((record) => [record.id, record.subject]));
 }
 

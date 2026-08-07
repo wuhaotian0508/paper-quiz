@@ -94,6 +94,50 @@ describe("ExamReviewSheetSchema", () => {
     ]);
   });
 
+  it("supplies a title and trims an over-long banner instead of failing the sheet", () => {
+    // Both failures seen in production on one request: the model returned no title, and a
+    // scope line past the 120-character layout limit. Neither is worth losing the sheet over.
+    const sections = ["keyConcepts", "importantDetails", "examples", "questions"].map((kind) => ({
+      kind,
+      heading: kind,
+      items: [{ label: "", body: "A grounded point." }],
+      sourceNote: "Page 1",
+    }));
+
+    const parsed = parseExamReviewOutput(
+      JSON.stringify({ scope: "S".repeat(400), subject: "J".repeat(200), sections }),
+    );
+
+    expect(parsed.title).toBe("Knowledge-Point Review");
+    expect(parsed.scope).toHaveLength(120);
+    expect(parsed.subject).toHaveLength(80);
+    expect(parsed.sections).toHaveLength(4);
+  });
+
+  it("still names a sheet whose shape it does not recognise", () => {
+    // The fall-through used to return the model's object untouched, so an unusual shape
+    // failed validation on a missing title rather than on what was actually unusual.
+    const parsed = parseExamReviewOutput(
+      JSON.stringify({
+        scope: "C".repeat(400),
+        topics: [
+          {
+            topic: "Retrieval",
+            keyIdeas: ["Retrieve before generating."],
+            formulaOrProcedure: "",
+            commonConfusion: "Confusing retrieval with ranking.",
+            sourceNote: "Page 2",
+            relatedMistakeIds: [],
+            mistakeFocus: "",
+          },
+        ],
+      }),
+    );
+
+    expect(parsed.title).toBe("Knowledge-Point Review");
+    expect(parsed.scope).toHaveLength(120);
+  });
+
   it("still loads a section saved before per-section page citations existed", () => {
     const sections = ["keyConcepts", "importantDetails", "examples", "questions"].map((kind) => ({
       kind,

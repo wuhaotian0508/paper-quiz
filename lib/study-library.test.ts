@@ -3,6 +3,8 @@ import {
   createLibraryRecord,
   listSubjects,
   readStudyLibrary,
+  removeLibrarySubject,
+  renameLibrarySubject,
   setLibrarySubject,
   upsertStudyLibrary,
   type StudyLibraryRecord,
@@ -88,5 +90,62 @@ describe("study library", () => {
     ];
 
     expect(listSubjects(records)).toEqual(["CS 61A", "MATH 1A"]);
+  });
+});
+
+describe("course folders", () => {
+  const record = (id: string, subject: string): StudyLibraryRecord => ({
+    id,
+    name: `${id}.pdf`,
+    uploadedAt: "2026-08-01T00:00:00.000Z",
+    lastOpenedAt: "",
+    subject,
+    updatedAt: "2026-08-01T00:00:00.000Z",
+  });
+  const now = new Date("2026-08-07T12:00:00.000Z");
+
+  it("renames a course everywhere it appears", () => {
+    const next = renameLibrarySubject(
+      [record("a", "UGBA 117"), record("b", "UGBA 117"), record("c", "CS 61A")],
+      "UGBA 117",
+      "UGBA 118",
+      now,
+    );
+    expect(next.map((item) => item.subject)).toEqual(["UGBA 118", "UGBA 118", "CS 61A"]);
+    expect(next[0].updatedAt).toBe(now.toISOString());
+    // An untouched course keeps its timestamp, so a rename cannot win an unrelated merge.
+    expect(next[2].updatedAt).toBe("2026-08-01T00:00:00.000Z");
+  });
+
+  it("merges into a course that already exists", () => {
+    const next = renameLibrarySubject(
+      [record("a", "UGBA 117"), record("b", "CS 61A")],
+      "UGBA 117",
+      "CS 61A",
+      now,
+    );
+    expect(next.every((item) => item.subject === "CS 61A")).toBe(true);
+  });
+
+  it("normalises the new name the same way an upload would", () => {
+    const next = renameLibrarySubject([record("a", "UGBA 117")], "UGBA 117", "  ugba   118 ", now);
+    expect(next[0].subject).toBe("ugba 118");
+  });
+
+  it("leaves the library untouched when the name did not change", () => {
+    const records = [record("a", "UGBA 117")];
+    expect(renameLibrarySubject(records, "UGBA 117", "UGBA 117", now)).toBe(records);
+  });
+
+  it("deleting a course keeps its files and unassigns them", () => {
+    const next = removeLibrarySubject(
+      [record("a", "UGBA 117"), record("b", "CS 61A")],
+      "UGBA 117",
+      now,
+    );
+    // The PDFs are the student's uploads; only the label they applied is removed.
+    expect(next).toHaveLength(2);
+    expect(next[0].subject).toBe("");
+    expect(next[1].subject).toBe("CS 61A");
   });
 });

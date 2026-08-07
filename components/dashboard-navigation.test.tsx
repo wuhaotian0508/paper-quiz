@@ -169,7 +169,10 @@ describe("DashboardNavigation", () => {
 
     expect(screen.queryByRole("link", { name: "BIO 1 Notes.pdf" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "MATH 1A Notes.pdf" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "MATH 1A" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "MATH 1A" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
   });
 
   it("starts in English and switches the sidebar to Chinese", () => {
@@ -197,5 +200,154 @@ describe("DashboardNavigation", () => {
 
     expect(screen.getByRole("link", { name: "Mistake Book" })).toBeInTheDocument();
     expect(window.localStorage.getItem("paper-quiz-locale")).toBe("en");
+  });
+});
+
+describe("organising courses from the sidebar", () => {
+  /** Stored with subjects already assigned, the way an established library looks. */
+  const storeCourses = (records: { id: string; name: string; subject: string }[]) =>
+    window.localStorage.setItem(
+      "paper-plane-quiz-library-v1",
+      JSON.stringify(
+        records.map((record) => ({
+          ...record,
+          uploadedAt: "2026-08-01T00:00:00.000Z",
+          lastOpenedAt: "",
+          updatedAt: "2026-08-01T00:00:00.000Z",
+        })),
+      ),
+    );
+
+  const storedLibrary = () =>
+    JSON.parse(window.localStorage.getItem("paper-plane-quiz-library-v1") || "[]") as {
+      id: string;
+      subject: string;
+    }[];
+
+  /** A DataTransfer stand-in; jsdom does not construct one. */
+  const dataTransfer = (id = "") => {
+    const store = new Map<string, string>([["text/plain", id]]);
+    return {
+      dropEffect: "",
+      effectAllowed: "",
+      clearData: () => store.clear(),
+      getData: (format: string) => store.get(format) ?? "",
+      setData: (format: string, value: string) => void store.set(format, value),
+    };
+  };
+
+  function folderOf(name: string) {
+    const label = screen.getByText(name);
+    const folder = label.closest(".sidebar-library-folder");
+    if (!folder) throw new Error(`no folder for ${name}`);
+    return folder;
+  }
+
+  it("moves a PDF into another course when it is dropped there", () => {
+    storeCourses([
+      { id: "m1", name: "Week 1.pdf", subject: "UGBA 117" },
+      { id: "m2", name: "Reader.pdf", subject: "CS 61A" },
+    ]);
+    render(<DashboardNavigation />);
+
+    const dragged = screen.getByText("Week 1.pdf");
+    const transfer = dataTransfer();
+    fireEvent.dragStart(dragged, { dataTransfer: transfer });
+    const target = folderOf("CS 61A");
+    fireEvent.dragOver(target, { dataTransfer: transfer });
+    fireEvent.drop(target, { dataTransfer: transfer });
+
+    expect(storedLibrary().find((item) => item.id === "m1")?.subject).toBe("CS 61A");
+    expect(folderOf("CS 61A")).toHaveTextContent("Week 1.pdf");
+  });
+
+  it("unassigns a PDF dropped on the unassigned folder", () => {
+    storeCourses([
+      { id: "m1", name: "Week 1.pdf", subject: "UGBA 117" },
+      { id: "m2", name: "Loose.pdf", subject: "" },
+    ]);
+    render(<DashboardNavigation />);
+
+    const transfer = dataTransfer("m1");
+    const target = folderOf("Unassigned");
+    fireEvent.dragOver(target, { dataTransfer: transfer });
+    fireEvent.drop(target, { dataTransfer: transfer });
+
+    expect(storedLibrary().find((item) => item.id === "m1")?.subject).toBe("");
+  });
+
+  it("renames a course on double-click and keeps its files", () => {
+    storeCourses([{ id: "m1", name: "Week 1.pdf", subject: "UGBA 117" }]);
+    render(<DashboardNavigation />);
+
+    fireEvent.doubleClick(screen.getByText("UGBA 117"));
+    const input = screen.getByLabelText("Course name");
+    fireEvent.change(input, { target: { value: "UGBA 118" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(storedLibrary()).toEqual([expect.objectContaining({ id: "m1", subject: "UGBA 118" })]);
+    expect(folderOf("UGBA 118")).toHaveTextContent("Week 1.pdf");
+  });
+
+  it("abandons a rename on Escape", () => {
+    storeCourses([{ id: "m1", name: "Week 1.pdf", subject: "UGBA 117" }]);
+    render(<DashboardNavigation />);
+
+    fireEvent.doubleClick(screen.getByText("UGBA 117"));
+    const input = screen.getByLabelText("Course name");
+    fireEvent.change(input, { target: { value: "Nonsense" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(storedLibrary()[0].subject).toBe("UGBA 117");
+    expect(screen.getByText("UGBA 117")).toBeInTheDocument();
+  });
+
+  it("treats an emptied name as a cancel, not as an unassign", () => {
+    storeCourses([{ id: "m1", name: "Week 1.pdf", subject: "UGBA 117" }]);
+    render(<DashboardNavigation />);
+
+    fireEvent.doubleClick(screen.getByText("UGBA 117"));
+    const input = screen.getByLabelText("Course name");
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(storedLibrary()[0].subject).toBe("UGBA 117");
+  });
+
+  it("deletes a course but keeps the PDFs, leaving them unassigned", () => {
+    storeCourses([
+      { id: "m1", name: "Week 1.pdf", subject: "UGBA 117" },
+      { id: "m2", name: "Reader.pdf", subject: "CS 61A" },
+    ]);
+    render(<DashboardNavigation />);
+
+    fireEvent.doubleClick(screen.getByText("UGBA 117"));
+    fireEvent.mouseDown(
+      screen.getByLabelText("Delete the UGBA 117 course and leave its files unassigned"),
+    );
+
+    expect(storedLibrary()).toHaveLength(2);
+    expect(storedLibrary().find((item) => item.id === "m1")?.subject).toBe("");
+    expect(screen.getByText("Week 1.pdf")).toBeInTheDocument();
+    expect(screen.queryByText("UGBA 117")).not.toBeInTheDocument();
+  });
+
+  it("offers no rename for the unassigned folder, which is not a course", () => {
+    storeCourses([{ id: "m1", name: "Loose.pdf", subject: "" }]);
+    render(<DashboardNavigation />);
+
+    fireEvent.doubleClick(screen.getByText("Unassigned"));
+
+    expect(screen.queryByLabelText("Course name")).not.toBeInTheDocument();
+  });
+
+  it("starts a rename from the keyboard with F2", () => {
+    storeCourses([{ id: "m1", name: "Week 1.pdf", subject: "UGBA 117" }]);
+    render(<DashboardNavigation />);
+
+    // Double-click has no keyboard equivalent; a tree view is expected to answer to F2.
+    fireEvent.keyDown(screen.getByText("UGBA 117"), { key: "F2" });
+
+    expect(screen.getByLabelText("Course name")).toHaveValue("UGBA 117");
   });
 });

@@ -10,12 +10,15 @@ import {
   createLibraryRecord,
   libraryDate,
   readStudyLibrary,
+  removeLibrarySubject,
+  renameLibrarySubject,
+  setLibrarySubject,
   STUDY_LIBRARY_KEY,
   STUDY_LIBRARY_UPDATED_EVENT,
   STUDY_MATERIAL_OPEN_EVENT,
   type StudyLibraryRecord,
 } from "@/lib/study-library";
-import { groupBySubject } from "@/lib/subject";
+import { groupBySubject, MAX_SUBJECT_CHARS, UNASSIGNED_SUBJECT } from "@/lib/subject";
 import { safeStorageSet } from "@/lib/request-validation";
 import { useLocale } from "@/hooks/use-locale";
 import { localeLabels, nextLocale, type MessageKey } from "@/lib/i18n";
@@ -59,6 +62,10 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
   // and capped is the default, so an empty list on first load is the right starting state.
   const [collapsedFolders, setCollapsedFolders] = useState<string[]>([]);
   const [uncappedFolders, setUncappedFolders] = useState<string[]>([]);
+  /** Course being renamed, and the folder a dragged file is currently over. */
+  const [editingSubject, setEditingSubject] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState("");
+  const [dragOverSubject, setDragOverSubject] = useState<string | null>(null);
   const { locale, setLocale, t } = useLocale();
 
   /**
@@ -81,6 +88,50 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
         ? previous.filter((name) => name !== subject)
         : [...previous, subject],
     );
+
+  /**
+   * The sidebar owns no state the workspace can see, so every edit is written straight to
+   * storage and announced. The workspace listens for the same event and re-reads, which
+   * stops its copy going stale and overwriting this on its next save.
+   */
+  const writeLibrary = (next: StudyLibraryRecord[]) => {
+    setLibrary(next);
+    safeStorageSet(STUDY_LIBRARY_KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event(STUDY_LIBRARY_UPDATED_EVENT));
+  };
+
+  const dropOnFolder = (subject: string, materialId: string) => {
+    setDragOverSubject(null);
+    if (!materialId) return;
+    const record = library.find((item) => item.id === materialId);
+    if (!record || record.subject === subject) return;
+    writeLibrary(setLibrarySubject(library, materialId, subject));
+  };
+
+  const startRename = (subject: string) => {
+    // Unassigned is the absence of a course, not one of them: there is no name to change
+    // and nothing to delete, so it stays a plain folder.
+    if (subject === UNASSIGNED_SUBJECT) return;
+    setEditingSubject(subject);
+    setDraftName(subject);
+  };
+
+  const commitRename = () => {
+    if (editingSubject === null) return;
+    const next = draftName.trim();
+    // An emptied name would silently unassign every file in the folder, which is the delete
+    // action, not the rename one. Cancel instead and leave the folder as it was.
+    if (next && next !== editingSubject)
+      writeLibrary(renameLibrarySubject(library, editingSubject, next));
+    setEditingSubject(null);
+    setDraftName("");
+  };
+
+  const deleteFolder = (subject: string) => {
+    writeLibrary(removeLibrarySubject(library, subject));
+    setEditingSubject(null);
+    setDraftName("");
+  };
 
   useEffect(() => {
     const syncWithLocation = () => setActiveId(selectedNavigationId(window.location.hash));
@@ -173,19 +224,79 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
               const uncapped = uncappedFolders.includes(subject);
               const name = subject || t("library.unassigned");
               return (
-                <div className="sidebar-library-folder" key={subject || "unassigned"}>
-                  <h3 className="sidebar-library-folder-name">
-                    <button
-                      aria-expanded={!collapsed}
-                      className="sidebar-library-folder-toggle"
-                      onClick={() => toggle(setCollapsedFolders, subject)}
-                      type="button"
-                    >
-                      <span aria-hidden="true" className="sidebar-library-folder-caret" />
-                      <span aria-hidden="true" className="sidebar-library-folder-icon" />
-                      <span className="sidebar-library-folder-label">{name}</span>
-                    </button>
-                  </h3>
+                <div
+                  className={`sidebar-library-folder ${dragOverSubject === subject ? "is-drop-target" : ""}`}
+                  key={subject || "unassigned"}
+                  onDragOver={(event) => {
+                    // Without preventDefault the browser refuses the drop outright.
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    setDragOverSubject(subject);
+                  }}
+                  onDragLeave={(event) => {
+                    // Ignore the events fired while crossing this folder's own children.
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+                      setDragOverSubject(null);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    dropOnFolder(subject, event.dataTransfer.getData("text/plain"));
+                  }}
+                >
+                  {editingSubject === subject ? (
+                    <div className="sidebar-library-folder-edit">
+                      <input
+                        aria-label={t("nav.folderNameAria")}
+                        autoFocus
+                        maxLength={MAX_SUBJECT_CHARS}
+                        onBlur={commitRename}
+                        onChange={(event) => setDraftName(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") commitRename();
+                          if (event.key === "Escape") {
+                            setEditingSubject(null);
+                            setDraftName("");
+                          }
+                        }}
+                        value={draftName}
+                      />
+                      <button
+                        aria-label={t("nav.deleteFolderAria", { name })}
+                        className="sidebar-library-folder-delete"
+                        // onMouseDown, not onClick: the input's blur commits the rename and
+                        // unmounts this button before a click would ever land on it.
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          deleteFolder(subject);
+                        }}
+                        type="button"
+                      >
+                        {t("nav.deleteFolder")}
+                      </button>
+                    </div>
+                  ) : (
+                    <h3 className="sidebar-library-folder-name">
+                      <button
+                        aria-expanded={!collapsed}
+                        className="sidebar-library-folder-toggle"
+                        onClick={() => toggle(setCollapsedFolders, subject)}
+                        onDoubleClick={() => startRename(subject)}
+                        // Double-click cannot be reached from a keyboard; F2 is what a tree
+                        // view is expected to answer to, and the Library page can do it too.
+                        onKeyDown={(event) => {
+                          if (event.key === "F2") startRename(subject);
+                        }}
+                        title={
+                          subject === UNASSIGNED_SUBJECT ? undefined : t("nav.renameFolderHint")
+                        }
+                        type="button"
+                      >
+                        <span aria-hidden="true" className="sidebar-library-folder-caret" />
+                        <span aria-hidden="true" className="sidebar-library-folder-icon" />
+                        <span className="sidebar-library-folder-label">{name}</span>
+                      </button>
+                    </h3>
+                  )}
                   {/*
                     A collapsed folder drops its files from the tree rather than hiding them
                     with CSS, so they leave the tab order and the screen reader's list too.
@@ -196,6 +307,7 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
                       <div className="sidebar-library-list">
                         {(uncapped ? items : items.slice(0, FILES_PER_FOLDER)).map((item) => (
                           <a
+                            draggable
                             href="#library"
                             key={item.id}
                             onClick={(event) => {
@@ -204,6 +316,14 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
                                 new CustomEvent(STUDY_MATERIAL_OPEN_EVENT, { detail: item.id }),
                               );
                             }}
+                            onDragStart={(event) => {
+                              // An anchor drags its href by default, which would make the
+                              // drop look like a link drop rather than a file move.
+                              event.dataTransfer.clearData();
+                              event.dataTransfer.setData("text/plain", item.id);
+                              event.dataTransfer.effectAllowed = "move";
+                            }}
+                            onDragEnd={() => setDragOverSubject(null)}
                             title={t("nav.openLibrary", { name: item.name })}
                           >
                             <strong>{item.name}</strong>
@@ -213,7 +333,9 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
                       {items.length > FILES_PER_FOLDER ? (
                         <button
                           // The visible label repeats in every folder, so the course names the target.
-                          aria-label={t(uncapped ? "nav.showLessAria" : "nav.showMoreAria", { name })}
+                          aria-label={t(uncapped ? "nav.showLessAria" : "nav.showMoreAria", {
+                            name,
+                          })}
                           className="sidebar-library-more"
                           onClick={() => toggle(setUncappedFolders, subject)}
                           type="button"
@@ -263,4 +385,3 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
     </aside>
   );
 }
-

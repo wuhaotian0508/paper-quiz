@@ -214,3 +214,64 @@ describe("parseQuizOutput", () => {
     });
   });
 });
+
+describe("recovering a missing correctOptionId", () => {
+  const question = (extra: Record<string, unknown>, options?: unknown[]) => ({
+    title: "Review",
+    summary: "A review quiz.",
+    questions: [
+      {
+        id: "q1",
+        type: "multiple_choice",
+        prompt: "Which document is required?",
+        explanation: "The guide says passport.",
+        sourceNote: "Page 10",
+        options: options ?? [
+          { id: "a", text: "Passport", explanation: "Named in the guide." },
+          { id: "b", text: "Visa", explanation: "Needed for entry, not here." },
+          { id: "c", text: "Form", explanation: "Not mentioned." },
+          { id: "d", text: "None", explanation: "One document is required." },
+        ],
+        ...extra,
+      },
+    ],
+  });
+
+  // Production lost every question in a quiz to this one absent field, which the gateway
+  // does not enforce, so the answer is recovered from the other shapes models produce.
+  it.each([
+    ["answer", { answer: "b" }],
+    ["correctAnswer", { correctAnswer: "B" }],
+    ["correct_option_id", { correct_option_id: "b)" }],
+    ["correctOption", { correctOption: "Option B" }],
+  ])("reads the answer from %s", (_name, extra) => {
+    expect(
+      parseQuizOutput(JSON.stringify(question(extra)), "lecture.pdf").questions[0],
+    ).toMatchObject({ correctOptionId: "b" });
+  });
+
+  it("reads the answer from an option flagged as correct", () => {
+    const options = [
+      { id: "a", text: "Passport", explanation: "Named in the guide." },
+      { id: "b", text: "Visa", explanation: "Needed for entry, not here.", isCorrect: true },
+      { id: "c", text: "Form", explanation: "Not mentioned." },
+      { id: "d", text: "None", explanation: "One document is required." },
+    ];
+    expect(
+      parseQuizOutput(JSON.stringify(question({}, options)), "lecture.pdf").questions[0],
+    ).toMatchObject({ correctOptionId: "b" });
+  });
+
+  it("keeps an answer the model did label", () => {
+    expect(
+      parseQuizOutput(
+        JSON.stringify(question({ correctOptionId: "c", answer: "a" })),
+        "lecture.pdf",
+      ).questions[0],
+    ).toMatchObject({ correctOptionId: "c" });
+  });
+
+  it("still rejects a question with no answer anywhere", () => {
+    expect(() => parseQuizOutput(JSON.stringify(question({})), "lecture.pdf")).toThrow();
+  });
+});

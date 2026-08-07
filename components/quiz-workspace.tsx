@@ -217,6 +217,14 @@ export function QuizWorkspace() {
   useEffect(() => {
     window.dispatchEvent(new CustomEvent("paper-quiz-sync-status", { detail: syncStatus }));
   }, [syncStatus]);
+  // The sidebar edits courses straight in storage. Without re-reading, this copy stays stale
+  // and the next save here — or the next sync upload — silently reverts the student's edit.
+  useEffect(() => {
+    const reread = () =>
+      setLibrary(readStudyLibrary(window.localStorage.getItem(STUDY_LIBRARY_KEY)));
+    window.addEventListener(STUDY_LIBRARY_UPDATED_EVENT, reread);
+    return () => window.removeEventListener(STUDY_LIBRARY_UPDATED_EVENT, reread);
+  }, []);
 
   const attachSource = (form: FormData) => {
     form.set("locale", locale);

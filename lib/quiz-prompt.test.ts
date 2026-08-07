@@ -30,6 +30,9 @@ describe("buildQuizInstructions", () => {
     // Asking for it in prose was not enough on its own: the field contract is what the
     // model follows, and an option shape without `explanation` parses fine but renders blank.
     expect(instructions).toContain('{"id": "a", "text": "...", "explanation": "..."}');
-    expect(instructions).toContain("required on all four options");
+    expect(instructions).toContain("all four need their own explanation");
+    // Describing only the option shape here once cost every question its correctOptionId and
+    // failed the whole quiz, so the two have to be named together.
+    expect(instructions).toContain("needs both correctOptionId and an options array");
   });
 });

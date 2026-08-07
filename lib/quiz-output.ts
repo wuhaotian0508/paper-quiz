@@ -40,6 +40,56 @@ function stripCodeFence(output: string) {
     .trim();
 }
 
+const OPTION_IDS = ["a", "b", "c", "d"] as const;
+
+function readOptionId(value: unknown): "a" | "b" | "c" | "d" | undefined {
+  if (typeof value === "number" && value >= 0 && value < 4) return OPTION_IDS[value];
+  if (typeof value !== "string") return undefined;
+  // "B", "b)", "Option C", "answer: d" all name an option; take the first a-d letter.
+  const letter = value.trim().toLowerCase().match(/[a-d]/)?.[0];
+  return letter ? (letter as "a" | "b" | "c" | "d") : undefined;
+}
+
+/**
+ * Recovers the answer to a multiple-choice question the model did not label with
+ * `correctOptionId`.
+ *
+ * Losing the whole quiz to one missing field is the worst outcome available, and this
+ * gateway does not enforce the response schema, so the answer is looked for under the other
+ * names models reach for and on the options themselves before giving up.
+ */
+function normalizeCorrectOption(question: Record<string, unknown>): unknown {
+  if (readOptionId(question.correctOptionId)) return question;
+
+  const named = [
+    question.correctOptionId,
+    question.correctOption,
+    question.correct_option_id,
+    question.correctAnswer,
+    question.correct_answer,
+    question.answer,
+    question.correct,
+  ]
+    .map(readOptionId)
+    .find(Boolean);
+  if (named) return { ...question, correctOptionId: named };
+
+  const options = Array.isArray(question.options) ? question.options : [];
+  const flagged = options.findIndex(
+    (option) =>
+      !!option &&
+      typeof option === "object" &&
+      ["isCorrect", "correct", "is_correct"].some(
+        (key) => (option as Record<string, unknown>)[key] === true,
+      ),
+  );
+  if (flagged >= 0) {
+    const option = options[flagged] as Record<string, unknown>;
+    return { ...question, correctOptionId: readOptionId(option.id) ?? OPTION_IDS[flagged] };
+  }
+  return question;
+}
+
 function normalizeGatewayQuestionTypes(value: unknown): unknown {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
   const quiz = value as { questions?: unknown };
@@ -49,12 +99,16 @@ function normalizeGatewayQuestionTypes(value: unknown): unknown {
     ...quiz,
     questions: quiz.questions.map((question) => {
       if (!question || typeof question !== "object" || Array.isArray(question)) return question;
-      const item = question as { type?: unknown };
+      const item = question as Record<string, unknown>;
       const normalizedType =
         typeof item.type === "string"
           ? gatewayQuestionTypeAliases[item.type as keyof typeof gatewayQuestionTypeAliases]
           : undefined;
-      return normalizedType ? { ...item, type: normalizedType } : item;
+      const typed = normalizedType ? { ...item, type: normalizedType } : item;
+      const type = (typed as { type?: unknown }).type;
+      return type === "multiple_choice"
+        ? normalizeCorrectOption(typed as Record<string, unknown>)
+        : typed;
     }),
   };
 }
