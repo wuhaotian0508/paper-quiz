@@ -58,6 +58,7 @@ describe("ExamReviewSheetSchema", () => {
   it("requires source facts and supplied mistake ids to remain separate", () => {
     expect(buildExamReviewInstructions()).toContain("sole factual authority");
     expect(buildExamReviewInstructions()).toContain("supplied mistake identifiers");
+    expect(buildExamReviewInstructions()).toContain("keyIdeas");
   });
 
   it("accepts a JSON response wrapped in a Markdown code fence", () => {

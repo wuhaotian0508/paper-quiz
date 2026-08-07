@@ -33,6 +33,7 @@ export function buildExamReviewInstructions() {
     "For each topic, state essential ideas, include a formula or procedure only when the source contains one, name one common confusion, and cite the supporting page, section, or transcript topic.",
     "The supplied PDF or transcript is the sole factual authority. Learner mistakes only determine which source-grounded concepts deserve emphasis.",
     "Return relatedMistakeIds only from the supplied mistake identifiers, and use an empty array with an empty mistakeFocus when no supplied mistake applies.",
+    "Return exactly one JSON object with this shape: { title: string, topics: [{ topic: string, keyIdeas: string[], formulaOrProcedure: string, commonConfusion: string, sourceNote: string, relatedMistakeIds: string[], mistakeFocus: string }] }. Include 4 to 8 topics.",
     "Return JSON only, without Markdown headings or a code fence.",
     "Write every user-visible field in English. Do not invent facts or imply this document is permitted during an exam.",
   ].join("\n");
