@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { REQUEST_TIMEOUT_MS } from "@/lib/api-client";
+import { QUIZ_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from "@/lib/api-client";
 import { useLocale } from "@/hooks/use-locale";
 import type { MessageKey } from "@/lib/i18n";
 
@@ -23,7 +23,7 @@ const copy: Record<"transcribing" | "generating", { eyebrow: MessageKey; heading
 export function LoadingView({ mode }: { mode: "transcribing" | "generating" }) {
   const { t } = useLocale();
   const [elapsed, setElapsed] = useState(0);
-  const limit = Math.round(REQUEST_TIMEOUT_MS / 1000);
+  const limit = Math.round((mode === "generating" ? QUIZ_TIMEOUT_MS : REQUEST_TIMEOUT_MS) / 1000);
 
   useEffect(() => {
     const id = window.setInterval(() => setElapsed((value) => value + 1), 1000);

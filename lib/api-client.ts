@@ -5,6 +5,9 @@
  */
 export const REQUEST_TIMEOUT_MS = 60_000;
 
+/** Quiz generation gets a longer budget: more content to read and more questions to write. */
+export const QUIZ_TIMEOUT_MS = 100_000;
+
 export async function postForm(
   path: string,
   form: FormData,

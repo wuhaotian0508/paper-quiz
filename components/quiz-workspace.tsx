@@ -70,7 +70,7 @@ import { QuizView, type ChatMessage } from "@/components/quiz-view";
 import { HelpCenter } from "@/components/help-center";
 import { ReviewSheetView } from "@/components/review-sheet-view";
 import { safeStorageSet } from "@/lib/request-validation";
-import { postForm } from "@/lib/api-client";
+import { postForm, QUIZ_TIMEOUT_MS } from "@/lib/api-client";
 import { isAudio, isPdf } from "@/lib/study-file";
 import { attachStudyFile, attachStudyFiles } from "@/lib/study-upload";
 import { renderAndStorePdfPages } from "@/lib/source-pages";
@@ -376,6 +376,7 @@ export function QuizWorkspace() {
       form.set("count", String(total));
       form.set("locale", locale);
       const response = await postForm("/api/generate-quiz", form, {
+        timeoutMs: QUIZ_TIMEOUT_MS,
         timeoutMessage: t("error.quizTimeout"),
       });
       const data = await readQuizResponse(response);

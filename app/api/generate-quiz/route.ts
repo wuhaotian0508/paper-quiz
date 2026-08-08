@@ -18,7 +18,7 @@ import { del } from "@vercel/blob";
 import { readStudyFiles } from "@/lib/study-upload";
 import { readLocale, translate } from "@/lib/i18n";
 
-export const maxDuration = 60;
+export const maxDuration = 100;
 
 function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
         ],
         text: { format: zodTextFormat(QuizSchema, "quiz") },
       });
-      const { text: outputText, stoppedEarlyBecause } = await collectResponse(stream);
+      const { text: outputText, stoppedEarlyBecause, usage } = await collectResponse(stream);
       if (stoppedEarlyBecause === "max_output_tokens")
         throw new Error(
           "The quiz was cut off before it finished. Ask for fewer questions and try again.",

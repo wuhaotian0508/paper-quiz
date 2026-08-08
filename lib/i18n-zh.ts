@@ -83,7 +83,7 @@ export const zh: Messages = {
   "error.chooseAtLeastOne": "请至少选择一道题。",
   "error.maxQuestions": "题目数量请不要超过 15 道。",
   "error.customNeedsDetails": "请为每个自定义题型填写名称和要求。",
-  "error.quizTimeout": "出题超过了 60 秒上限。请减少题目数量或换更短的课程内容。",
+  "error.quizTimeout": "出题超过了 100 秒上限。请减少题目数量或换更短的课程内容。",
   "error.quizFailed": "出题失败。",
   "error.transcribeTimeout": "转写超过了 60 秒上限。请换一段更短或更小的录音。",
   "error.transcribeFailed": "音频转写失败。",

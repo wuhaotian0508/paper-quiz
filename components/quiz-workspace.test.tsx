@@ -536,10 +536,10 @@ describe("QuizWorkspace", () => {
       target: { files: [new File(["%PDF-1.4"], "lecture.pdf", { type: "application/pdf" })] },
     });
     fireEvent.click(screen.getByRole("button", { name: "Generate quiz" }));
-    await vi.advanceTimersByTimeAsync(61_000);
+    await vi.advanceTimersByTimeAsync(101_000);
     vi.useRealTimers();
 
-    expect(await screen.findByText(/ran past the 60 second limit/i)).toBeInTheDocument();
+    expect(await screen.findByText(/ran past the 100 second limit/i)).toBeInTheDocument();
   });
 
   it("keeps mistakes from different quizzes separate when practising them together", async () => {

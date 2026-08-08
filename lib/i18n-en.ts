@@ -86,7 +86,7 @@ export const en = {
   "error.maxQuestions": "Choose 15 questions or fewer.",
   "error.customNeedsDetails": "Give every custom question type a name and requirements.",
   "error.quizTimeout":
-    "Quiz generation ran past the 60 second limit. Try fewer questions or a shorter lecture.",
+    "Quiz generation ran past the 100 second limit. Try fewer questions or a shorter lecture.",
   "error.quizFailed": "Quiz generation failed.",
   "error.transcribeTimeout":
     "Transcription ran past the 60 second limit. Try a shorter or smaller recording.",
