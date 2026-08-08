@@ -93,7 +93,7 @@ export async function POST(request: Request) {
       input: [{ role: "user", content: sourceContent }],
       text: { format: zodTextFormat(ExamReviewSheetSchema, "exam_review") },
     });
-    const { text, stoppedEarlyBecause } = await collectResponse(stream);
+    const { text, stoppedEarlyBecause, usage } = await collectResponse(stream);
     if (stoppedEarlyBecause === "max_output_tokens")
       return jsonError("The exam review was cut off before it finished. Please try again.", 502);
     if (stoppedEarlyBecause || !text)
@@ -115,6 +115,7 @@ export async function POST(request: Request) {
             mistakeFocus: relatedMistakeIds.length ? topic.mistakeFocus : "",
           };
         }) ?? null,
+      usage,
     });
   } catch (error) {
     console.error(

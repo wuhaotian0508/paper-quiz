@@ -90,12 +90,12 @@ export async function POST(request: Request) {
       ],
       text: { format: zodTextFormat(OptionExplanationsSchema, "option_explanations") },
     });
-    const { text: output, stoppedEarlyBecause } = await collectResponse(stream);
+    const { text: output, stoppedEarlyBecause, usage } = await collectResponse(stream);
     if (stoppedEarlyBecause) {
       console.error("Option analysis stopped early", { reason: stoppedEarlyBecause });
       return error("Option analysis was cut off before it finished. Please try again.", 502);
     }
-    return Response.json(parseOptionExplanationsOutput(output));
+    return Response.json({ ...parseOptionExplanationsOutput(output), usage });
   } catch (cause) {
     console.error(
       "Option analysis failed",

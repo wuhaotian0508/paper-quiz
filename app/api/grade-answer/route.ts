@@ -106,12 +106,12 @@ export async function POST(request: Request) {
       ],
       text: { format: zodTextFormat(GradeResultSchema, "grade") },
     });
-    const { text: output, stoppedEarlyBecause } = await collectResponse(stream);
+    const { text: output, stoppedEarlyBecause, usage } = await collectResponse(stream);
     if (stoppedEarlyBecause) {
       console.error("Answer grading stopped early", { reason: stoppedEarlyBecause });
       return error("Grading was cut off before it finished. Please try again.", 502);
     }
-    return Response.json(GradeResultSchema.parse(JSON.parse(output)));
+    return Response.json({ ...GradeResultSchema.parse(JSON.parse(output)), usage });
   } catch (cause) {
     console.error(
       "Answer grading failed",

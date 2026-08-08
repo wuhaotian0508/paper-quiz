@@ -7,7 +7,8 @@ import {
   QuizSchema,
 } from "@/lib/quiz";
 import { getOpenAIClientOptions, getOpenAIModel } from "@/lib/openai-config";
-import { collectResponse } from "@/lib/openai-stream";
+import { collectResponse, type ResponseUsage } from "@/lib/openai-stream";
+import { mergeUsage } from "@/lib/usage-meter";
 import { getQuizGenerationOptions } from "@/lib/quiz-generation";
 import { parseQuizOutput } from "@/lib/quiz-output";
 import { buildQuizInstructions } from "@/lib/quiz-prompt";
@@ -87,6 +88,7 @@ export async function POST(request: Request) {
     const sourceParts = files.length
       ? await buildSourceFileParts({ fileIds: sourceFileIds, files })
       : [];
+    let totalUsage: ResponseUsage | null = null;
     const generateOnce = async (correction?: string) => {
       const instructions = files.length
         ? `${buildQuizInstructions({ ...settings, locale })}\n\nUse all selected PDFs as one study set. In every sourceNote, name the supporting source file and page or section when available. Selected files: ${sourceNames}.`
@@ -108,6 +110,8 @@ export async function POST(request: Request) {
         text: { format: zodTextFormat(QuizSchema, "quiz") },
       });
       const { text: outputText, stoppedEarlyBecause, usage } = await collectResponse(stream);
+      // Accumulated across attempts: a repeated-question retry is billed twice.
+      totalUsage = mergeUsage(totalUsage, usage);
       if (stoppedEarlyBecause === "max_output_tokens")
         throw new Error(
           "The quiz was cut off before it finished. Ask for fewer questions and try again.",
@@ -127,6 +131,7 @@ export async function POST(request: Request) {
       ...quiz,
       sourceFileId: sourceFileIds[0] ?? null,
       sourceFileIds,
+      usage: totalUsage,
     });
   } catch (error) {
     console.error(

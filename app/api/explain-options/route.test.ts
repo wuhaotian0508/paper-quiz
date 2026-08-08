@@ -115,7 +115,8 @@ describe("POST /api/explain-options", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual(JSON.parse(explanations));
+    // `usage` rides along so the client meter can show what the call cost.
+    expect(await response.json()).toMatchObject(JSON.parse(explanations));
   });
 
   it("grounds the explanation in the study material when there is some", async () => {
@@ -153,7 +154,7 @@ describe("POST /api/explain-options", () => {
     const response = await POST(request((form) => form.set("question", choiceQuestion)));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual(JSON.parse(explanations));
+    expect(await response.json()).toMatchObject(JSON.parse(explanations));
   });
 
   it("reports prose instead of storing it as an explanation", async () => {

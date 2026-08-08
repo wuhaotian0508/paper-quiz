@@ -26,6 +26,14 @@ import {
 } from "@/lib/study-library";
 import { groupBySubject, MAX_SUBJECT_CHARS, UNASSIGNED_SUBJECT } from "@/lib/subject";
 import { safeStorageSet } from "@/lib/request-validation";
+import {
+  EMPTY_USAGE,
+  formatCost,
+  readUsage,
+  USAGE_METER_KEY,
+  USAGE_METER_UPDATED_EVENT,
+  type UsageTotals,
+} from "@/lib/usage-meter";
 import { useLocale } from "@/hooks/use-locale";
 import { localeLabels, nextLocale, type MessageKey } from "@/lib/i18n";
 
@@ -74,6 +82,8 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
   const [dragOverSubject, setDragOverSubject] = useState<string | null>(null);
   /** Courses created by hand, including any still empty, and the new-course draft. */
   const [subjects, setSubjects] = useState<string[]>([]);
+  /** What this browser's model calls have cost so far. Shown, never billed. */
+  const [usage, setUsage] = useState<UsageTotals>(EMPTY_USAGE);
   const [newSubject, setNewSubject] = useState<string | null>(null);
   const { locale, setLocale, t } = useLocale();
 
@@ -196,6 +206,17 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
     return () => {
       window.removeEventListener("storage", syncLibrary);
       window.removeEventListener(STUDY_LIBRARY_UPDATED_EVENT, syncLibrary);
+    };
+  }, []);
+
+  useEffect(() => {
+    const syncUsage = () => setUsage(readUsage(window.localStorage.getItem(USAGE_METER_KEY)));
+    syncUsage();
+    window.addEventListener(USAGE_METER_UPDATED_EVENT, syncUsage);
+    window.addEventListener("storage", syncUsage);
+    return () => {
+      window.removeEventListener(USAGE_METER_UPDATED_EVENT, syncUsage);
+      window.removeEventListener("storage", syncUsage);
     };
   }, []);
 
@@ -404,6 +425,15 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
           <p className="sidebar-library-empty">{t("nav.libraryEmpty")}</p>
         )}
       </section>
+      {usage.calls > 0 ? (
+        <div className="sidebar-usage" aria-label={t("usage.aria")}>
+          <div className="sidebar-usage-row">
+            <span>{t("usage.used", { count: usage.calls })}</span>
+            <strong>{formatCost(usage.cost)}</strong>
+          </div>
+          <small>{t("usage.notCharged")}</small>
+        </div>
+      ) : null}
       <div className="sidebar-utilities">
         <a className="sidebar-utility-link" href="#help">
           <span aria-hidden="true">?</span> {t("nav.help")}

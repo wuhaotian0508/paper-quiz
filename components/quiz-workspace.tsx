@@ -70,6 +70,7 @@ import { QuizView, type ChatMessage } from "@/components/quiz-view";
 import { HelpCenter } from "@/components/help-center";
 import { ReviewSheetView } from "@/components/review-sheet-view";
 import { safeStorageSet } from "@/lib/request-validation";
+import { addUsage, readUsage, USAGE_METER_KEY, USAGE_METER_UPDATED_EVENT } from "@/lib/usage-meter";
 import { postForm, QUIZ_TIMEOUT_MS } from "@/lib/api-client";
 import { isAudio, isPdf } from "@/lib/study-file";
 import { attachStudyFile, attachStudyFiles } from "@/lib/study-upload";
@@ -226,6 +227,17 @@ export function QuizWorkspace() {
     return () => window.removeEventListener(STUDY_LIBRARY_UPDATED_EVENT, reread);
   }, []);
 
+  /**
+   * Records what a model call consumed. Nothing is charged and nothing is gated: the meter
+   * only makes the running cost visible while the product is still proving it earns reuse.
+   */
+  const recordUsage = (usage: { inputTokens: number; outputTokens: number } | null | undefined) => {
+    if (!usage) return;
+    const next = addUsage(readUsage(window.localStorage.getItem(USAGE_METER_KEY)), usage);
+    safeStorageSet(USAGE_METER_KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event(USAGE_METER_UPDATED_EVENT));
+  };
+
   const attachSource = (form: FormData) => {
     form.set("locale", locale);
     if (sourceFileIds.length > 1) form.set("fileIds", JSON.stringify(sourceFileIds));
@@ -275,6 +287,9 @@ export function QuizWorkspace() {
       const data = (await response.json()) as OptionExplanations & { error?: string };
       if (!response.ok) throw new Error(data.error || t("error.optionAnalysisFailed"));
 
+      recordUsage(
+        (data as unknown as { usage?: { inputTokens: number; outputTokens: number } }).usage,
+      );
       setQuiz((old) => (old ? applyOptionExplanations(old, question.id, data) : old));
       // Keyed on content, not `question.id`: a mistake-book review renumbers questions to the
       // entry id, while a normal quiz numbers from q1, and only `mistakeKey` matches both.
@@ -382,6 +397,7 @@ export function QuizWorkspace() {
       const data = await readQuizResponse(response);
       if (!response.ok) throw new Error("error" in data ? data.error : t("error.quizFailed"));
       const generated = data as GeneratedQuiz;
+      recordUsage((generated as { usage?: { inputTokens: number; outputTokens: number } }).usage);
       const rawSourceFileIds = generated.sourceFileIds || [];
       const generatedSourceFileIds =
         rawSourceFileIds.length === files.length &&
@@ -474,6 +490,9 @@ export function QuizWorkspace() {
       });
       const grade = (await response.json()) as GradeResult & { error?: string };
       if (!response.ok) throw new Error(grade.error || t("error.gradeFailed"));
+      recordUsage(
+        (grade as unknown as { usage?: { inputTokens: number; outputTokens: number } }).usage,
+      );
       recordGrade(current, answer, grade);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("error.gradeFailed"));

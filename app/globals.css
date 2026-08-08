@@ -3621,6 +3621,33 @@ h1 {
   font-size: 11px;
   line-height: 1.45;
 }
+/* Accrued model cost, shown but never billed. */
+.sidebar-usage {
+  margin: 0 0 10px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+.sidebar-usage-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.sidebar-usage-row strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+.sidebar-usage small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
 .sidebar-utilities {
   display: grid;
   gap: 8px;
