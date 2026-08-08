@@ -3623,6 +3623,10 @@ h1 {
 }
 /* Accrued model cost, shown inside Settings. Nothing is billed. */
 .auth-settings-toggle {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
   width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--line);
@@ -3635,6 +3639,10 @@ h1 {
 }
 .auth-settings-toggle:hover {
   background: rgba(255, 231, 164, 0.35);
+}
+.auth-settings-cost {
+  color: var(--coral-deep);
+  font-weight: 700;
 }
 .auth-settings-panel {
   display: grid;

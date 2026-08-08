@@ -90,7 +90,7 @@ it("shows the signed-in email from the initial browser session", async () => {
   render(<AuthMenu client={client} />);
 
   // The account row is a Settings button now; identity and sign-out live behind it.
-  fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+  fireEvent.click(await screen.findByRole("button", { name: /Settings/ }));
 
   expect(screen.getByText("student@example.com")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
@@ -114,9 +114,11 @@ it("shows the usage bar inside Settings, and charges nothing", async () => {
   );
 
   render(<AuthMenu client={client} />);
-  fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+  // The collapsed row already shows the cost, so the top-up is discoverable.
+  expect(await screen.findByRole("button", { name: /Settings/ })).toHaveTextContent("$0.10");
+  fireEvent.click(screen.getByRole("button", { name: /Settings/ }));
 
-  expect(screen.getByText("$0.10")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "$5" })).toBeInTheDocument();
   // Half of the $0.20 reference; the reference is a display anchor, not a cap.
   expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "50");
   expect(screen.getByText("Nothing is billed yet")).toBeInTheDocument();
@@ -131,7 +133,7 @@ it("redirects to the dedicated login page after signing out", async () => {
   const onSignedOut = vi.fn();
   render(<AuthMenu client={client} onSignedOut={onSignedOut} />);
 
-  fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+  fireEvent.click(await screen.findByRole("button", { name: /Settings/ }));
   fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
   await waitFor(() => expect(client.auth.signOut).toHaveBeenCalled());
@@ -144,7 +146,7 @@ it("shows sync status only after a user has signed in", async () => {
     data: { session: { user: { email: "student@example.com" } } },
   });
   render(<AuthMenu client={client} />);
-  fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+  fireEvent.click(await screen.findByRole("button", { name: /Settings/ }));
 
   expect(screen.getByText("Sync ready")).toBeInTheDocument();
   window.dispatchEvent(new CustomEvent("paper-quiz-sync-status", { detail: "synced" }));

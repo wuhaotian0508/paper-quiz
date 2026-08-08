@@ -266,13 +266,16 @@ export function AuthMenu({
     const overAllowance = usage.cost > allowance;
     return (
       <div className="auth-menu auth-menu-signed-in">
+        {/* The collapsed row shows the running cost: a bare "Settings" gave no sign that
+            usage and top-up were inside it, and they went unnoticed. */}
         <button
           type="button"
           className="auth-settings-toggle"
           aria-expanded={settingsOpen}
           onClick={() => setSettingsOpen((open) => !open)}
         >
-          {t("auth.settings")}
+          <span>{t("auth.settings")}</span>
+          <span className="auth-settings-cost">{formatCost(usage.cost)}</span>
         </button>
         {settingsOpen ? (
           <div className="auth-settings-panel">
@@ -299,8 +302,6 @@ export function AuthMenu({
                   ? t("usage.overAllowance")
                   : t("usage.ofAllowance", { allowance: formatCost(allowance) })}
               </small>
-              {/* Deliberately not a checkout: paying is not wired up, and a button that looked
-              like it was would be worse than saying plainly that nothing is charged. */}
               <small className="usage-bar-note">{t("usage.notChargedShort")}</small>
             </div>
             <div className="usage-topup">
