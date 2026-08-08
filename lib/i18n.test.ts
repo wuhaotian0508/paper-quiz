@@ -50,7 +50,6 @@ it("keeps both dictionaries in step", () => {
     "nav.brand",
     "nav.switchToChinese",
     "nav.switchToEnglish",
-    "auth.usernamePlaceholder",
     "login.emailPlaceholder",
   ]);
 });

@@ -104,12 +104,11 @@ it("surfaces a rejected sign-in without navigating", async () => {
   expect(assign).not.toHaveBeenCalled();
 });
 
-it("registers with a username, an email, and a password", async () => {
+it("registers with an email and a password", async () => {
   const client = createClient();
   render(<LoginView client={client} returnTo="/review/review-123" />);
 
   fireEvent.click(screen.getByRole("tab", { name: "Register" }));
-  fireEvent.change(screen.getByLabelText("Username"), { target: { value: "study_bear" } });
   fireEvent.change(screen.getByLabelText("Email"), {
     target: { value: "student@example.com" },
   });
@@ -124,45 +123,27 @@ it("registers with a username, an email, and a password", async () => {
       password: "correct-horse-battery",
       options: {
         emailRedirectTo: "http://localhost:3000/auth/callback?returnTo=%2Freview%2Freview-123",
-        data: { username: "study_bear" },
       },
     }),
   );
 });
 
-it("rejects a taken username before creating the account", async () => {
-  const client = createClient();
-  client.rpc = vi.fn().mockResolvedValue({ data: false, error: null });
-  render(<LoginView client={client} />);
-
-  fireEvent.click(screen.getByRole("tab", { name: "Register" }));
-  fireEvent.change(screen.getByLabelText("Username"), { target: { value: "study_bear" } });
-  fireEvent.change(screen.getByLabelText("Email"), { target: { value: "a@example.com" } });
-  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "long-enough" } });
-  fireEvent.click(screen.getByRole("button", { name: "Create account" }));
-
-  await waitFor(() =>
-    expect(screen.getByRole("status")).toHaveTextContent("That username is already taken."),
-  );
-  expect(client.auth.signUp).not.toHaveBeenCalled();
-});
-
-it("rejects a username with unsupported characters", async () => {
+it("asks for no username on either tab, and checks none in the database", async () => {
   const client = createClient();
   render(<LoginView client={client} />);
 
+  expect(screen.queryByLabelText("Username")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("tab", { name: "Register" }));
-  fireEvent.change(screen.getByLabelText("Username"), { target: { value: "no spaces!" } });
-  fireEvent.change(screen.getByLabelText("Email"), { target: { value: "a@example.com" } });
-  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "long-enough" } });
+  expect(screen.queryByLabelText("Username")).not.toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText("Email"), { target: { value: "a@b.com" } });
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "pw1234" } });
   fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
-  await waitFor(() =>
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Usernames use 3-32 lowercase letters, numbers, or underscores.",
-    ),
-  );
-  expect(client.auth.signUp).not.toHaveBeenCalled();
+  // `paper_quiz_username_available` and the profile table it guarded were never applied,
+  // so the check always passed and the name was never stored.
+  await waitFor(() => expect(client.auth.signUp).toHaveBeenCalled());
+  expect(client.rpc).not.toHaveBeenCalled();
 });
 
 it("can send a magic link back to the shared artifact", async () => {

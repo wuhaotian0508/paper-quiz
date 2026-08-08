@@ -3,7 +3,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { AuthClient } from "@/components/auth-menu";
-import { normalizeUsername, usernameError } from "@/lib/auth-username";
 import { useLocale } from "@/hooks/use-locale";
 
 type LoginViewProps = {
@@ -28,7 +27,6 @@ export function LoginView({
   const [authClient, setAuthClient] = useState<AuthClient | null>(client ?? null);
   const [configurationError, setConfigurationError] = useState(unavailableReason ?? "");
   const [mode, setMode] = useState<AuthMode>("login");
-  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("password");
@@ -108,12 +106,6 @@ export function LoginView({
     event.preventDefault();
     if (!authClient) return;
 
-    const invalid = usernameError(username);
-    if (invalid) {
-      setMessage(t(invalid));
-      return;
-    }
-    const name = normalizeUsername(username);
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
       setMessage(t("auth.enterEmailAndPassword"));
@@ -122,21 +114,14 @@ export function LoginView({
 
     setIsSubmitting(true);
     setMessage("");
-    // Checked up front so the common collision produces a clear message rather than a
-    // unique-constraint failure from the trigger that creates the profile row.
-    const availability = await authClient.rpc?.("paper_quiz_username_available", {
-      p_username: name,
-    });
-    if (availability?.data === false) {
-      setIsSubmitting(false);
-      setMessage(t("auth.usernameTaken"));
-      return;
-    }
-
+    // An account is an email and a password. Registration used to also take a username,
+    // checked and stored through a `paper_quiz_profiles` table and two functions that were
+    // never applied to the database: the duplicate check silently passed and the name was
+    // never saved, so the field asked for something the account never carried.
     const { error } = await authClient.auth.signUp({
       email: trimmedEmail,
       password,
-      options: { emailRedirectTo: authRedirectUrl(returnTo), data: { username: name } },
+      options: { emailRedirectTo: authRedirectUrl(returnTo) },
     });
     setIsSubmitting(false);
     setMessage(error ? error.message : t("auth.accountCreated"));
@@ -236,39 +221,18 @@ export function LoginView({
                   : sendMagicLink(event))
             }
           >
-            {/* Only registration asks for a username; sign-in is by email. */}
-            {registering ? (
-              <>
-                <label htmlFor="login-username">{t("auth.username")}</label>
-                <input
-                  id="login-username"
-                  type="text"
-                  value={username}
-                  onChange={(event) => setUsername(event.target.value)}
-                  autoComplete="username"
-                  placeholder={t("auth.usernamePlaceholder")}
-                  required
-                />
-                <p className="login-field-note">{t("auth.usernameNote")}</p>
-              </>
-            ) : null}
-            {registering || loginMethod === "magic-link" || loginMethod === "password" ? (
-              <>
-                <label htmlFor="login-email">{t("login.email")}</label>
-                <input
-                  id="login-email"
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  autoComplete="email"
-                  placeholder={t("login.emailPlaceholder")}
-                  required
-                />
-                {registering ? (
-                  <p className="login-field-note">{t("auth.emailForRecovery")}</p>
-                ) : null}
-              </>
-            ) : null}
+            {/* An account is an email and a password, on both tabs. */}
+            <label htmlFor="login-email">{t("login.email")}</label>
+            <input
+              id="login-email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
+              placeholder={t("login.emailPlaceholder")}
+              required
+            />
+            {registering ? <p className="login-field-note">{t("auth.emailForRecovery")}</p> : null}
             {registering || loginMethod === "password" ? (
               <>
                 <label htmlFor="login-password">{t("auth.password")}</label>
