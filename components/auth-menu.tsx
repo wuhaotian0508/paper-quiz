@@ -14,6 +14,7 @@ import {
   USAGE_METER_UPDATED_EVENT,
   type UsageTotals,
 } from "@/lib/usage-meter";
+import { CREDIT_OPTIONS } from "@/lib/credit-options";
 
 type AuthSession = { user: { email?: string | null } } | null;
 type AuthResult = { error: { message: string } | null };
@@ -84,6 +85,25 @@ export function AuthMenu({
   const [usage, setUsage] = useState<UsageTotals>(EMPTY_USAGE);
   /** The account row is a usage bar by default; identity and sign-out sit behind Settings. */
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [checkoutStatus, setCheckoutStatus] = useState("");
+
+  /**
+   * Buying credit ahead of billing. Practice stays free and unlimited, so this is never a
+   * gate the learner has to pass - it is only offered inside Settings.
+   */
+  const startCheckout = async (option: string) => {
+    setCheckoutStatus(t("usage.openingCheckout"));
+    try {
+      const body = new FormData();
+      body.set("option", option);
+      const response = await fetch("/api/checkout", { method: "POST", body });
+      const data = (await response.json()) as { url?: string; error?: string };
+      if (!response.ok || !data.url) throw new Error(data.error || t("usage.checkoutFailed"));
+      window.location.assign(data.url);
+    } catch (cause) {
+      setCheckoutStatus(cause instanceof Error ? cause.message : t("usage.checkoutFailed"));
+    }
+  };
 
   useEffect(() => {
     const syncUsage = () => setUsage(readUsage(window.localStorage.getItem(USAGE_METER_KEY)));
@@ -282,6 +302,25 @@ export function AuthMenu({
               {/* Deliberately not a checkout: paying is not wired up, and a button that looked
               like it was would be worse than saying plainly that nothing is charged. */}
               <small className="usage-bar-note">{t("usage.notChargedShort")}</small>
+            </div>
+            <div className="usage-topup">
+              <small>{t("usage.addCredit")}</small>
+              <div className="usage-topup-options">
+                {CREDIT_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => void startCheckout(option.id)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              {checkoutStatus ? (
+                <small role="status" className="usage-topup-status">
+                  {checkoutStatus}
+                </small>
+              ) : null}
             </div>
             <span className="auth-settings-email" title={userEmail}>
               {userEmail}

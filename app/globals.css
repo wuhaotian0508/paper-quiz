@@ -3692,6 +3692,33 @@ h1 {
 .usage-bar-note {
   opacity: 0.75;
 }
+.usage-topup {
+  display: grid;
+  gap: 5px;
+  padding-top: 7px;
+  border-top: 1px solid var(--line);
+}
+.usage-topup-options {
+  display: flex;
+  gap: 6px;
+}
+.usage-topup-options button {
+  flex: 1 1 0;
+  padding: 5px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.usage-topup-options button:hover {
+  background: rgba(255, 231, 164, 0.4);
+}
+.usage-topup-status {
+  color: var(--coral-deep);
+}
 .sidebar-utilities {
   display: grid;
   gap: 8px;
