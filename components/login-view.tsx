@@ -75,30 +75,23 @@ export function LoginView({
     event.preventDefault();
     if (!authClient) return;
 
-    const name = normalizeUsername(username);
-    if (!name || !password) {
-      setMessage(t("auth.enterUsernameAndPassword"));
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setMessage(t("auth.enterEmailAndPassword"));
       return;
     }
 
     setIsSubmitting(true);
     setMessage("");
-    // The account is keyed by email in Supabase Auth, so resolve the username first.
-    // The function only answers once the password checks out, so a wrong password and
-    // an unknown username are indistinguishable from here.
-    const lookup = await authClient.rpc?.("paper_quiz_email_for_login", {
-      p_username: name,
-      p_password: password,
-    });
-    const resolvedEmail = typeof lookup?.data === "string" ? lookup.data : "";
-    if (lookup?.error || !resolvedEmail) {
-      setIsSubmitting(false);
-      setMessage(lookup?.error?.message || t("auth.usernameNotFound"));
-      return;
-    }
-
+    // Signs in against Supabase Auth directly, which is keyed by email.
+    //
+    // This used to take a username and resolve it to an email through a
+    // `paper_quiz_email_for_login` function. That function lives in a migration that was
+    // never applied, so every password login failed on a missing-function error while the
+    // form still asked for a username. Going straight to the email removes the dependency
+    // rather than leaving sign-in resting on schema that may not be deployed.
     const { error } = await authClient.auth.signInWithPassword({
-      email: resolvedEmail,
+      email: trimmedEmail,
       password,
     });
     setIsSubmitting(false);
@@ -243,7 +236,8 @@ export function LoginView({
                   : sendMagicLink(event))
             }
           >
-            {registering || loginMethod === "password" ? (
+            {/* Only registration asks for a username; sign-in is by email. */}
+            {registering ? (
               <>
                 <label htmlFor="login-username">{t("auth.username")}</label>
                 <input
@@ -255,10 +249,10 @@ export function LoginView({
                   placeholder={t("auth.usernamePlaceholder")}
                   required
                 />
-                {registering ? <p className="login-field-note">{t("auth.usernameNote")}</p> : null}
+                <p className="login-field-note">{t("auth.usernameNote")}</p>
               </>
             ) : null}
-            {registering || loginMethod === "magic-link" ? (
+            {registering || loginMethod === "magic-link" || loginMethod === "password" ? (
               <>
                 <label htmlFor="login-email">{t("login.email")}</label>
                 <input

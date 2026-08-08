@@ -45,53 +45,63 @@ it("renders a standalone sign-in form without workspace navigation", () => {
   expect(screen.queryByRole("link", { name: "Dashboard" })).not.toBeInTheDocument();
 });
 
-it("logs in with a username and password", async () => {
+it("logs in with an email and password", async () => {
   const client = createClient();
   const assign = vi.fn();
   render(<LoginView client={client} returnTo="/review/review-123" onAuthenticated={assign} />);
 
-  fireEvent.change(screen.getByLabelText("Username"), { target: { value: "Study_Bear" } });
+  fireEvent.change(screen.getByLabelText("Email"), { target: { value: "student@example.com" } });
   fireEvent.change(screen.getByLabelText("Password"), {
     target: { value: "correct-horse-battery" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Log in" }));
 
-  // The username is resolved to the account email before Supabase Auth sees it.
   await waitFor(() =>
-    expect(client.rpc).toHaveBeenCalledWith("paper_quiz_email_for_login", {
-      p_username: "study_bear",
-      p_password: "correct-horse-battery",
+    expect(client.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: "student@example.com",
+      password: "correct-horse-battery",
     }),
   );
-  expect(client.auth.signInWithPassword).toHaveBeenCalledWith({
-    email: "student@example.com",
-    password: "correct-horse-battery",
-  });
   expect(assign).toHaveBeenCalledWith("/review/review-123");
 });
 
-it("does not ask for an email on the password login tab", () => {
-  render(<LoginView client={createClient()} />);
-
-  expect(screen.getByLabelText("Username")).toBeInTheDocument();
-  expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
-});
-
-it("reports an unknown username or wrong password without naming which", async () => {
+it("signs in without the database function that password login used to need", async () => {
   const client = createClient();
-  client.rpc = vi.fn().mockResolvedValue({ data: null, error: null });
   render(<LoginView client={client} />);
 
-  fireEvent.change(screen.getByLabelText("Username"), { target: { value: "study_bear" } });
+  fireEvent.change(screen.getByLabelText("Email"), { target: { value: "student@example.com" } });
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "pw" } });
+  fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+
+  // Resolving a username through `paper_quiz_email_for_login` failed for every learner,
+  // because the migration defining it was never applied. Sign-in must not depend on it.
+  await waitFor(() => expect(client.auth.signInWithPassword).toHaveBeenCalled());
+  expect(client.rpc).not.toHaveBeenCalled();
+});
+
+it("asks for an email rather than a username on the password login tab", () => {
+  render(<LoginView client={createClient()} />);
+
+  expect(screen.getByLabelText("Email")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Username")).not.toBeInTheDocument();
+});
+
+it("surfaces a rejected sign-in without navigating", async () => {
+  const client = createClient();
+  client.auth.signInWithPassword = vi
+    .fn()
+    .mockResolvedValue({ error: { message: "Invalid login credentials" } });
+  const assign = vi.fn();
+  render(<LoginView client={client} onAuthenticated={assign} />);
+
+  fireEvent.change(screen.getByLabelText("Email"), { target: { value: "student@example.com" } });
   fireEvent.change(screen.getByLabelText("Password"), { target: { value: "wrong-password" } });
   fireEvent.click(screen.getByRole("button", { name: "Log in" }));
 
   await waitFor(() =>
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "No account matches that username and password.",
-    ),
+    expect(screen.getByRole("status")).toHaveTextContent("Invalid login credentials"),
   );
-  expect(client.auth.signInWithPassword).not.toHaveBeenCalled();
+  expect(assign).not.toHaveBeenCalled();
 });
 
 it("registers with a username, an email, and a password", async () => {
