@@ -89,8 +89,38 @@ it("shows the signed-in email from the initial browser session", async () => {
   });
   render(<AuthMenu client={client} />);
 
-  expect(await screen.findByText("student@example.com")).toBeInTheDocument();
+  // The account row is a Settings button now; identity and sign-out live behind it.
+  fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+
+  expect(screen.getByText("student@example.com")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+});
+
+it("shows the usage bar inside Settings, and charges nothing", async () => {
+  const client = createClient();
+  client.auth.getSession = vi.fn().mockResolvedValue({
+    data: { session: { user: { email: "student@example.com" } } },
+  });
+  window.localStorage.setItem(
+    "paper-quiz-usage-v1",
+    JSON.stringify({
+      version: 1,
+      calls: 3,
+      inputTokens: 500_000,
+      outputTokens: 0,
+      cost: 0.1,
+      updatedAt: "2026-08-07T12:00:00.000Z",
+    }),
+  );
+
+  render(<AuthMenu client={client} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+
+  expect(screen.getByText("$0.10")).toBeInTheDocument();
+  // Half of the $0.20 reference; the reference is a display anchor, not a cap.
+  expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "50");
+  expect(screen.getByText("Nothing is billed yet")).toBeInTheDocument();
+  window.localStorage.removeItem("paper-quiz-usage-v1");
 });
 
 it("redirects to the dedicated login page after signing out", async () => {
@@ -101,7 +131,8 @@ it("redirects to the dedicated login page after signing out", async () => {
   const onSignedOut = vi.fn();
   render(<AuthMenu client={client} onSignedOut={onSignedOut} />);
 
-  fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+  fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
   await waitFor(() => expect(client.auth.signOut).toHaveBeenCalled());
   expect(onSignedOut).toHaveBeenCalled();
@@ -113,8 +144,9 @@ it("shows sync status only after a user has signed in", async () => {
     data: { session: { user: { email: "student@example.com" } } },
   });
   render(<AuthMenu client={client} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
 
-  expect(await screen.findByText("Sync ready")).toBeInTheDocument();
+  expect(screen.getByText("Sync ready")).toBeInTheDocument();
   window.dispatchEvent(new CustomEvent("paper-quiz-sync-status", { detail: "synced" }));
   expect(await screen.findByText("Synced")).toBeInTheDocument();
 });

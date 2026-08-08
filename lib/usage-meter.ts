@@ -13,8 +13,8 @@ export const USAGE_METER_KEY = "paper-quiz-usage-v1";
 export const USAGE_METER_UPDATED_EVENT = "paper-quiz-usage-updated";
 
 /** Dollars per million tokens. Configurable because the deployed model sits behind a gateway. */
-const DEFAULT_INPUT_COST_PER_MTOK = 1.25;
-const DEFAULT_OUTPUT_COST_PER_MTOK = 10;
+const DEFAULT_INPUT_COST_PER_MTOK = 0.2;
+const DEFAULT_OUTPUT_COST_PER_MTOK = 1.2;
 
 export function usageRates(
   env: { inputPerMTok?: string; outputPerMTok?: string } = {
@@ -120,4 +120,27 @@ export function formatCost(cost: number): string {
   if (cost <= 0) return "$0.00";
   if (cost < 0.01) return `$${cost.toFixed(4)}`;
   return `$${cost.toFixed(2)}`;
+}
+
+/**
+ * The reference the usage bar fills against.
+ *
+ * There is no quota — usage is unlimited and unbilled — so this is a display reference, not
+ * a cap. It exists because a bar needs something to be a fraction of, and because naming a
+ * figure is what makes "you have used this much, and we are not charging for it" legible.
+ * Past the reference the bar stays full and the copy says so; nothing stops working.
+ */
+const DEFAULT_FREE_ALLOWANCE_USD = 0.2;
+
+export function freeAllowance(
+  env: { allowance?: string } = { allowance: process.env.NEXT_PUBLIC_FREE_ALLOWANCE_USD },
+): number {
+  const parsed = Number(env.allowance);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_FREE_ALLOWANCE_USD;
+}
+
+/** How full the bar is, 0 to 1. Caps at 1 so an over-run cannot overflow the track. */
+export function usageProgress(cost: number, allowance = freeAllowance()): number {
+  if (!(allowance > 0)) return 0;
+  return Math.max(0, Math.min(1, cost / allowance));
 }

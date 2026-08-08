@@ -4,6 +4,16 @@ import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useLocale } from "@/hooks/use-locale";
 import type { MessageKey } from "@/lib/i18n";
+import {
+  EMPTY_USAGE,
+  formatCost,
+  freeAllowance,
+  readUsage,
+  usageProgress,
+  USAGE_METER_KEY,
+  USAGE_METER_UPDATED_EVENT,
+  type UsageTotals,
+} from "@/lib/usage-meter";
 
 type AuthSession = { user: { email?: string | null } } | null;
 type AuthResult = { error: { message: string } | null };
@@ -71,6 +81,20 @@ export function AuthMenu({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [usage, setUsage] = useState<UsageTotals>(EMPTY_USAGE);
+  /** The account row is a usage bar by default; identity and sign-out sit behind Settings. */
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    const syncUsage = () => setUsage(readUsage(window.localStorage.getItem(USAGE_METER_KEY)));
+    syncUsage();
+    window.addEventListener(USAGE_METER_UPDATED_EVENT, syncUsage);
+    window.addEventListener("storage", syncUsage);
+    return () => {
+      window.removeEventListener(USAGE_METER_UPDATED_EVENT, syncUsage);
+      window.removeEventListener("storage", syncUsage);
+    };
+  }, []);
 
   useEffect(() => {
     function updateSyncStatus(event: Event) {
@@ -218,15 +242,58 @@ export function AuthMenu({
   }
 
   if (userEmail) {
+    const allowance = freeAllowance();
+    const overAllowance = usage.cost > allowance;
     return (
       <div className="auth-menu auth-menu-signed-in">
-        <span title={userEmail}>{userEmail}</span>
-        <span className={`auth-sync-status auth-sync-status-${syncStatus}`} role="status">
-          {t(syncStatusLabels[syncStatus])}
-        </span>
-        <button type="button" onClick={() => void signOut()} disabled={isSubmitting}>
-          {t("auth.signOut")}
+        <button
+          type="button"
+          className="auth-settings-toggle"
+          aria-expanded={settingsOpen}
+          onClick={() => setSettingsOpen((open) => !open)}
+        >
+          {t("auth.settings")}
         </button>
+        {settingsOpen ? (
+          <div className="auth-settings-panel">
+            <div className="usage-bar-block">
+              <div className="usage-bar-row">
+                <span>{t("usage.thisBrowser")}</span>
+                <strong>{formatCost(usage.cost)}</strong>
+              </div>
+              <div
+                className="usage-bar-track"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(usageProgress(usage.cost, allowance) * 100)}
+                aria-label={t("usage.barAria")}
+              >
+                <span
+                  className={`usage-bar-fill ${overAllowance ? "is-over" : ""}`}
+                  style={{ width: `${usageProgress(usage.cost, allowance) * 100}%` }}
+                />
+              </div>
+              <small>
+                {overAllowance
+                  ? t("usage.overAllowance")
+                  : t("usage.ofAllowance", { allowance: formatCost(allowance) })}
+              </small>
+              {/* Deliberately not a checkout: paying is not wired up, and a button that looked
+              like it was would be worse than saying plainly that nothing is charged. */}
+              <small className="usage-bar-note">{t("usage.notChargedShort")}</small>
+            </div>
+            <span className="auth-settings-email" title={userEmail}>
+              {userEmail}
+            </span>
+            <span className={`auth-sync-status auth-sync-status-${syncStatus}`} role="status">
+              {t(syncStatusLabels[syncStatus])}
+            </span>
+            <button type="button" onClick={() => void signOut()} disabled={isSubmitting}>
+              {t("auth.signOut")}
+            </button>
+          </div>
+        ) : null}
       </div>
     );
   }

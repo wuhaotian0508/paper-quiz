@@ -3621,32 +3621,76 @@ h1 {
   font-size: 11px;
   line-height: 1.45;
 }
-/* Accrued model cost, shown but never billed. */
-.sidebar-usage {
-  margin: 0 0 10px;
+/* Accrued model cost, shown inside Settings. Nothing is billed. */
+.auth-settings-toggle {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.auth-settings-toggle:hover {
+  background: rgba(255, 231, 164, 0.35);
+}
+.auth-settings-panel {
+  display: grid;
+  gap: 7px;
+  margin-top: 7px;
   padding: 9px 10px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface-soft);
 }
-.sidebar-usage-row {
+.auth-settings-email {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usage-bar-block {
+  display: grid;
+  gap: 4px;
+}
+.usage-bar-row {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  font-size: 11px;
   color: var(--muted);
+  font-size: 11px;
 }
-.sidebar-usage-row strong {
+.usage-bar-row strong {
   color: var(--ink);
   font-size: 13px;
 }
-.sidebar-usage small {
+.usage-bar-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(120, 120, 120, 0.22);
+}
+.usage-bar-fill {
   display: block;
-  margin-top: 3px;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--coral-deep);
+  transition: width 240ms ease;
+}
+.usage-bar-fill.is-over {
+  background: var(--muted);
+}
+.usage-bar-block small {
   color: var(--muted);
   font-size: 10px;
   line-height: 1.4;
+}
+.usage-bar-note {
+  opacity: 0.75;
 }
 .sidebar-utilities {
   display: grid;

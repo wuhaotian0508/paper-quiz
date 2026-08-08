@@ -6,7 +6,9 @@ import {
   formatCost,
   mergeUsage,
   readUsage,
+  usageProgress,
   usageRates,
+  freeAllowance,
 } from "@/lib/usage-meter";
 
 const rates = { input: 1.25, output: 10 };
@@ -20,8 +22,8 @@ describe("usage cost", () => {
 
   it("falls back to defaults when the configured rate is unusable", () => {
     expect(usageRates({ inputPerMTok: "abc", outputPerMTok: "-3" })).toEqual({
-      input: 1.25,
-      output: 10,
+      input: 0.2,
+      output: 1.2,
     });
     expect(usageRates({ inputPerMTok: "2", outputPerMTok: "0" })).toEqual({ input: 2, output: 0 });
   });
@@ -88,5 +90,31 @@ describe("formatting", () => {
     expect(formatCost(0.0031)).toBe("$0.0031");
     expect(formatCost(1.239)).toBe("$1.24");
     expect(formatCost(0)).toBe("$0.00");
+  });
+});
+
+describe("the usage bar", () => {
+  it("fills against the free allowance", () => {
+    expect(usageProgress(0, 0.2)).toBe(0);
+    expect(usageProgress(0.1, 0.2)).toBeCloseTo(0.5);
+    expect(usageProgress(0.2, 0.2)).toBe(1);
+  });
+
+  it("caps at full instead of overflowing the track", () => {
+    // The allowance is a display reference, not a cap: usage past it keeps working.
+    expect(usageProgress(5, 0.2)).toBe(1);
+    expect(usageProgress(-1, 0.2)).toBe(0);
+  });
+
+  it("falls back to a default allowance when the configured one is unusable", () => {
+    expect(freeAllowance({ allowance: "abc" })).toBe(0.2);
+    expect(freeAllowance({ allowance: "0" })).toBe(0.2);
+    expect(freeAllowance({ allowance: "1.5" })).toBe(1.5);
+  });
+
+  it("prices a call at the deployed gateway's rates", () => {
+    // $0.20 per million input, $1.20 per million output.
+    expect(costOf({ inputTokens: 1_000_000, outputTokens: 0 })).toBeCloseTo(0.2);
+    expect(costOf({ inputTokens: 0, outputTokens: 1_000_000 })).toBeCloseTo(1.2);
   });
 });
