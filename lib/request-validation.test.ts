@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  MAX_GENERATION_BRIEF_CHARS,
   parseChatHistory,
+  parseGenerationBrief,
   parseReviewMistakeContext,
   readBoundedText,
   validatePdfFile,
@@ -40,6 +42,19 @@ describe("request validation", () => {
   it("bounds form text", () => {
     expect(readBoundedText("  hello ", 10)).toBe("hello");
     expect(readBoundedText("x".repeat(11), 10)).toBeNull();
+  });
+
+  it("trims a generation brief and ignores anything that is not text", () => {
+    expect(parseGenerationBrief("  Focus on chapter 3.  ")).toBe("Focus on chapter 3.");
+    expect(parseGenerationBrief(null)).toBe("");
+    expect(parseGenerationBrief(undefined)).toBe("");
+    expect(parseGenerationBrief(42)).toBe("");
+  });
+
+  it("truncates an over-long brief instead of failing the generation", () => {
+    expect(parseGenerationBrief("a".repeat(MAX_GENERATION_BRIEF_CHARS + 200))).toHaveLength(
+      MAX_GENERATION_BRIEF_CHARS,
+    );
   });
 
   it("accepts only compact mistake context for a review", () => {

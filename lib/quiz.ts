@@ -71,6 +71,9 @@ export const QuestionConfigurationSchema = z.discriminatedUnion("type", [
     type: z.enum(["multiple_choice", "fill_blank", "short_answer"]),
     count: z.number().int().min(0).max(15),
   }),
+  // Custom types are no longer offered in the UI — a free-text brief covers the same
+  // ground for the whole quiz instead of per type. The variant stays so a browser still
+  // running the previous bundle, or a draft persisted under it, is not rejected outright.
   z.object({
     type: z.literal("custom"),
     count: z.number().int().min(1).max(15),

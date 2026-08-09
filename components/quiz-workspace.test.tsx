@@ -99,7 +99,7 @@ describe("QuizWorkspace", () => {
     expect(screen.getByRole("button", { name: /Generate quiz/i })).toBeDisabled();
     expect(screen.getByLabelText("Multiple-choice questions")).toHaveValue(5);
     expect(screen.getByLabelText("Fill-blank questions")).toHaveValue(0);
-    expect(screen.getByRole("button", { name: /Add custom question type/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Anything specific for this set/i)).toHaveValue("");
   });
 
   it("transcribes an audio upload before offering quiz generation", async () => {
@@ -725,6 +725,88 @@ describe("QuizWorkspace", () => {
       "lecture-1.pdf",
       "homework-1.pdf",
     ]);
+  });
+
+  it("sends the learner's brief with the quiz request, and omits it when blank", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          title: "Chapter 3 quiz",
+          summary: "Focused set.",
+          questions: [
+            {
+              id: "brief-q1",
+              type: "multiple_choice",
+              prompt: "A chapter 3 question?",
+              options: [
+                { id: "a", text: "A" },
+                { id: "b", text: "B" },
+                { id: "c", text: "C" },
+                { id: "d", text: "D" },
+              ],
+              correctOptionId: "a",
+              explanation: "A is correct.",
+              sourceNote: "lecture-1.pdf",
+            },
+          ],
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(<QuizWorkspace />);
+
+    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
+      target: { files: [new File(["%PDF-1.4"], "lecture-1.pdf", { type: "application/pdf" })] },
+    });
+    fireEvent.change(screen.getByLabelText(/Anything specific for this set/i), {
+      target: { value: "  Focus on chapter 3.  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Generate quiz/i }));
+
+    await screen.findByText("A chapter 3 question?");
+    // Trimmed on the way out, so a stray space is not sent as a brief.
+    expect((fetchMock.mock.calls[0][1].body as FormData).get("brief")).toBe(
+      "Focus on chapter 3.",
+    );
+  });
+
+  it("omits the brief field when the learner writes nothing", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          title: "Plain quiz",
+          summary: "No brief.",
+          questions: [
+            {
+              id: "plain-q1",
+              type: "multiple_choice",
+              prompt: "An unbriefed question?",
+              options: [
+                { id: "a", text: "A" },
+                { id: "b", text: "B" },
+                { id: "c", text: "C" },
+                { id: "d", text: "D" },
+              ],
+              correctOptionId: "a",
+              explanation: "A is correct.",
+              sourceNote: "lecture-1.pdf",
+            },
+          ],
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(<QuizWorkspace />);
+
+    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
+      target: { files: [new File(["%PDF-1.4"], "lecture-1.pdf", { type: "application/pdf" })] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Generate quiz/i }));
+
+    await screen.findByText("An unbriefed question?");
+    expect((fetchMock.mock.calls[0][1].body as FormData).get("brief")).toBeNull();
   });
 
   it("accepts files larger than the former 20 MB application limit", () => {

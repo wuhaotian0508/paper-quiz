@@ -7,6 +7,7 @@ import { collectResponse } from "@/lib/openai-stream";
 import {
   MAX_TRANSCRIPT_CHARS,
   MAX_QUESTION_CHARS,
+  parseGenerationBrief,
   parseReviewMistakeContext,
   readBoundedText,
   validatePdfFile,
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
       ? readBoundedText(questionContextValue, MAX_QUESTION_CHARS)
       : "";
     const locale = readLocale(form.get("locale") === null ? null : String(form.get("locale")));
+    const brief = parseGenerationBrief(form.get("brief"));
     const rawMistakes = form.get("mistakes");
     const parsedMistakes =
       rawMistakes === null
@@ -79,10 +81,10 @@ export async function POST(request: Request) {
       {
         type: "input_text" as const,
         text: transcript
-          ? `${buildExamReviewInstructions(locale)}\n\n<lecture_transcript>\n${transcript}\n</lecture_transcript>${mistakeContext}`
+          ? `${buildExamReviewInstructions(locale, brief)}\n\n<lecture_transcript>\n${transcript}\n</lecture_transcript>${mistakeContext}`
           : questionContext
-            ? `${buildExamReviewInstructions(locale)}\n\n<saved_quiz_questions>\n${questionContext}\n</saved_quiz_questions>${mistakeContext}`
-            : `${buildExamReviewInstructions(locale)}\n\nCreate the review from all attached PDF sources.${mistakeContext}`,
+            ? `${buildExamReviewInstructions(locale, brief)}\n\n<saved_quiz_questions>\n${questionContext}\n</saved_quiz_questions>${mistakeContext}`
+            : `${buildExamReviewInstructions(locale, brief)}\n\nCreate the review from all attached PDF sources.${mistakeContext}`,
       },
     ];
     const stream = await client.responses.create({

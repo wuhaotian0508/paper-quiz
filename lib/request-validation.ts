@@ -14,6 +14,25 @@ export const MAX_MEMORY_CHARS = 1_200;
 export const MAX_REVIEW_MISTAKES = 20;
 const MAX_REVIEW_MISTAKE_CHARS = 2_000;
 
+/**
+ * A free-text note the learner writes before generating a quiz or a review sheet: "focus
+ * on chapter 3", "keep the wording simple", "cover the case study, not the theory".
+ *
+ * Bounded well below the transcript limit because it is pasted straight into the prompt
+ * alongside the output contract, and a brief long enough to bury that contract would cost
+ * the quiz or sheet its shape.
+ */
+export const MAX_GENERATION_BRIEF_CHARS = 500;
+
+/**
+ * Truncates rather than rejecting: an over-long brief is a learner typing too much, not a
+ * malformed request, and losing the whole generation over it would be the wrong trade.
+ */
+export function parseGenerationBrief(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, MAX_GENERATION_BRIEF_CHARS);
+}
+
 const ChatMessageSchema = z
   .object({
     role: z.enum(["user", "assistant"]),

@@ -1,6 +1,7 @@
 "use client";
 
 import type { Difficulty } from "@/lib/quiz";
+import { MAX_GENERATION_BRIEF_CHARS } from "@/lib/request-validation";
 import { formatBytes, isAudio } from "@/lib/study-file";
 import type { StudySession } from "@/lib/study-history";
 import type { DailyReviewPaper } from "@/lib/daily-review";
@@ -8,8 +9,6 @@ import type { MistakeBookEntry } from "@/lib/mistake-book";
 import { DailyReviewPapers } from "@/components/daily-review-papers";
 import { useLocale } from "@/hooks/use-locale";
 import type { MessageKey } from "@/lib/i18n";
-
-export type CustomDraft = { key: string; label: string; instructions: string; count: number };
 
 export const fixedTypes = [
   ["multiple_choice", "upload.typeMultipleChoice"],
@@ -27,7 +26,7 @@ export function UploadView({
   files,
   error,
   counts,
-  custom,
+  brief,
   difficulty,
   loading,
   mistakeCount,
@@ -37,7 +36,7 @@ export function UploadView({
   papers,
   onAcceptFiles,
   onCountsChange,
-  onCustomChange,
+  onBriefChange,
   onDifficultyChange,
   onOpenMistakes,
   onOpenProgress,
@@ -49,7 +48,8 @@ export function UploadView({
   files: File[];
   error: string;
   counts: Record<string, number>;
-  custom: CustomDraft[];
+  /** The learner's free-text request for this run; "" when they wrote nothing. */
+  brief: string;
   difficulty: Difficulty;
   loading: boolean;
   mistakeCount: number;
@@ -60,7 +60,7 @@ export function UploadView({
   papers: DailyReviewPaper[];
   onAcceptFiles: (next?: FileList | File[]) => void;
   onCountsChange: (update: (previous: Record<string, number>) => Record<string, number>) => void;
-  onCustomChange: (update: (previous: CustomDraft[]) => CustomDraft[]) => void;
+  onBriefChange: (next: string) => void;
   onDifficultyChange: (next: Difficulty) => void;
   onOpenMistakes: () => void;
   onOpenProgress: () => void;
@@ -148,74 +148,21 @@ export function UploadView({
                 </label>
               ))}
             </div>
-            {custom.map((item) => (
-              <div className="custom-row" key={item.key}>
-                <input
-                  aria-label={t("upload.customTypeNameAria")}
-                  value={item.label}
-                  placeholder={t("upload.customTypeNamePlaceholder")}
-                  onChange={(event) =>
-                    onCustomChange((items) =>
-                      items.map((value) =>
-                        value.key === item.key ? { ...value, label: event.target.value } : value,
-                      ),
-                    )
-                  }
-                />
-                <input
-                  aria-label={t("upload.customRequirementsAria")}
-                  value={item.instructions}
-                  placeholder={t("upload.customRequirementsPlaceholder")}
-                  onChange={(event) =>
-                    onCustomChange((items) =>
-                      items.map((value) =>
-                        value.key === item.key
-                          ? { ...value, instructions: event.target.value }
-                          : value,
-                      ),
-                    )
-                  }
-                />
-                <input
-                  aria-label={t("upload.customCountAria")}
-                  min="1"
-                  max="15"
-                  type="number"
-                  value={item.count}
-                  onChange={(event) =>
-                    onCustomChange((items) =>
-                      items.map((value) =>
-                        value.key === item.key
-                          ? {
-                              ...value,
-                              count: Math.max(1, Math.min(15, Number(event.target.value) || 1)),
-                            }
-                          : value,
-                      ),
-                    )
-                  }
-                />
-                <button
-                  className="text-button"
-                  onClick={() =>
-                    onCustomChange((items) => items.filter((value) => value.key !== item.key))
-                  }
-                >
-                  {t("upload.remove")}
-                </button>
-              </div>
-            ))}
-            <button
-              className="text-button"
-              onClick={() =>
-                onCustomChange((items) => [
-                  ...items,
-                  { key: crypto.randomUUID(), label: "", instructions: "", count: 1 },
-                ])
-              }
-            >
-              {t("upload.addCustomType")}
-            </button>
+            <div className="quiz-brief">
+              <label htmlFor="quiz-brief">
+                {t("upload.briefLabel")}
+                <small>{t("upload.briefHint")}</small>
+              </label>
+              <textarea
+                id="quiz-brief"
+                aria-label={t("upload.briefLabel")}
+                maxLength={MAX_GENERATION_BRIEF_CHARS}
+                placeholder={t("upload.briefPlaceholder")}
+                rows={2}
+                value={brief}
+                onChange={(event) => onBriefChange(event.target.value)}
+              />
+            </div>
             <div className="segmented-control difficulty-control">
               {(Object.keys(difficultyCopy) as Difficulty[]).map((item) => (
                 <button

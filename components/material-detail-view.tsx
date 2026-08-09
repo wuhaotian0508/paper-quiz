@@ -10,6 +10,7 @@ import { hasSource } from "@/lib/study-history";
 import { ExamReviewSheetSchema, type ExamReviewSheet } from "@/lib/exam-review";
 import { ReviewSheetSections } from "@/components/review-sheet-sections";
 import { postForm } from "@/lib/api-client";
+import { MAX_GENERATION_BRIEF_CHARS } from "@/lib/request-validation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { createSharedReview } from "@/lib/shared-review-client";
 import { getSharedReviewUrl } from "@/lib/shared-review";
@@ -50,6 +51,8 @@ export function MaterialDetailView({
   const [examReviewSavedAt, setExamReviewSavedAt] = useState("");
   const [examReviewLoading, setExamReviewLoading] = useState(false);
   const [examReviewError, setExamReviewError] = useState("");
+  /** The learner's free-text request for this sheet; "" when they wrote nothing. */
+  const [reviewBrief, setReviewBrief] = useState("");
   const [reviewShareLoading, setReviewShareLoading] = useState(false);
   const [reviewShareStatus, setReviewShareStatus] = useState("");
   const [reviewShareUrl, setReviewShareUrl] = useState("");
@@ -167,6 +170,7 @@ export function MaterialDetailView({
         ),
       );
       form.set("locale", locale);
+      if (reviewBrief.trim()) form.set("brief", reviewBrief.trim());
       const response = await postForm("/api/generate-exam-review", form, {
         timeoutMessage: t("material.reviewTimeout"),
       });
@@ -405,6 +409,22 @@ export function MaterialDetailView({
           <div className="eyebrow">{t("material.knowledgeReviewEyebrow")}</div>
           <h2 id="knowledge-review-heading">{t("material.buildReviewSheet")}</h2>
           <p>{t("material.buildReviewSheetNote")}</p>
+        </div>
+        <div className="quiz-brief material-review-brief">
+          <label htmlFor="review-brief">
+            {t("material.reviewBriefLabel")}
+            <small>{t("upload.briefHint")}</small>
+          </label>
+          <textarea
+            id="review-brief"
+            aria-label={t("material.reviewBriefLabel")}
+            disabled={!hasReviewContext || examReviewLoading}
+            maxLength={MAX_GENERATION_BRIEF_CHARS}
+            placeholder={t("material.reviewBriefPlaceholder")}
+            rows={2}
+            value={reviewBrief}
+            onChange={(event) => setReviewBrief(event.target.value)}
+          />
         </div>
         <div className="material-review-builder-actions">
           <button

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeAnswer, parseSettings, parseQuestionConfiguration } from "./quiz";
+import { normalizeAnswer, parseQuestionConfiguration, parseSettings } from "./quiz";
 
 describe("parseSettings", () => {
   it("normalizes fill-blank answers for matching", () => {
@@ -20,6 +20,7 @@ describe("parseSettings", () => {
 });
 
 describe("parseQuestionConfiguration", () => {
+  // The UI no longer creates custom types, but a browser on the previous bundle still can.
   it("accepts fixed and custom question quantities", () => {
     expect(
       parseQuestionConfiguration(

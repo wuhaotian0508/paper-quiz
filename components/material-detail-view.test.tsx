@@ -202,6 +202,67 @@ describe("MaterialDetailView", () => {
     expect(String(form.get("questionContext"))).toContain("Evidence comes from");
   });
 
+  it("sends the learner's brief with the review request, and omits it when blank", async () => {
+    const reviewResponse = () =>
+      new Response(
+        JSON.stringify({
+          title: "Briefed review",
+          topics: Array.from({ length: 4 }, (_, index) => ({
+            topic: `Topic ${index + 1}`,
+            keyIdeas: ["A grounded point."],
+            formulaOrProcedure: "",
+            commonConfusion: "Do not confuse the concepts.",
+            sourceNote: "Saved quiz question",
+            relatedMistakeIds: [],
+            mistakeFocus: "",
+          })),
+        }),
+        { headers: { "content-type": "application/json" } },
+      );
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(reviewResponse())));
+
+    const material = {
+      id: "m1",
+      name: "Lecture.pdf",
+      questions: [
+        {
+          id: "q1" as const,
+          type: "fill_blank" as const,
+          prompt: "Evidence comes from ___.",
+          acceptedAnswers: ["sources"],
+          referenceAnswer: "sources",
+          explanation: "The PDF grounds the answer.",
+          sourceNote: "Page 1",
+        },
+      ],
+      mistakes: [],
+      sessions: [],
+      lastPracticedAt: "",
+    };
+
+    const { unmount } = render(
+      <MaterialDetailView material={material} onBack={vi.fn()} onPractice={vi.fn()} />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/Anything specific for this sheet/i), {
+      target: { value: "  Focus on the formulas.  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate knowledge-point review sheet" }));
+    expect(await screen.findByText("Briefed review")).toBeInTheDocument();
+    const briefed = (vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as FormData;
+    // Trimmed on the way out, so a stray space is not sent as a brief.
+    expect(briefed.get("brief")).toBe("Focus on the formulas.");
+
+    unmount();
+    vi.mocked(fetch).mockClear();
+    render(<MaterialDetailView material={material} onBack={vi.fn()} onPractice={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Generate knowledge-point review sheet" }));
+    expect(await screen.findByText("Briefed review")).toBeInTheDocument();
+    expect(
+      ((vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as FormData).get("brief"),
+    ).toBeNull();
+  });
+
   it("lets the learner attach the original PDF when saved question context has no page references", () => {
     render(
       <MaterialDetailView

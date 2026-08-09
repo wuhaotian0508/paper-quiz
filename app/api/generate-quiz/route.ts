@@ -13,7 +13,12 @@ import { getQuizGenerationOptions } from "@/lib/quiz-generation";
 import { parseQuizOutput } from "@/lib/quiz-output";
 import { buildQuizInstructions } from "@/lib/quiz-prompt";
 import { generateDistinctQuiz } from "@/lib/quiz-coverage";
-import { MAX_TRANSCRIPT_CHARS, readBoundedText, validatePdfFile } from "@/lib/request-validation";
+import {
+  MAX_TRANSCRIPT_CHARS,
+  parseGenerationBrief,
+  readBoundedText,
+  validatePdfFile,
+} from "@/lib/request-validation";
 import { buildSourceFileParts, MAX_SOURCE_FILES, uploadSourceFiles } from "@/lib/source-reference";
 import { del } from "@vercel/blob";
 import { readStudyFiles } from "@/lib/study-upload";
@@ -42,6 +47,7 @@ export async function POST(request: Request) {
     const questionConfigValue = String(form.get("questions") ?? "");
     const difficultyValue = String(form.get("difficulty") ?? "");
     const locale = readLocale(form.get("locale") === null ? null : String(form.get("locale")));
+    const brief = parseGenerationBrief(form.get("brief"));
 
     if (!files.length && !transcript) {
       return jsonError("Please upload a PDF or provide a lecture transcript.", 400);
@@ -91,8 +97,8 @@ export async function POST(request: Request) {
     let totalUsage: ResponseUsage | null = null;
     const generateOnce = async (correction?: string) => {
       const instructions = files.length
-        ? `${buildQuizInstructions({ ...settings, locale })}\n\nUse all selected PDFs as one study set. In every sourceNote, name the supporting source file and page or section when available. Selected files: ${sourceNames}.`
-        : `${buildQuizInstructions({ ...settings, locale })}\n\n<lecture_transcript>\n${transcript}\n</lecture_transcript>`;
+        ? `${buildQuizInstructions({ ...settings, locale, brief })}\n\nUse all selected PDFs as one study set. In every sourceNote, name the supporting source file and page or section when available. Selected files: ${sourceNames}.`
+        : `${buildQuizInstructions({ ...settings, locale, brief })}\n\n<lecture_transcript>\n${transcript}\n</lecture_transcript>`;
       const stream = await client.responses.create({
         ...generationOptions,
         input: [

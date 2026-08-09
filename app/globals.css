@@ -497,7 +497,7 @@ h1 {
   font-size: 10px;
 }
 .type-grid input,
-.custom-row input,
+.quiz-brief textarea,
 .written-answer,
 .chat-compose input {
   width: 100%;
@@ -509,17 +509,36 @@ h1 {
   outline: none;
 }
 .type-grid input:focus,
-.custom-row input:focus,
+.quiz-brief textarea:focus,
 .written-answer:focus,
 .chat-compose input:focus {
   border-color: var(--mint-deep);
   box-shadow: 0 0 0 3px rgba(167, 217, 193, 0.2);
 }
-.custom-row {
-  display: grid;
-  grid-template-columns: 1fr 1.6fr 58px auto;
-  gap: 7px;
-  margin: 8px 0;
+.quiz-brief {
+  margin: 14px 0 4px;
+}
+.material-review-brief {
+  margin: 0 0 14px;
+}
+.quiz-brief label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 7px;
+  font-weight: 700;
+  font-size: 12px;
+}
+.quiz-brief label small {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 11px;
+}
+.quiz-brief textarea {
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  resize: vertical;
 }
 .setting-heading {
   display: flex;
@@ -2101,9 +2120,6 @@ h1 {
   }
   .type-grid {
     grid-template-columns: 1fr;
-  }
-  .custom-row {
-    grid-template-columns: 1fr 1fr;
   }
   .chat-compose {
     flex-wrap: wrap;

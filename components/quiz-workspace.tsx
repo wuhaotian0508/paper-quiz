@@ -65,7 +65,7 @@ import { MaterialDetailView } from "@/components/material-detail-view";
 import { LoadingView } from "@/components/loading-view";
 import { ResultsView } from "@/components/results-view";
 import { TranscriptReviewView } from "@/components/transcript-review-view";
-import { UploadView, fixedTypes, type CustomDraft } from "@/components/upload-view";
+import { UploadView, fixedTypes } from "@/components/upload-view";
 import { QuizView, type ChatMessage } from "@/components/quiz-view";
 import { HelpCenter } from "@/components/help-center";
 import { ReviewSheetView } from "@/components/review-sheet-view";
@@ -113,7 +113,7 @@ export function QuizWorkspace() {
     fill_blank: 0,
     short_answer: 0,
   });
-  const [custom, setCustom] = useState<CustomDraft[]>([]);
+  const [brief, setBrief] = useState("");
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [index, setIndex] = useState(0);
   const [answer, setAnswer] = useState("");
@@ -357,19 +357,10 @@ export function QuizWorkspace() {
     });
   };
 
-  const config = (): QuestionConfiguration[] => [
-    ...fixedTypes
+  const config = (): QuestionConfiguration[] =>
+    fixedTypes
       .map(([type]) => ({ type, count: counts[type] || 0 }) as QuestionConfiguration)
-      .filter((item) => item.count > 0),
-    ...custom
-      .filter((item) => item.count > 0)
-      .map((item) => ({
-        type: "custom" as const,
-        count: item.count,
-        label: item.label.trim(),
-        instructions: item.instructions.trim(),
-      })),
-  ];
+      .filter((item) => item.count > 0);
 
   const generateQuiz = async () => {
     const questions = config();
@@ -377,8 +368,6 @@ export function QuizWorkspace() {
     if (!files.length && !transcript.trim()) return setError(t("error.chooseFileOrTranscript"));
     if (!questions.length || total < 1) return setError(t("error.chooseAtLeastOne"));
     if (total > 15) return setError(t("error.maxQuestions"));
-    if (questions.some((item) => item.type === "custom" && (!item.label || !item.instructions)))
-      return setError(t("error.customNeedsDetails"));
     setError("");
     setLoading(true);
     setView("generating");
@@ -390,6 +379,7 @@ export function QuizWorkspace() {
       form.set("difficulty", difficulty);
       form.set("count", String(total));
       form.set("locale", locale);
+      if (brief.trim()) form.set("brief", brief.trim());
       const response = await postForm("/api/generate-quiz", form, {
         timeoutMs: QUIZ_TIMEOUT_MS,
         timeoutMessage: t("error.quizTimeout"),
@@ -853,7 +843,7 @@ export function QuizWorkspace() {
         files={files}
         error={error}
         counts={counts}
-        custom={custom}
+        brief={brief}
         difficulty={difficulty}
         loading={loading}
         mistakeCount={mistakes.length}
@@ -863,7 +853,7 @@ export function QuizWorkspace() {
         papers={dailyPapers}
         onAcceptFiles={acceptFiles}
         onCountsChange={setCounts}
-        onCustomChange={setCustom}
+        onBriefChange={setBrief}
         onDifficultyChange={setDifficulty}
         onOpenMistakes={() => setView("mistakes")}
         onOpenProgress={() => setView("progress")}
