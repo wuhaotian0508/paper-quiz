@@ -3,6 +3,13 @@ import { z } from "zod";
 export const DifficultySchema = z.enum(["basic", "mixed", "challenging"]);
 export type Difficulty = z.infer<typeof DifficultySchema>;
 
+/**
+ * What every quiz is generated at now that the three-way picker is gone. The learner asks
+ * for harder or gentler questions in the brief instead, in their own words, which is what
+ * "Core review / Mixed practice / Challenge mode" was failing to communicate.
+ */
+export const DEFAULT_DIFFICULTY: Difficulty = "mixed";
+
 const OptionSchema = z.object({
   id: z.enum(["a", "b", "c", "d"]),
   text: z.string().min(1),

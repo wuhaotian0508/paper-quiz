@@ -107,7 +107,6 @@ export function QuizWorkspace() {
   /** Which uploaded file this practice belongs to, so questions and mistakes group per PDF. */
   const [material, setMaterial] = useState({ materialId: "", materialName: "" });
   const [openMaterialId, setOpenMaterialId] = useState<string | null>(null);
-  const [difficulty, setDifficulty] = useState<Difficulty>("mixed");
   const [counts, setCounts] = useState<Record<string, number>>({
     multiple_choice: 5,
     fill_blank: 0,
@@ -376,7 +375,6 @@ export function QuizWorkspace() {
       if (transcript.trim()) form.set("transcript", transcript.trim());
       else if (files.length) await attachStudyFiles(form, files);
       form.set("questions", JSON.stringify(questions));
-      form.set("difficulty", difficulty);
       form.set("count", String(total));
       form.set("locale", locale);
       if (brief.trim()) form.set("brief", brief.trim());
@@ -844,7 +842,6 @@ export function QuizWorkspace() {
         error={error}
         counts={counts}
         brief={brief}
-        difficulty={difficulty}
         loading={loading}
         mistakeCount={mistakes.length}
         sessionCount={sessions.length}
@@ -854,7 +851,6 @@ export function QuizWorkspace() {
         onAcceptFiles={acceptFiles}
         onCountsChange={setCounts}
         onBriefChange={setBrief}
-        onDifficultyChange={setDifficulty}
         onOpenMistakes={() => setView("mistakes")}
         onOpenProgress={() => setView("progress")}
         onOpenLibrary={() => setView("library")}

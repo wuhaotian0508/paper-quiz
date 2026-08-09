@@ -565,38 +565,6 @@ h1 {
   color: var(--muted);
   font-size: 11px;
 }
-.segmented-control {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 12px;
-  background: var(--paper-deep);
-}
-.segmented-control button {
-  flex: 1;
-  border: 0;
-  padding: 9px 7px;
-  border-radius: 9px;
-  color: var(--muted);
-  background: transparent;
-  cursor: pointer;
-  font-size: 11px;
-  transition:
-    background 0.2s,
-    color 0.2s,
-    box-shadow 0.2s;
-}
-.segmented-control button:hover {
-  color: var(--ink);
-}
-.segmented-control button.is-active {
-  color: var(--ink);
-  background: var(--white);
-  box-shadow: 0 3px 10px rgba(60, 58, 45, 0.08);
-}
-.difficulty-control button {
-  font-size: 10px;
-}
 .primary-button {
   border: 0;
   border-radius: 13px;
@@ -2162,9 +2130,6 @@ h1 {
   .setting-row {
     grid-template-columns: 1fr;
     gap: 14px;
-  }
-  .difficulty-control button {
-    font-size: 11px;
   }
   .type-grid {
     grid-template-columns: 1fr;

@@ -110,6 +110,28 @@ describe("POST /api/generate-quiz", () => {
     });
   });
 
+  it("accepts a request with no difficulty, which is what the picker's removal sends", async () => {
+    process.env.OPENAI_API_KEY = "";
+    const form = validForm();
+    form.delete("difficulty");
+
+    const response = await POST(requestWith(form));
+
+    // Reaching the configuration check means the settings parsed; a rejected difficulty
+    // would have returned 400 before this point.
+    expect(response.status).toBe(503);
+  });
+
+  it("still honours a difficulty sent by a browser on the previous bundle", async () => {
+    process.env.OPENAI_API_KEY = "test-key";
+    const form = validForm();
+    form.set("difficulty", "not-a-level");
+
+    const response = await POST(requestWith(form));
+
+    expect(response.status).toBe(400);
+  });
+
   it("accepts multiple PDFs as one combined quiz source before checking server configuration", async () => {
     process.env.OPENAI_API_KEY = "";
     const form = validForm();

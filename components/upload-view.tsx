@@ -1,6 +1,5 @@
 "use client";
 
-import type { Difficulty } from "@/lib/quiz";
 import { MAX_GENERATION_BRIEF_CHARS } from "@/lib/request-validation";
 import { formatBytes, isAudio } from "@/lib/study-file";
 import type { StudySession } from "@/lib/study-history";
@@ -16,18 +15,11 @@ export const fixedTypes = [
   ["short_answer", "upload.typeShortAnswer"],
 ] as const satisfies readonly (readonly [string, MessageKey])[];
 
-const difficultyCopy: Record<Difficulty, MessageKey> = {
-  basic: "upload.difficultyBasic",
-  mixed: "upload.difficultyMixed",
-  challenging: "upload.difficultyChallenging",
-};
-
 export function UploadView({
   files,
   error,
   counts,
   brief,
-  difficulty,
   loading,
   mistakeCount,
   sessionCount,
@@ -37,7 +29,6 @@ export function UploadView({
   onAcceptFiles,
   onCountsChange,
   onBriefChange,
-  onDifficultyChange,
   onOpenMistakes,
   onOpenProgress,
   onOpenLibrary,
@@ -50,7 +41,6 @@ export function UploadView({
   counts: Record<string, number>;
   /** The learner's free-text request for this run; "" when they wrote nothing. */
   brief: string;
-  difficulty: Difficulty;
   loading: boolean;
   mistakeCount: number;
   sessionCount: number;
@@ -61,7 +51,6 @@ export function UploadView({
   onAcceptFiles: (next?: FileList | File[]) => void;
   onCountsChange: (update: (previous: Record<string, number>) => Record<string, number>) => void;
   onBriefChange: (next: string) => void;
-  onDifficultyChange: (next: Difficulty) => void;
   onOpenMistakes: () => void;
   onOpenProgress: () => void;
   onOpenLibrary: () => void;
@@ -162,17 +151,6 @@ export function UploadView({
                 value={brief}
                 onChange={(event) => onBriefChange(event.target.value)}
               />
-            </div>
-            <div className="segmented-control difficulty-control">
-              {(Object.keys(difficultyCopy) as Difficulty[]).map((item) => (
-                <button
-                  key={item}
-                  className={difficulty === item ? "is-active" : ""}
-                  onClick={() => onDifficultyChange(item)}
-                >
-                  {t(difficultyCopy[item])}
-                </button>
-              ))}
             </div>
           </div>
           <button

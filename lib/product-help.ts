@@ -57,7 +57,8 @@ function buildProductMap(locale: Locale) {
   const label = (key: MessageKey) => `“${translate(locale, key)}”`;
   return `
 Verified navigation and buttons:
-- Dashboard: use ${label("upload.chooseFileAria")}, then configure ${label("upload.questionMix")}, select ${label("upload.difficultyBasic")}, ${label("upload.difficultyMixed")}, or ${label("upload.difficultyChallenging")}, and click ${label("upload.generateQuiz")} (or ${label("upload.transcribeRecording")} for one recording).
+- Dashboard: use ${label("upload.chooseFileAria")}, then configure ${label("upload.questionMix")}, and click ${label("upload.generateQuiz")} (or ${label("upload.transcribeRecording")} for one recording).
+- Asking for something specific: ${label("upload.briefLabel")} takes a free-text note before generating, such as which chapters to cover or how hard the questions should be. There is no difficulty picker; the brief is where that goes. The review-sheet builder has the same box, ${label("material.reviewBriefLabel")}.
 - Uploads: up to 5 PDFs at once, or a single lecture recording as MP3, M4A, WAV, WebM, or MP4. A recording is transcribed first and the transcript can be edited before questions are generated. Recordings must stay under 25MB, which is roughly 20-25 minutes; a longer lecture fails to upload, and the fix is to split it or trim it.
 - Question mix: up to 15 questions total across multiple choice, fill-blank, and short answer. A custom type takes its own label and instructions.
 - Daily review: the dashboard shows ${label("daily.heading")}, one paper per course scheduled by the forgetting curve. Click ${label("daily.start")} to sit one.

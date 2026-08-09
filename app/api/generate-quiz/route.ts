@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import {
+  DEFAULT_DIFFICULTY,
   DifficultySchema,
   parseQuestionConfiguration,
   parseSettings,
@@ -66,7 +67,12 @@ export async function POST(request: Request) {
     let settings: { difficulty: string; questions: ReturnType<typeof parseQuestionConfiguration> };
     try {
       if (questionConfigValue) {
-        const difficulty = DifficultySchema.parse(difficultyValue);
+        // The difficulty picker is gone from the UI, so the field arrives only from a
+        // browser still on the previous bundle. Absent means the default level, not a
+        // malformed request; a supplied value is still honoured and still validated.
+        const difficulty = difficultyValue
+          ? DifficultySchema.parse(difficultyValue)
+          : DEFAULT_DIFFICULTY;
         settings = { difficulty, questions: parseQuestionConfiguration(questionConfigValue) };
       } else {
         const legacy = parseSettings(countValue, difficultyValue);
