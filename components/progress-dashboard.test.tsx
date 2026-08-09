@@ -36,6 +36,28 @@ const dueIn = (days: number): ReviewState => {
   return { ...createReviewState(new Date()), dueAt: due.toISOString() };
 };
 
+it("explains the review ladder in the same intervals the scheduler uses", () => {
+  render(
+    <ProgressDashboard
+      sessions={[]}
+      mistakes={[]}
+      onBack={vi.fn()}
+      onOpen={vi.fn()}
+      onReview={vi.fn()}
+    />,
+  );
+
+  fireEvent.click(screen.getByText("How is this schedule decided?"));
+  // Read from REVIEW_INTERVAL_DAYS, so changing the ladder cannot leave the copy lying.
+  expect(screen.getByText(/1, 2, 4, 7, 15, 30 days/)).toBeInTheDocument();
+  expect(screen.getByText(/moves up a step/)).toBeInTheDocument();
+  expect(screen.getByText(/drops to the first step/)).toBeInTheDocument();
+  expect(screen.getByText(/Clear all 6 steps/)).toBeInTheDocument();
+  // The two calendar markers are what reviewers could not read; the legend names both.
+  expect(screen.getByText(/sets you finished that day/)).toBeInTheDocument();
+  expect(screen.getByText(/questions due that day/)).toBeInTheDocument();
+});
+
 it("offers to start today's review when questions are due", () => {
   const onReview = vi.fn();
   const due = [mistake("a", dueIn(0)), mistake("b", dueIn(-3))];
@@ -70,7 +92,8 @@ it("marks upcoming review dates on the calendar without offering to start them",
     />,
   );
 
-  expect(container.querySelectorAll(".calendar-due")).toHaveLength(1);
+  // Scoped to the grid: the explainer's legend reuses the same marker classes.
+  expect(container.querySelectorAll(".calendar-grid .calendar-due")).toHaveLength(1);
   expect(screen.queryByRole("button", { name: "Start review" })).not.toBeInTheDocument();
 });
 

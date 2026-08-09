@@ -410,6 +410,16 @@ export const zh: Messages = {
   "progress.thu": "四",
   "progress.fri": "五",
   "progress.sat": "六",
+  "progress.curveTitle": "这个复习计划是怎么排的？",
+  "progress.curveWhat":
+    "每做错一道题，它就进入复习阶梯，从你上次作答算起，分别在第 {days} 天回来找你。",
+  "progress.curveCorrect": "答对就往上走一级，下次间隔更长。",
+  "progress.curveWrong": "答错就退回第一级，明天再来一次。",
+  "progress.curveDone": "走完全部 {last} 级这道题就毕业，不再出现在复习里。",
+  "progress.curveLegendPractised": "当天完成的练习套数。",
+  "progress.curveLegendDue": "当天到期的题数，逾期未做的会累加到今天。",
+  "progress.curveWhy":
+    "间隔越拉越长，是因为刚学完时忘得最快。在快要忘掉之前复习一次才记得住，而且比反复重看省得多的时间。",
   "progress.dayPractice": "{date} 的练习",
   "progress.questionCount": "{count} 道题",
   "progress.dayEmpty": "这一天没有完成的练习记录。",

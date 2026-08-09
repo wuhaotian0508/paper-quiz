@@ -431,6 +431,18 @@ export const en = {
   "progress.thu": "Thu",
   "progress.fri": "Fri",
   "progress.sat": "Sat",
+  "progress.curveTitle": "How is this schedule decided?",
+  "progress.curveWhat":
+    "Every question you get wrong joins a review ladder. It comes back after {days} days, counting from the last time you answered it.",
+  "progress.curveCorrect": "Answer it right and it moves up a step, so the next gap is longer.",
+  "progress.curveWrong":
+    "Answer it wrong and it drops to the first step, so you see it again tomorrow.",
+  "progress.curveDone":
+    "Clear all {last} steps and the question retires: it stops appearing in your reviews.",
+  "progress.curveLegendPractised": "sets you finished that day.",
+  "progress.curveLegendDue": "questions due that day. Anything overdue is added to today.",
+  "progress.curveWhy":
+    "The gaps widen because memory fades fastest right after learning. Reviewing just before you would forget is what makes it stick, and it takes far less time than rereading.",
   "progress.dayPractice": "{date} practice",
   "progress.questionCount": "{count} questions",
   "progress.dayEmpty": "No completed practice recorded for this day.",

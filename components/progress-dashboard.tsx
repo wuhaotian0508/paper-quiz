@@ -3,7 +3,12 @@
 import { useMemo, useState } from "react";
 import { downloadProgressPdf } from "@/lib/pdf-export";
 import type { MistakeBookEntry } from "@/lib/mistake-book";
-import { dueEntries, forecastDueCounts, reviewDateKey } from "@/lib/review-schedule";
+import {
+  dueEntries,
+  forecastDueCounts,
+  REVIEW_INTERVAL_DAYS,
+  reviewDateKey,
+} from "@/lib/review-schedule";
 import {
   getSessionAccuracy,
   groupSessionsByDate,
@@ -156,6 +161,22 @@ export function ProgressDashboard({ sessions, mistakes, onBack, onOpen, onReview
               );
             })}
           </div>
+          {/* Reviewers could see the numbers but not what drove them; the ladder is read
+              from the schedule itself so the copy cannot drift from the behaviour. */}
+          <details className="curve-explainer">
+            <summary>{t("progress.curveTitle")}</summary>
+            <p>{t("progress.curveWhat", { days: REVIEW_INTERVAL_DAYS.join(", ") })}</p>
+            <ul>
+              <li>{t("progress.curveCorrect")}</li>
+              <li>{t("progress.curveWrong")}</li>
+              <li>{t("progress.curveDone", { last: REVIEW_INTERVAL_DAYS.length })}</li>
+            </ul>
+            <p className="curve-legend">
+              <span className="calendar-practised">1</span> {t("progress.curveLegendPractised")}
+              <span className="calendar-due">1</span> {t("progress.curveLegendDue")}
+            </p>
+            <p>{t("progress.curveWhy")}</p>
+          </details>
         </article>
       </div>
       <article className="progress-card daily-sessions">

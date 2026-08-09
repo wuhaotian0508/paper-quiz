@@ -1674,6 +1674,54 @@ h1 {
   background: var(--coral-deep);
   font-weight: 800;
 }
+.curve-explainer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.curve-explainer summary {
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+.curve-explainer > *:not(summary) {
+  margin-top: 8px;
+}
+.curve-explainer ul {
+  margin-left: 16px;
+  list-style: disc;
+}
+/* The legend repeats the calendar's two markers, which are otherwise only styled
+   inside a day cell. */
+.curve-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+/* Each marker is drawn the way the day cell draws it — plain green text for practised,
+   a coral pill for due — so the legend matches what it is explaining. */
+.curve-legend .calendar-practised {
+  color: var(--mint-deep);
+  font-weight: 800;
+  font-size: 12px;
+}
+.curve-legend .calendar-due {
+  display: inline-grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: var(--white);
+  background: var(--coral-deep);
+  font-weight: 800;
+  font-size: 11px;
+}
 .progress-due-banner {
   display: flex;
   align-items: center;
