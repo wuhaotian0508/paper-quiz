@@ -3746,6 +3746,15 @@ h1 {
 .sidebar-utility-link:hover {
   color: var(--coral-deep);
 }
+.sidebar-utility-primary {
+  color: var(--ink);
+}
+.sidebar-utility-hint {
+  margin: -4px 0 2px 30px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
 .sidebar-theme-toggle,
 .sidebar-locale-toggle {
   display: flex;
@@ -4162,6 +4171,10 @@ h1 {
   }
   .sidebar-utility-link {
     font-size: 11px;
+  }
+  /* The utilities collapse to one row here; a sentence of hint would break it. */
+  .sidebar-utility-hint {
+    display: none;
   }
   .sidebar-theme-toggle,
   .sidebar-locale-toggle {

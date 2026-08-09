@@ -46,10 +46,13 @@ it("keeps both dictionaries in step", () => {
     (key) => en[key as keyof typeof en] === zh[key as keyof typeof zh],
   );
   // Brand names and a couple of deliberate cross-language labels stay identical.
+  // "Chatbot" is one of them: it names the feature in both languages.
   expect(untranslated).toEqual([
     "nav.brand",
+    "nav.help",
     "nav.switchToChinese",
     "nav.switchToEnglish",
+    "help.launcher",
     "login.emailPlaceholder",
   ]);
 });

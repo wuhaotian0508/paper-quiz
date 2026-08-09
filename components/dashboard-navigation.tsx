@@ -405,9 +405,12 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
         )}
       </section>
       <div className="sidebar-utilities">
-        <a className="sidebar-utility-link" href="#help">
+        {/* The chatbot answers "how do I" faster than the form does, so it leads and the
+            feedback form stays for the things it cannot fix. */}
+        <a className="sidebar-utility-link sidebar-utility-primary" href="#help">
           <span aria-hidden="true">?</span> {t("nav.help")}
         </a>
+        <p className="sidebar-utility-hint">{t("nav.helpHint")}</p>
         <a className="sidebar-utility-link" href={createFeedbackHref()}>
           <span aria-hidden="true">@</span> {t("nav.feedback")}
         </a>

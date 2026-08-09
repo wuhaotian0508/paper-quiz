@@ -44,7 +44,7 @@ describe("Home", () => {
       "#mistake-book",
     );
     expect(screen.getByRole("link", { name: "Calendar" })).toHaveAttribute("href", "#progress");
-    expect(screen.getByRole("link", { name: "Help" })).toHaveAttribute("href", "#help");
+    expect(screen.getByRole("link", { name: "Chatbot" })).toHaveAttribute("href", "#help");
     const feedback = screen.getByRole("link", { name: "Feedback" });
     expect(feedback).toHaveAttribute(
       "href",

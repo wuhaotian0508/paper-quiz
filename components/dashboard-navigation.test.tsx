@@ -22,7 +22,8 @@ describe("DashboardNavigation", () => {
 
     const calendar = screen.getByRole("link", { name: "Calendar" });
     expect(calendar).toHaveAttribute("href", "#progress");
-    expect(screen.getByRole("link", { name: "Help" })).toHaveAttribute("href", "#help");
+    expect(screen.getByRole("link", { name: "Chatbot" })).toHaveAttribute("href", "#help");
+    expect(screen.getByText("Stuck on anything? Ask the chatbot first.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Feedback" })).toHaveAttribute(
       "href",
       "https://docs.google.com/forms/d/e/1FAIpQLSdgqSIBtVjXqOVEsb586N1_vdIAcYz-ce-54pfxERikOGudRQ/viewform",

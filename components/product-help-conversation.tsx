@@ -24,16 +24,22 @@ const suggestionKeys: MessageKey[] = [
   "help.suggestionExport",
 ];
 
+/**
+ * Mirrors the workspace's own hash routing, so the chatbot is told the screen the learner
+ * is actually looking at. The legacy hashes fold into `library` exactly as the workspace
+ * folds them, and an unknown hash falls back to the dashboard.
+ */
 function currentView() {
   const value = window.location.hash.replace("#", "");
   if (value === "progress") return "calendar";
+  if (["history", "review-sheets", "materials"].includes(value)) return "library";
   if (
     [
       "dashboard",
       "quiz-lab",
       "mistake-book",
       "calendar",
-      "history",
+      "library",
       "quiz",
       "results",
       "help",
