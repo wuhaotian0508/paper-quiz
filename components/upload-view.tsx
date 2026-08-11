@@ -1,7 +1,7 @@
 "use client";
 
 import { MAX_GENERATION_BRIEF_CHARS } from "@/lib/request-validation";
-import { formatBytes, isAudio } from "@/lib/study-file";
+import { formatBytes } from "@/lib/study-file";
 import type { StudySession } from "@/lib/study-history";
 import type { DailyReviewPaper } from "@/lib/daily-review";
 import type { MistakeBookEntry } from "@/lib/mistake-book";
@@ -34,6 +34,7 @@ export function UploadView({
   onOpenLibrary,
   onOpenSession,
   onSitPaper,
+  onPasteNotes,
   onStart,
 }: {
   files: File[];
@@ -56,10 +57,11 @@ export function UploadView({
   onOpenLibrary: () => void;
   onOpenSession: (session: StudySession) => void;
   onSitPaper: (entries: MistakeBookEntry[]) => void;
+  /** Opens the paste-notes screen, for material that never existed as a PDF. */
+  onPasteNotes: () => void;
   onStart: () => void;
 }) {
   const { t } = useLocale();
-  const needsTranscription = Boolean(files.length === 1 && isAudio(files[0]));
   const isCombinedPdfSet = files.length > 1;
   const studyDayCount = new Set(
     sessions.map((session) => new Date(session.createdAt).toLocaleDateString()),
@@ -89,7 +91,7 @@ export function UploadView({
               aria-label={t("upload.chooseFileAria")}
               type="file"
               multiple
-              accept="application/pdf,.pdf,audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/webm,video/mp4,.mp3,.m4a,.wav,.webm,.mp4"
+              accept="application/pdf,.pdf"
               onChange={(event) => onAcceptFiles(event.target.files || undefined)}
             />
             <span className="upload-icon">{t("upload.uploadIcon")}</span>
@@ -111,6 +113,9 @@ export function UploadView({
               </>
             )}
           </label>
+          <button className="text-button paste-notes-button" type="button" onClick={onPasteNotes}>
+            {t("upload.pasteNotes")}
+          </button>
           {error && <div className="error-message">{error}</div>}
           <div className="settings-block">
             <div className="setting-heading">
@@ -158,11 +163,7 @@ export function UploadView({
             disabled={!files.length || loading}
             onClick={onStart}
           >
-            {needsTranscription
-              ? t("upload.transcribeRecording")
-              : isCombinedPdfSet
-                ? t("upload.generateCombined")
-                : t("upload.generateQuiz")}
+            {isCombinedPdfSet ? t("upload.generateCombined") : t("upload.generateQuiz")}
           </button>
           <p className="privacy-note">{t("upload.privacyNote")}</p>
         </div>

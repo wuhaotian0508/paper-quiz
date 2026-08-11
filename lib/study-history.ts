@@ -53,6 +53,20 @@ export function materialFromFile(file: File): { materialId: string; materialName
   return { materialId: file.name, materialName: file.name };
 }
 
+/**
+ * Pasted notes carry no file name, so their first line names the material — the same job a
+ * PDF's name does above. Without one every pasted set lands in the "no source recorded"
+ * bucket together, and the library cannot tell one lecture's notes from another's.
+ */
+export function materialFromNotes(
+  notes: string,
+  fallbackName: string,
+): { materialId: string; materialName: string } {
+  const firstLine = notes.trim().split("\n", 1)[0].trim();
+  const name = (firstLine || fallbackName).slice(0, 60);
+  return { materialId: name, materialName: name };
+}
+
 const readString = (value: unknown) => (typeof value === "string" ? value : "");
 
 /**

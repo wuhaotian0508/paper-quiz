@@ -48,11 +48,11 @@ it("keeps the question and shows a retryable error after an API failure", async 
   vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network unavailable"));
   render(<ProductHelpConversation />);
 
-  fireEvent.click(screen.getByRole("button", { name: "How do I upload a lecture?" }));
+  fireEvent.click(screen.getByRole("button", { name: "How do I upload study material?" }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent("Network unavailable");
   expect(
-    screen.getByText("How do I upload a lecture?", { selector: ".product-help-message.user" }),
+    screen.getByText("How do I upload study material?", { selector: ".product-help-message.user" }),
   ).toBeInTheDocument();
 });
 
@@ -62,7 +62,7 @@ it("shows the server error returned by the chatbot API", async () => {
   );
   render(<ProductHelpConversation />);
 
-  fireEvent.click(screen.getByRole("button", { name: "How do I upload a lecture?" }));
+  fireEvent.click(screen.getByRole("button", { name: "How do I upload study material?" }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent("The help service is not configured.");
 });

@@ -25,6 +25,8 @@ export const en = {
   "nav.folderNameAria": "Course name",
   "nav.deleteFolder": "Delete",
   "nav.deleteFolderAria": "Delete the {name} course and leave its files unassigned",
+  "storage.full":
+    "This browser's storage is full, so new quizzes and mistakes are no longer being saved. Sign in to sync, or clear space in your browser settings.",
   "usage.aria": "AI usage this browser",
   "usage.thisBrowser": "Used this browser",
   "usage.barAria": "Share of the free allowance used",
@@ -53,24 +55,25 @@ export const en = {
   "upload.typeShortAnswer": "Short-answer questions",
   "upload.eyebrow": "Quiz lab",
   "upload.heading": "Start a new practice set.",
-  "upload.subheading": "Upload one or more PDFs, or a lecture recording, then configure your quiz.",
-  "upload.chooseFileAria": "Choose a PDF or lecture recording",
+  "upload.subheading": "Upload one or more PDFs, then configure your quiz.",
+  "upload.chooseFileAria": "Choose PDFs",
   "upload.uploadIcon": "Upload",
   "upload.pdfsReady": "{count} PDFs ready to generate together",
   "upload.readyToGenerate": "{size} - Ready to generate",
-  "upload.dropHere": "Drop in a PDF or lecture recording",
-  "upload.acceptedFormats": "PDF, MP3, M4A, WAV, WebM, or MP4",
+  "upload.dropHere": "Drop in one or more PDFs",
+  "upload.acceptedFormats": "PDF",
+  "upload.pasteNotes": "No PDF? Paste your lecture notes instead",
   "upload.questionMix": "Question mix",
-  "upload.generationLanguageNote": "Questions, answers, and explanations are generated in English.",
+  "upload.generationLanguageNote":
+    "Questions, answers, and explanations default to English. An explicit language request below takes priority.",
   "upload.briefLabel": "Anything specific for this set?",
   "upload.briefHint": "Optional",
   "upload.briefPlaceholder":
     "e.g. focus on chapters 3-4, use the case study, keep the wording plain",
-  "upload.transcribeRecording": "Transcribe recording",
   "upload.generateCombined": "Generate combined quiz",
   "upload.generateQuiz": "Generate quiz",
   "upload.privacyNote":
-    "Large files pass through a temporary Vercel Blob and are deleted after processing. Your lecture is sent to OpenAI to build the quiz; PDFs may stay there for up to 7 days so grading and follow-up questions can reference them. Answers stay in this browser.",
+    "Large files pass through a temporary Vercel Blob and are deleted after processing. Your study material is sent to OpenAI to build the quiz; PDFs may stay there for up to 7 days so grading and follow-up questions can reference them. Answers stay in this browser.",
   "upload.shortcutsAria": "Study shortcuts",
   "upload.questionsToRevisit": "{count} questions to revisit",
   "upload.recordedStudyDays": "{count} recorded study days",
@@ -87,16 +90,11 @@ export const en = {
   "upload.viewLearningCalendar": "View learning calendar",
 
   // Workspace errors and share status
-  "error.chooseStudyFile": "Choose a PDF, MP3, M4A, WAV, WebM, or MP4 study file.",
-  "error.chooseFileOrTranscript": "Choose a study file or review a transcript first.",
+  "error.chooseStudyFile": "Choose one or more PDF study files.",
   "error.chooseAtLeastOne": "Choose at least one question.",
   "error.maxQuestions": "Choose 15 questions or fewer.",
-  "error.quizTimeout":
-    "Quiz generation ran past the 100 second limit. Try fewer questions or a shorter lecture.",
+  "error.quizTimeout": "Quiz generation ran past the 100 second limit. Try fewer questions.",
   "error.quizFailed": "Quiz generation failed.",
-  "error.transcribeTimeout":
-    "Transcription ran past the 60 second limit. Try a shorter or smaller recording.",
-  "error.transcribeFailed": "Audio transcription failed.",
   "error.reuploadForGrading":
     "Upload the same study file again before grading this written question.",
   "error.gradeTimeout": "Grading ran past the 60 second limit. Please try again.",
@@ -177,6 +175,8 @@ export const en = {
   "review.pageLabel": "Page {page}",
   "review.slideAlt": "Source slide, page {page}, for {heading}",
   "review.enlargeSlideAria": "Enlarge source slide, page {page}, for {heading}",
+  "review.showSlide": "Show source page {page}",
+  "review.hideSlide": "Hide source page {page}",
 
   // Results
   "results.eyebrow": "Practice complete",
@@ -192,7 +192,7 @@ export const en = {
   "results.shareExpiry":
     "Expires in 7 days. Questions only; the source PDF and answer key stay private.",
   "results.openMistakeBook": "Open mistake book ({count})",
-  "results.uploadAnother": "Upload another lecture",
+  "results.uploadAnother": "Upload another PDF",
 
   // Mistake book
   "mistakes.filterAll": "All",
@@ -256,7 +256,8 @@ export const en = {
     "The original PDF source has expired, so this review will use the saved questions from this PDF plus its mistakes.",
   "material.attachPdf": "Attach original PDF",
   "material.attachPdfAria": "Attach original PDF for source pages",
-  "material.noReviewContext": "Generate a quiz from this PDF first to create its review sheet.",
+  "material.noReviewContext":
+    "Attach the original PDF to create its review sheet, or generate a quiz from it first.",
   "material.attachChooseOriginal": "Please choose the original PDF file.",
   "material.attachPreparing": "Preparing PDF page previews. Generate the review again when ready.",
   "material.attachReadyWithTranscript":
@@ -280,12 +281,14 @@ export const en = {
   "material.openQuiz": "Open quiz",
   "material.noSessions": "No generated quiz is saved for this PDF yet.",
   "material.reviewTimeout":
-    "Exam review generation ran past the 60 second limit. Please try again.",
+    "Exam review generation ran past the 100 second limit. Please try again.",
   "material.reviewFailed": "Exam review generation failed.",
   "material.reviewAria": "{name} exam review",
   "material.reviewBriefLabel": "Anything specific for this sheet?",
   "material.reviewBriefPlaceholder":
-    "e.g. focus on the formulas, skip the history, I am revising for the final",
+    "e.g. focus on formulas, write the sheet in Chinese, make it harder",
+  "material.reviewBriefLanguageNote":
+    "The interface language is only the default. A clear language request here takes priority.",
   "material.reviewSheetNote": "Core concepts from this PDF, organized for fast review.",
   "material.savedInBrowser": "Saved in this browser · {date}",
   "material.exportReviewPdf": "Export exam review PDF",
@@ -404,8 +407,7 @@ export const en = {
   "materials.setOne": "{count} set",
   "materials.setOther": "{count} sets",
   "materials.open": "Open",
-  "materials.empty":
-    "Generate a quiz from a PDF or recording and it will show up here, grouped by file.",
+  "materials.empty": "Generate a quiz from a PDF and it will show up here, grouped by file.",
   "materials.back": "Back to upload",
 
   // Progress / calendar
@@ -460,8 +462,6 @@ export const en = {
   "readOnly.next": "Next",
 
   // Loading
-  "loading.transcribingEyebrow": "Transcribing your lecture",
-  "loading.transcribingHeading": "Turning spoken ideas into review material.",
   "loading.generatingEyebrow": "Preparing your personal quiz",
   "loading.generatingHeading": "Writing your focused practice set.",
   "loading.elapsed": "{elapsed}s elapsed",
@@ -470,11 +470,13 @@ export const en = {
   "loading.underLimit": " - most requests finish well under {limit}s.",
 
   // Transcript review
-  "transcript.eyebrow": "Transcript review",
+  "transcript.eyebrow": "Notes review",
   "transcript.heading": "Check the lecture notes before building your quiz.",
-  "transcript.label": "Lecture transcript",
+  "transcript.hint":
+    "Paste notes, a transcript, or anything you typed up yourself. Questions come only from what is here.",
+  "transcript.label": "Lecture notes",
   "transcript.chooseAnother": "Choose another study file",
-  "transcript.generate": "Generate quiz from transcript",
+  "transcript.generate": "Generate quiz from these notes",
 
   // Help center and product help chat
   "help.eyebrow": "PaperQuiz chatbot",
@@ -487,7 +489,7 @@ export const en = {
   "help.widgetTitle": "PaperQuiz chatbot",
   "help.widgetSubtitle": "Stuck on anything? Ask here first",
   "help.closeAria": "Close help",
-  "help.suggestionUpload": "How do I upload a lecture?",
+  "help.suggestionUpload": "How do I upload study material?",
   "help.suggestionTypes": "How do I choose question types?",
   "help.suggestionMistakes": "Where is my mistake book?",
   "help.suggestionExport": "How do I export a PDF?",
@@ -560,7 +562,7 @@ export const en = {
   "login.quoteAuthor": "— UCB Student",
   "login.featuresAria": "Product benefits",
   "login.featureUploadLead": "Upload",
-  "login.featureUpload": "PDFs, slides, or recordings",
+  "login.featureUpload": "PDFs and slides",
   "login.featureGenerateLead": "Generate",
   "login.featureGenerate": "focused practice quizzes",
   "login.featureImproveLead": "Improve",
@@ -590,6 +592,9 @@ export const en = {
   "shared.selfReview": "Self review",
   "shared.reviewThis": "Review this",
   "shared.referenceAnswer": "Reference answer: {answer}",
+  "shared.correctAnswer": "Correct answer: {answer}",
+  "shared.yourAnswer": "Your answer: {answer}",
+  "shared.noAnswerGiven": "left blank",
   "shared.loadingReview": "Loading review...",
   "shared.reviewUnavailable": "This review is unavailable.",
   "shared.reviewEyebrow": "Paper Plane Quiz review",

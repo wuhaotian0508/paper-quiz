@@ -46,6 +46,7 @@ const baseProps = {
   onOpenProgress: vi.fn(),
   onOpenLibrary: vi.fn(),
   onOpenSession: vi.fn(),
+  onPasteNotes: vi.fn(),
   onStart: vi.fn(),
 };
 

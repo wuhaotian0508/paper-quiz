@@ -4,6 +4,7 @@ import {
   getSessionAccuracy,
   groupSessionsByDate,
   EMPTY_SOURCE,
+  materialFromNotes,
   readSessions,
   type StudySession,
 } from "./study-history";
@@ -60,5 +61,25 @@ describe("study history", () => {
     };
     expect(groupSessionsByDate([session])["2026-07-21"]).toHaveLength(1);
     expect(getSessionAccuracy(session)).toBe(50);
+  });
+});
+
+describe("materialFromNotes", () => {
+  it("names pasted notes after their first line, so two lectures do not merge", () => {
+    expect(materialFromNotes("Week 3 — Bayes rule\nP(A|B) = ...", "Lecture notes")).toEqual({
+      materialId: "Week 3 — Bayes rule",
+      materialName: "Week 3 — Bayes rule",
+    });
+  });
+
+  it("falls back to the supplied label when the notes open with blank lines", () => {
+    expect(materialFromNotes("\n\n   \n", "Lecture notes")).toEqual({
+      materialId: "Lecture notes",
+      materialName: "Lecture notes",
+    });
+  });
+
+  it("caps a runaway first line so it stays usable as a library entry", () => {
+    expect(materialFromNotes("x".repeat(200), "Lecture notes").materialName).toHaveLength(60);
   });
 });
