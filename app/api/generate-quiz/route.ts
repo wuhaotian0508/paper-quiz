@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import {
   DEFAULT_DIFFICULTY,
+  assertQuizMatchesQuestionConfiguration,
   DifficultySchema,
   parseQuestionConfiguration,
   parseSettings,
@@ -12,8 +13,9 @@ import { collectResponse, type ResponseUsage } from "@/lib/openai-stream";
 import { mergeUsage } from "@/lib/usage-meter";
 import { getQuizGenerationOptions } from "@/lib/quiz-generation";
 import { parseQuizOutput } from "@/lib/quiz-output";
-import { buildQuizInstructions } from "@/lib/quiz-prompt";
+import { buildQuizInstructions, buildQuizPreferencePrompt } from "@/lib/quiz-prompt";
 import { generateDistinctQuiz } from "@/lib/quiz-coverage";
+import { LearnerFacingError, learnerFacingMessage } from "@/lib/learner-error";
 import {
   MAX_TRANSCRIPT_CHARS,
   parseGenerationBrief,
@@ -102,20 +104,32 @@ export async function POST(request: Request) {
       : [];
     let totalUsage: ResponseUsage | null = null;
     const generateOnce = async (correction?: string) => {
-      const instructions = files.length
-        ? `${buildQuizInstructions({ ...settings, locale, brief })}\n\nUse all selected PDFs as one study set. In every sourceNote, name the supporting source file and page or section when available. Selected files: ${sourceNames}.`
-        : `${buildQuizInstructions({ ...settings, locale, brief })}\n\n<lecture_transcript>\n${transcript}\n</lecture_transcript>`;
+      const instructions = [
+        buildQuizInstructions({ ...settings, locale }),
+        files.length
+          ? `Use all selected PDFs as one study set. In every sourceNote, name the supporting source file and page or section when available. Selected files: ${sourceNames}.`
+          : "The lecture transcript in the user input is the sole study material.",
+      ].join("\n\n");
+      const inputText = [
+        // Keep the authoritative prompt in the user content as well as `instructions`.
+        // The configured OpenAI-compatible gateway has historically dropped the latter,
+        // leaving the model with only the PDF and learner brief and causing prose/invalid JSON.
+        instructions,
+        buildQuizPreferencePrompt(brief),
+        transcript ? `<lecture_transcript>\n${transcript}\n</lecture_transcript>` : "",
+        correction ?? "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
       const stream = await client.responses.create({
         ...generationOptions,
+        instructions,
         input: [
           {
             role: "user",
             content: [
               ...sourceParts,
-              {
-                type: "input_text" as const,
-                text: `${instructions}${correction ? `\n\n${correction}` : ""}`,
-              },
+              ...(inputText ? [{ type: "input_text" as const, text: inputText }] : []),
             ],
           },
         ],
@@ -125,17 +139,21 @@ export async function POST(request: Request) {
       // Accumulated across attempts: a repeated-question retry is billed twice.
       totalUsage = mergeUsage(totalUsage, usage);
       if (stoppedEarlyBecause === "max_output_tokens")
-        throw new Error(
+        throw new LearnerFacingError(
           "The quiz was cut off before it finished. Ask for fewer questions and try again.",
         );
-      if (stoppedEarlyBecause) throw new Error("Quiz generation stopped early. Please try again.");
-      if (!outputText) throw new Error("AI did not return a usable quiz. Please try again.");
-      return parseQuizOutput(
+      if (stoppedEarlyBecause)
+        throw new LearnerFacingError("Quiz generation stopped early. Please try again.");
+      if (!outputText)
+        throw new LearnerFacingError("AI did not return a usable quiz. Please try again.");
+      const quiz = parseQuizOutput(
         outputText,
         files.length
           ? files.map((file) => file.name).join(" + ")
           : translate(locale, "transcript.label"),
       );
+      assertQuizMatchesQuestionConfiguration(quiz, settings.questions);
+      return quiz;
     };
 
     const quiz = await generateDistinctQuiz(generateOnce);
@@ -150,7 +168,12 @@ export async function POST(request: Request) {
       "Quiz generation failed",
       error instanceof Error ? error.message : "unknown error",
     );
-    return jsonError("Quiz generation failed. Please try again later.", 502);
+    // A learner-facing message survives; anything else stays the generic sentence so a
+    // provider or parsing failure never leaks its internals into the response.
+    return jsonError(
+      learnerFacingMessage(error, "Quiz generation failed. Please try again later."),
+      502,
+    );
   } finally {
     await Promise.all(
       temporaryBlobUrls.map(async (url) => {

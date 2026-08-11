@@ -36,6 +36,7 @@ import {
   EMPTY_SOURCE,
   hasSource,
   materialFromFile,
+  materialFromNotes,
   readSessions,
   STUDY_HISTORY_KEY,
   type PersistedSource,
@@ -64,16 +65,16 @@ import { LibraryView } from "@/components/library-view";
 import { MaterialDetailView } from "@/components/material-detail-view";
 import { LoadingView } from "@/components/loading-view";
 import { ResultsView } from "@/components/results-view";
-import { TranscriptReviewView } from "@/components/transcript-review-view";
 import { UploadView, fixedTypes } from "@/components/upload-view";
+import { TranscriptReviewView } from "@/components/transcript-review-view";
 import { QuizView, type ChatMessage } from "@/components/quiz-view";
 import { HelpCenter } from "@/components/help-center";
 import { ReviewSheetView } from "@/components/review-sheet-view";
 import { safeStorageSet } from "@/lib/request-validation";
 import { addUsage, readUsage, USAGE_METER_KEY, USAGE_METER_UPDATED_EVENT } from "@/lib/usage-meter";
 import { postForm, QUIZ_TIMEOUT_MS } from "@/lib/api-client";
-import { isAudio, isPdf } from "@/lib/study-file";
-import { attachStudyFile, attachStudyFiles } from "@/lib/study-upload";
+import { isPdf } from "@/lib/study-file";
+import { attachStudyFiles } from "@/lib/study-upload";
 import { renderAndStorePdfPages } from "@/lib/source-pages";
 import { useStudySync } from "@/hooks/use-study-sync";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
@@ -83,8 +84,6 @@ import { useLocale } from "@/hooks/use-locale";
 
 type View =
   | "upload"
-  | "transcribing"
-  | "reviewing"
   | "generating"
   | "quiz"
   | "results"
@@ -94,7 +93,8 @@ type View =
   | "session-review"
   | "material-detail"
   | "help"
-  | "review-sheet";
+  | "review-sheet"
+  | "transcript";
 
 export function QuizWorkspace() {
   const { locale, t } = useLocale();
@@ -321,12 +321,7 @@ export function QuizWorkspace() {
   const acceptFiles = (next?: FileList | File[]) => {
     const selected = Array.from(next || []);
     if (!selected.length) return;
-    const hasRecording = selected.some(isAudio);
-    if (
-      selected.some((file) => !isPdf(file) && !isAudio(file)) ||
-      (hasRecording && (selected.length !== 1 || !isAudio(selected[0])))
-    )
-      return setError(t("error.chooseStudyFile"));
+    if (selected.some((file) => !isPdf(file))) return setError(t("error.chooseStudyFile"));
     setError("");
     const uploadedAt = new Date().toISOString();
     const nextLibrary: StudyLibraryRecord[] = selected.filter(isPdf).map((file) => {
@@ -364,7 +359,9 @@ export function QuizWorkspace() {
   const generateQuiz = async () => {
     const questions = config();
     const total = questions.reduce((sum, item) => sum + item.count, 0);
-    if (!files.length && !transcript.trim()) return setError(t("error.chooseFileOrTranscript"));
+    // Notes pasted by hand are a source in their own right, so a run needs one or the other.
+    const pastedNotes = files.length ? "" : transcript.trim();
+    if (!files.length && !pastedNotes) return setError(t("error.chooseStudyFile"));
     if (!questions.length || total < 1) return setError(t("error.chooseAtLeastOne"));
     if (total > 15) return setError(t("error.maxQuestions"));
     setError("");
@@ -372,8 +369,16 @@ export function QuizWorkspace() {
     setView("generating");
     try {
       const form = new FormData();
-      if (transcript.trim()) form.set("transcript", transcript.trim());
-      else if (files.length) await attachStudyFiles(form, files);
+      if (pastedNotes) {
+        form.set("transcript", pastedNotes);
+        setMaterial(materialFromNotes(pastedNotes, t("transcript.label")));
+        // `attachSource` prefers a provider file id over the transcript, so a stale id left
+        // by an earlier PDF would send grading and tutor chat to the wrong source entirely.
+        setSourceFileId(null);
+        setSourceFileIds([]);
+      } else {
+        await attachStudyFiles(form, files);
+      }
       form.set("questions", JSON.stringify(questions));
       form.set("count", String(total));
       form.set("locale", locale);
@@ -410,30 +415,11 @@ export function QuizWorkspace() {
       setView("quiz");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("error.quizFailed"));
-      setView("upload");
+      // Back where the source came from, so a failed run does not strand pasted notes on a
+      // screen that cannot show them.
+      setView(pastedNotes ? "transcript" : "upload");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const transcribe = async () => {
-    const file = files[0];
-    if (!file) return;
-    setView("transcribing");
-    try {
-      const form = new FormData();
-      await attachStudyFile(form, file);
-      const response = await postForm("/api/transcribe", form, {
-        timeoutMessage: t("error.transcribeTimeout"),
-      });
-      const data = (await response.json()) as { transcript?: string; error?: string };
-      if (!response.ok || !data.transcript)
-        throw new Error(data.error || t("error.transcribeFailed"));
-      setTranscript(data.transcript);
-      setView("reviewing");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("error.transcribeFailed"));
-      setView("upload");
     }
   };
 
@@ -708,16 +694,7 @@ export function QuizWorkspace() {
     return () => window.removeEventListener(STUDY_MATERIAL_OPEN_EVENT, handleMaterialOpen);
   }, [materials, openMaterial]);
 
-  if (view === "transcribing" || view === "generating") return <LoadingView mode={view} />;
-  if (view === "reviewing")
-    return (
-      <TranscriptReviewView
-        transcript={transcript}
-        onChange={setTranscript}
-        onBack={reset}
-        onGenerate={() => void generateQuiz()}
-      />
-    );
+  if (view === "generating") return <LoadingView mode="generating" />;
   if (view === "progress")
     return (
       <ProgressDashboard
@@ -734,6 +711,17 @@ export function QuizWorkspace() {
   if (view === "session-review" && reviewSession)
     return <ReadOnlyReview session={reviewSession} onBack={() => setView("progress")} />;
   if (view === "help") return <HelpCenter onBack={reset} />;
+  if (view === "transcript")
+    return (
+      <TranscriptReviewView
+        transcript={transcript}
+        error={error}
+        loading={loading}
+        onChange={setTranscript}
+        onBack={reset}
+        onGenerate={() => void generateQuiz()}
+      />
+    );
   if (view === "review-sheet")
     return (
       <ReviewSheetView
@@ -856,10 +844,14 @@ export function QuizWorkspace() {
         onOpenLibrary={() => setView("library")}
         onOpenSession={openSession}
         onSitPaper={practiceMistakes}
-        onStart={() => {
-          if (files.length === 1 && isAudio(files[0])) void transcribe();
-          else void generateQuiz();
+        onPasteNotes={() => {
+          setError("");
+          // The two sources are mutually exclusive — the route rejects a request carrying
+          // both — so choosing to paste drops any files already picked.
+          setFiles([]);
+          setView("transcript");
         }}
+        onStart={() => void generateQuiz()}
       />
     </>
   );

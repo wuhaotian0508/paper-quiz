@@ -91,39 +91,12 @@ describe("QuizWorkspace", () => {
 
     expect(screen.queryByRole("heading", { name: "Welcome back." })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Saved study data")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Choose a PDF or lecture recording")).toHaveAttribute(
-      "accept",
-      expect.stringContaining("audio/mpeg"),
-    );
-    expect(screen.getAllByText(/PDF or lecture recording/i)).not.toHaveLength(0);
+    expect(screen.getByLabelText("Choose PDFs")).toHaveAttribute("accept", "application/pdf,.pdf");
+    expect(screen.getAllByText(/PDF/i)).not.toHaveLength(0);
     expect(screen.getByRole("button", { name: /Generate quiz/i })).toBeDisabled();
     expect(screen.getByLabelText("Multiple-choice questions")).toHaveValue(5);
     expect(screen.getByLabelText("Fill-blank questions")).toHaveValue(0);
     expect(screen.getByLabelText(/Anything specific for this set/i)).toHaveValue("");
-  });
-
-  it("transcribes an audio upload before offering quiz generation", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ transcript: "A lecture transcript about RAG." }), {
-        headers: { "content-type": "application/json" },
-      }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-    render(<QuizWorkspace />);
-
-    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
-      target: { files: [new File(["audio"], "lecture.webm", { type: "audio/webm" })] },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /Transcribe recording/i }));
-
-    expect(await screen.findByLabelText("Lecture transcript")).toHaveValue(
-      "A lecture transcript about RAG.",
-    );
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/transcribe",
-      expect.objectContaining({ method: "POST" }),
-    );
-    expect(screen.getByRole("button", { name: /Generate quiz from transcript/i })).toBeEnabled();
   });
 
   it("offers separate student-copy and answer-key PDF exports after generating a quiz", async () => {
@@ -157,7 +130,7 @@ describe("QuizWorkspace", () => {
     );
     render(<QuizWorkspace />);
 
-    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
+    fireEvent.change(screen.getByLabelText("Choose PDFs"), {
       target: { files: [new File(["%PDF-1.4"], "lecture.pdf", { type: "application/pdf" })] },
     });
     fireEvent.click(screen.getByRole("button", { name: "Generate quiz" }));
@@ -170,7 +143,7 @@ describe("QuizWorkspace", () => {
 
   it("reports an actionable error when all question counts are zero", async () => {
     render(<QuizWorkspace />);
-    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
+    fireEvent.change(screen.getByLabelText("Choose PDFs"), {
       target: { files: [new File(["pdf"], "lecture.pdf", { type: "application/pdf" })] },
     });
     fireEvent.change(screen.getByLabelText("Multiple-choice questions"), {
@@ -212,7 +185,7 @@ describe("QuizWorkspace", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<QuizWorkspace />);
 
-    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
+    fireEvent.change(screen.getByLabelText("Choose PDFs"), {
       target: { files: [new File(["%PDF-1.4"], "lecture.pdf", { type: "application/pdf" })] },
     });
     fireEvent.change(screen.getByLabelText("Multiple-choice questions"), {
@@ -265,7 +238,7 @@ describe("QuizWorkspace", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<QuizWorkspace />);
 
-    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
+    fireEvent.change(screen.getByLabelText("Choose PDFs"), {
       target: { files: [new File(["%PDF-1.4"], "lecture.pdf", { type: "application/pdf" })] },
     });
     fireEvent.change(screen.getByLabelText("Multiple-choice questions"), {
@@ -340,7 +313,7 @@ describe("QuizWorkspace", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<QuizWorkspace />);
 
-    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
+    fireEvent.change(screen.getByLabelText("Choose PDFs"), {
       target: { files: [new File(["%PDF-1.4"], "lecture.pdf", { type: "application/pdf" })] },
     });
     fireEvent.change(screen.getByLabelText("Multiple-choice questions"), {
@@ -390,7 +363,7 @@ describe("QuizWorkspace", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<QuizWorkspace />);
 
-    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
+    fireEvent.change(screen.getByLabelText("Choose PDFs"), {
       target: {
         files: [
           new File(["%PDF-1.4"], "lecture-1.pdf", { type: "application/pdf" }),
@@ -449,7 +422,7 @@ describe("QuizWorkspace", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<QuizWorkspace />);
 
-    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
+    fireEvent.change(screen.getByLabelText("Choose PDFs"), {
       target: {
         files: [
           new File(["%PDF-1.4"], "lecture-1.pdf", { type: "application/pdf" }),
@@ -532,7 +505,7 @@ describe("QuizWorkspace", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     render(<QuizWorkspace />);
 
-    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
+    fireEvent.change(screen.getByLabelText("Choose PDFs"), {
       target: { files: [new File(["%PDF-1.4"], "lecture.pdf", { type: "application/pdf" })] },
     });
     fireEvent.click(screen.getByRole("button", { name: "Generate quiz" }));
@@ -636,7 +609,7 @@ describe("QuizWorkspace", () => {
     );
     render(<QuizWorkspace />);
 
-    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
+    fireEvent.change(screen.getByLabelText("Choose PDFs"), {
       target: {
         files: [new File(["%PDF-1.4"], "forces-lecture.pdf", { type: "application/pdf" })],
       },
@@ -648,7 +621,7 @@ describe("QuizWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: /Friction/ }));
     fireEvent.click(screen.getByRole("button", { name: "Submit answer" }));
     fireEvent.click(await screen.findByRole("button", { name: "View results" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Upload another lecture" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Upload another PDF" }));
 
     fireEvent.click(await screen.findByRole("button", { name: /Library/ }));
     expect(await screen.findByText("forces-lecture.pdf")).toBeInTheDocument();
@@ -667,7 +640,7 @@ describe("QuizWorkspace", () => {
 
   it("accepts a dropped study file", () => {
     render(<QuizWorkspace />);
-    const zone = screen.getByText(/Drop in a PDF or lecture recording/i).closest("label");
+    const zone = screen.getByText(/Drop in one or more PDFs/i).closest("label");
     expect(zone).not.toBeNull();
     fireEvent.drop(zone!, {
       dataTransfer: { files: [new File(["pdf"], "lecture.pdf", { type: "application/pdf" })] },
@@ -704,7 +677,7 @@ describe("QuizWorkspace", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<QuizWorkspace />);
 
-    const picker = screen.getByLabelText("Choose a PDF or lecture recording");
+    const picker = screen.getByLabelText("Choose PDFs");
     fireEvent.change(picker, {
       target: {
         files: [
@@ -756,7 +729,7 @@ describe("QuizWorkspace", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<QuizWorkspace />);
 
-    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
+    fireEvent.change(screen.getByLabelText("Choose PDFs"), {
       target: { files: [new File(["%PDF-1.4"], "lecture-1.pdf", { type: "application/pdf" })] },
     });
     fireEvent.change(screen.getByLabelText(/Anything specific for this set/i), {
@@ -766,9 +739,7 @@ describe("QuizWorkspace", () => {
 
     await screen.findByText("A chapter 3 question?");
     // Trimmed on the way out, so a stray space is not sent as a brief.
-    expect((fetchMock.mock.calls[0][1].body as FormData).get("brief")).toBe(
-      "Focus on chapter 3.",
-    );
+    expect((fetchMock.mock.calls[0][1].body as FormData).get("brief")).toBe("Focus on chapter 3.");
   });
 
   it("omits the brief field when the learner writes nothing", async () => {
@@ -800,7 +771,7 @@ describe("QuizWorkspace", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<QuizWorkspace />);
 
-    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
+    fireEvent.change(screen.getByLabelText("Choose PDFs"), {
       target: { files: [new File(["%PDF-1.4"], "lecture-1.pdf", { type: "application/pdf" })] },
     });
     fireEvent.click(screen.getByRole("button", { name: /Generate quiz/i }));
@@ -814,11 +785,52 @@ describe("QuizWorkspace", () => {
     const largePdf = new File([new Uint8Array(20 * 1024 * 1024 + 1)], "large.pdf", {
       type: "application/pdf",
     });
-    fireEvent.change(screen.getByLabelText("Choose a PDF or lecture recording"), {
+    fireEvent.change(screen.getByLabelText("Choose PDFs"), {
       target: { files: [largePdf] },
     });
 
     expect(screen.getByText("large.pdf")).toBeInTheDocument();
     expect(screen.queryByText(/20 MB or smaller/i)).not.toBeInTheDocument();
+  });
+
+  it("builds a quiz from pasted notes when the learner has no PDF", async () => {
+    const quiz = {
+      title: "Bayes review",
+      summary: "Practice the chapter.",
+      questions: [
+        {
+          id: "q1",
+          type: "short_answer",
+          prompt: "State Bayes rule.",
+          explanation: "It relates the conditionals.",
+          sourceNote: "Pasted notes",
+          referenceAnswer: "P(A|B) = P(B|A)P(A)/P(B)",
+          gradingCriteria: ["states the formula"],
+          customLabel: null,
+          topic: "Bayes rule",
+        },
+      ],
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify(quiz), { headers: { "content-type": "application/json" } }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    render(<QuizWorkspace />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "No PDF? Paste your lecture notes instead" }),
+    );
+    fireEvent.change(await screen.findByLabelText("Lecture notes"), {
+      target: { value: "Week 3 - Bayes rule\nP(A|B) = P(B|A)P(A)/P(B)" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate quiz from these notes" }));
+
+    await screen.findByText("State Bayes rule.");
+    const body = fetchMock.mock.calls[0][1].body as FormData;
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/generate-quiz");
+    expect(body.get("transcript")).toContain("Bayes rule");
+    expect(body.get("files")).toBeNull();
   });
 });

@@ -25,6 +25,12 @@ const BaseQuestionSchema = z.object({
   // Marks printed on the exported exam paper. Nullish for quizzes saved before the
   // exam-paper layout; the exporter substitutes a default for the question type.
   points: z.number().int().min(1).max(40).nullish(),
+  /**
+   * Which part of the source this question assesses, in the model's own words. Not shown to
+   * the learner: it exists so the spread of a generated set can be measured instead of
+   * merely asked for. Nullish because every quiz saved before this field still has to load.
+   */
+  topic: z.string().min(1).max(80).nullish(),
 });
 
 export const MultipleChoiceQuestionSchema = BaseQuestionSchema.extend({
@@ -162,5 +168,25 @@ export function parseQuestionConfiguration(value: string): QuestionConfiguration
     return parsed.filter((item) => item.count > 0);
   } catch {
     throw new Error("Question configuration is invalid");
+  }
+}
+
+/** Rejects a model answer that changed the server-configured question count or type mix. */
+export function assertQuizMatchesQuestionConfiguration(
+  quiz: Quiz,
+  configuration: QuestionConfiguration[],
+) {
+  const requested = new Map<Question["type"], number>();
+  for (const item of configuration)
+    requested.set(item.type, (requested.get(item.type) ?? 0) + item.count);
+  const received = new Map<Question["type"], number>();
+  for (const question of quiz.questions)
+    received.set(question.type, (received.get(question.type) ?? 0) + 1);
+
+  if (received.size !== requested.size)
+    throw new Error("Quiz question types do not match the requested configuration.");
+  for (const [type, count] of requested) {
+    if (received.get(type) !== count)
+      throw new Error("Quiz question types do not match the requested configuration.");
   }
 }
