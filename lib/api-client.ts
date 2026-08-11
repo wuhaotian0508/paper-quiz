@@ -5,8 +5,12 @@
  */
 export const REQUEST_TIMEOUT_MS = 60_000;
 
-/** Quiz generation gets a longer budget: more content to read and more questions to write. */
+/**
+ * Quiz and review-sheet generation get a longer budget: both read the whole source, and
+ * both can run a second model pass — a repeated-question retry, or a language correction.
+ */
 export const QUIZ_TIMEOUT_MS = 100_000;
+export const REVIEW_TIMEOUT_MS = 100_000;
 
 export async function postForm(
   path: string,

@@ -9,7 +9,7 @@ import type { StudySession } from "@/lib/study-history";
 import { hasSource } from "@/lib/study-history";
 import { ExamReviewSheetSchema, type ExamReviewSheet } from "@/lib/exam-review";
 import { ReviewSheetSections } from "@/components/review-sheet-sections";
-import { postForm } from "@/lib/api-client";
+import { postForm, REVIEW_TIMEOUT_MS } from "@/lib/api-client";
 import { MAX_GENERATION_BRIEF_CHARS } from "@/lib/request-validation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { createSharedReview } from "@/lib/shared-review-client";
@@ -124,7 +124,11 @@ export function MaterialDetailView({
     ...material.mistakes.map((mistake) => mistake.source),
   ].find(hasSource);
   const hasReviewContext = Boolean(
-    reviewSource || material.questions.length || material.mistakes.length,
+    reviewSource ||
+      attachedSourceFile ||
+      attachedSourceTranscript ||
+      material.questions.length ||
+      material.mistakes.length,
   );
   const savedQuestionContext = material.questions
     .slice(0, 40)
@@ -172,6 +176,7 @@ export function MaterialDetailView({
       form.set("locale", locale);
       if (reviewBrief.trim()) form.set("brief", reviewBrief.trim());
       const response = await postForm("/api/generate-exam-review", form, {
+        timeoutMs: REVIEW_TIMEOUT_MS,
         timeoutMessage: t("material.reviewTimeout"),
       });
       const payload: unknown = await response.json();
@@ -386,9 +391,11 @@ export function MaterialDetailView({
           {practiceShareStatus}
         </p>
       ) : null}
-      {!reviewSource && hasReviewContext ? (
+      {!reviewSource ? (
         <div className="material-review-source-note">
-          <p>{t("material.expiredSource")}</p>
+          {!attachedSourceFile ? (
+            <p>{t(hasReviewContext ? "material.expiredSource" : "material.noReviewContext")}</p>
+          ) : null}
           <label className="text-button framed-button material-source-attach">
             {t("material.attachPdf")}
             <input
@@ -400,8 +407,6 @@ export function MaterialDetailView({
           </label>
           {attachedSourceStatus ? <small>{attachedSourceStatus}</small> : null}
         </div>
-      ) : !hasReviewContext ? (
-        <p className="material-review-source-note">{t("material.noReviewContext")}</p>
       ) : null}
 
       <section className="material-review-builder" aria-labelledby="knowledge-review-heading">
@@ -425,6 +430,9 @@ export function MaterialDetailView({
             value={reviewBrief}
             onChange={(event) => setReviewBrief(event.target.value)}
           />
+          <small className="material-review-brief-help">
+            {t("material.reviewBriefLanguageNote")}
+          </small>
         </div>
         <div className="material-review-builder-actions">
           <button
