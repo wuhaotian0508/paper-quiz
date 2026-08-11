@@ -25,19 +25,19 @@ it("exchanges an auth code before redirecting home", async () => {
   expect(response.headers.get("location")).toBe("https://paper-quiz-ai-amber.vercel.app/");
 });
 
-it("returns to a safe shared artifact after authentication", async () => {
+it("lands on the dashboard even when a shared page asked to be returned to", async () => {
   const exchangeCodeForSession = vi.fn().mockResolvedValue({ error: null });
   getSupabaseServerClient.mockResolvedValue({ auth: { exchangeCodeForSession } });
 
+  // Someone who opens a shared review or quiz and signs in wants their own workspace. Older
+  // magic links still carry `returnTo`, so the callback ignores it rather than trusting it.
   const response = await GET(
     new NextRequest(
       "https://paper-quiz-ai-amber.vercel.app/auth/callback?code=code-123&returnTo=%2Freview%2Freview-123",
     ),
   );
 
-  expect(response.headers.get("location")).toBe(
-    "https://paper-quiz-ai-amber.vercel.app/review/review-123",
-  );
+  expect(response.headers.get("location")).toBe("https://paper-quiz-ai-amber.vercel.app/");
 });
 
 it("does not follow an external return target", async () => {

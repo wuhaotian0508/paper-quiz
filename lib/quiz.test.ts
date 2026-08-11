@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { normalizeAnswer, parseQuestionConfiguration, parseSettings } from "./quiz";
+import {
+  assertQuizMatchesQuestionConfiguration,
+  normalizeAnswer,
+  parseQuestionConfiguration,
+  parseSettings,
+  type Quiz,
+} from "./quiz";
 
 describe("parseSettings", () => {
   it("normalizes fill-blank answers for matching", () => {
@@ -41,5 +47,43 @@ describe("parseQuestionConfiguration", () => {
         JSON.stringify([{ type: "custom", count: 1, label: "Calculation", instructions: "" }]),
       ),
     ).toThrow("Question configuration is invalid");
+  });
+});
+
+describe("assertQuizMatchesQuestionConfiguration", () => {
+  const quiz: Quiz = {
+    title: "Review",
+    summary: "A source-grounded review.",
+    questions: [
+      {
+        id: "q1",
+        type: "multiple_choice",
+        prompt: "What is retrieval?",
+        options: [
+          { id: "a", text: "Finding relevant context" },
+          { id: "b", text: "Deleting context" },
+          { id: "c", text: "Ignoring context" },
+          { id: "d", text: "Inventing context" },
+        ],
+        correctOptionId: "a",
+        explanation: "It finds relevant context.",
+        sourceNote: "Lecture 1",
+      },
+    ],
+  };
+
+  it("accepts the server-configured type mix", () => {
+    expect(() =>
+      assertQuizMatchesQuestionConfiguration(quiz, [{ type: "multiple_choice", count: 1 }]),
+    ).not.toThrow();
+  });
+
+  it("rejects a model response that changes the requested type or count", () => {
+    expect(() =>
+      assertQuizMatchesQuestionConfiguration(quiz, [{ type: "fill_blank", count: 1 }]),
+    ).toThrow("Quiz question types do not match the requested configuration.");
+    expect(() =>
+      assertQuizMatchesQuestionConfiguration(quiz, [{ type: "multiple_choice", count: 2 }]),
+    ).toThrow("Quiz question types do not match the requested configuration.");
   });
 });

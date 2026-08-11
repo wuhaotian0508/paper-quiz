@@ -9,9 +9,15 @@ type LoginViewProps = {
   client?: AuthClient;
   unavailableReason?: string;
   authError?: boolean;
-  returnTo?: string;
   onAuthenticated?: (destination: string) => void;
 };
+
+/**
+ * Sign-in always ends on the dashboard. The form used to accept a `returnTo` and hand the
+ * learner back to the shared review or quiz they came from, which reads as a failed sign-in:
+ * the shared page is public and looks the same either way.
+ */
+const AFTER_SIGN_IN = "/";
 
 type AuthMode = "login" | "register";
 type LoginMethod = "password" | "magic-link";
@@ -20,7 +26,6 @@ export function LoginView({
   client,
   unavailableReason,
   authError = false,
-  returnTo = "",
   onAuthenticated,
 }: LoginViewProps) {
   const { t } = useLocale();
@@ -63,7 +68,7 @@ export function LoginView({
     setMessage("");
     const { error } = await authClient.auth.signInWithOtp({
       email: trimmedEmail,
-      options: { emailRedirectTo: authRedirectUrl(returnTo) },
+      options: { emailRedirectTo: authRedirectUrl() },
     });
     setIsSubmitting(false);
     setMessage(error ? error.message : t("auth.checkInbox"));
@@ -98,7 +103,7 @@ export function LoginView({
       return;
     }
     (onAuthenticated ?? ((destination: string) => window.location.assign(destination)))(
-      safeReturnTo(returnTo),
+      AFTER_SIGN_IN,
     );
   }
 
@@ -121,7 +126,7 @@ export function LoginView({
     const { error } = await authClient.auth.signUp({
       email: trimmedEmail,
       password,
-      options: { emailRedirectTo: authRedirectUrl(returnTo) },
+      options: { emailRedirectTo: authRedirectUrl() },
     });
     setIsSubmitting(false);
     setMessage(error ? error.message : t("auth.accountCreated"));
@@ -135,7 +140,7 @@ export function LoginView({
     setMessage("");
     const { error } = await authClient.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: authRedirectUrl(returnTo) },
+      options: { redirectTo: authRedirectUrl() },
     });
     setIsSubmitting(false);
     if (error) setMessage(error.message);
@@ -287,14 +292,6 @@ export function LoginView({
   );
 }
 
-function authRedirectUrl(returnTo: string) {
-  const callback = new URL("/auth/callback", window.location.origin);
-  if (returnTo.startsWith("/") && !returnTo.startsWith("//")) {
-    callback.searchParams.set("returnTo", returnTo);
-  }
-  return callback.toString();
-}
-
-function safeReturnTo(returnTo: string) {
-  return returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/";
+function authRedirectUrl() {
+  return new URL("/auth/callback", window.location.origin).toString();
 }

@@ -5,11 +5,7 @@ import { QUIZ_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from "@/lib/api-client";
 import { useLocale } from "@/hooks/use-locale";
 import type { MessageKey } from "@/lib/i18n";
 
-const copy: Record<"transcribing" | "generating", { eyebrow: MessageKey; heading: MessageKey }> = {
-  transcribing: {
-    eyebrow: "loading.transcribingEyebrow",
-    heading: "loading.transcribingHeading",
-  },
+const copy: Record<"generating", { eyebrow: MessageKey; heading: MessageKey }> = {
   generating: {
     eyebrow: "loading.generatingEyebrow",
     heading: "loading.generatingHeading",
@@ -20,7 +16,7 @@ const copy: Record<"transcribing" | "generating", { eyebrow: MessageKey; heading
  * Shows real elapsed time rather than an open-ended spinner, and warns as the request
  * approaches the server's own deadline so a timeout is not a surprise.
  */
-export function LoadingView({ mode }: { mode: "transcribing" | "generating" }) {
+export function LoadingView({ mode }: { mode: "generating" }) {
   const { t } = useLocale();
   const [elapsed, setElapsed] = useState(0);
   const limit = Math.round((mode === "generating" ? QUIZ_TIMEOUT_MS : REQUEST_TIMEOUT_MS) / 1000);

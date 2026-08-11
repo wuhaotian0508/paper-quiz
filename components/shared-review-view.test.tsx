@@ -29,10 +29,8 @@ it("renders a read-only review with sign-in and use actions", async () => {
 
   expect(await screen.findByRole("heading", { name: "Lecture Review" })).toBeInTheDocument();
   expect(screen.getByText("Review the sequence.")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
-    "href",
-    "/login?returnTo=%2Freview%2Freview-123",
-  );
+  // Sign-in from a shared review goes to the dashboard, not back to this read-only page.
+  expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
   expect(screen.getByRole("link", { name: "Use this review" })).toHaveAttribute(
     "href",
     "#review-topics",

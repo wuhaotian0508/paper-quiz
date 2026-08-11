@@ -48,7 +48,7 @@ it("renders a standalone sign-in form without workspace navigation", () => {
 it("logs in with an email and password", async () => {
   const client = createClient();
   const assign = vi.fn();
-  render(<LoginView client={client} returnTo="/review/review-123" onAuthenticated={assign} />);
+  render(<LoginView client={client} onAuthenticated={assign} />);
 
   fireEvent.change(screen.getByLabelText("Email"), { target: { value: "student@example.com" } });
   fireEvent.change(screen.getByLabelText("Password"), {
@@ -62,7 +62,8 @@ it("logs in with an email and password", async () => {
       password: "correct-horse-battery",
     }),
   );
-  expect(assign).toHaveBeenCalledWith("/review/review-123");
+  // The dashboard is the destination even for someone who arrived from a shared review.
+  expect(assign).toHaveBeenCalledWith("/");
 });
 
 it("signs in without the database function that password login used to need", async () => {
@@ -106,7 +107,7 @@ it("surfaces a rejected sign-in without navigating", async () => {
 
 it("registers with an email and a password", async () => {
   const client = createClient();
-  render(<LoginView client={client} returnTo="/review/review-123" />);
+  render(<LoginView client={client} />);
 
   fireEvent.click(screen.getByRole("tab", { name: "Register" }));
   fireEvent.change(screen.getByLabelText("Email"), {
@@ -121,9 +122,7 @@ it("registers with an email and a password", async () => {
     expect(client.auth.signUp).toHaveBeenCalledWith({
       email: "student@example.com",
       password: "correct-horse-battery",
-      options: {
-        emailRedirectTo: "http://localhost:3000/auth/callback?returnTo=%2Freview%2Freview-123",
-      },
+      options: { emailRedirectTo: "http://localhost:3000/auth/callback" },
     }),
   );
 });
@@ -146,9 +145,9 @@ it("asks for no username on either tab, and checks none in the database", async 
   expect(client.rpc).not.toHaveBeenCalled();
 });
 
-it("can send a magic link back to the shared artifact", async () => {
+it("sends a magic link that returns to the dashboard", async () => {
   const client = createClient();
-  render(<LoginView client={client} returnTo="/review/review-123" />);
+  render(<LoginView client={client} />);
 
   fireEvent.click(screen.getByRole("tab", { name: "Email link" }));
   fireEvent.change(screen.getByLabelText("Email"), {
@@ -159,25 +158,21 @@ it("can send a magic link back to the shared artifact", async () => {
   await waitFor(() =>
     expect(client.auth.signInWithOtp).toHaveBeenCalledWith({
       email: "student@example.com",
-      options: {
-        emailRedirectTo: "http://localhost:3000/auth/callback?returnTo=%2Freview%2Freview-123",
-      },
+      options: { emailRedirectTo: "http://localhost:3000/auth/callback" },
     }),
   );
 });
 
 it("starts Google OAuth from the dedicated login page", async () => {
   const client = createClient();
-  render(<LoginView client={client} returnTo="/challenge/share-123" />);
+  render(<LoginView client={client} />);
 
   fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
 
   await waitFor(() =>
     expect(client.auth.signInWithOAuth).toHaveBeenCalledWith({
       provider: "google",
-      options: {
-        redirectTo: "http://localhost:3000/auth/callback?returnTo=%2Fchallenge%2Fshare-123",
-      },
+      options: { redirectTo: "http://localhost:3000/auth/callback" },
     }),
   );
 });

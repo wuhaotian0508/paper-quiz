@@ -15,7 +15,9 @@ const PublicQuestionSchema = z.discriminatedUnion("type", [
     id: z.string().min(1),
     type: z.literal("multiple_choice"),
     prompt: z.string().min(1),
-    options: z.array(z.object({ id: z.enum(["a", "b", "c", "d"]), text: z.string().min(1) })).length(4),
+    options: z
+      .array(z.object({ id: z.enum(["a", "b", "c", "d"]), text: z.string().min(1) }))
+      .length(4),
   }),
   z.object({ id: z.string().min(1), type: z.literal("fill_blank"), prompt: z.string().min(1) }),
   z.object({
@@ -46,7 +48,13 @@ const ResultSchema = z.object({
   ),
 });
 
-export function SharedChallengeView({ slug, client }: { slug: string; client?: SharedChallengeClient }) {
+export function SharedChallengeView({
+  slug,
+  client,
+}: {
+  slug: string;
+  client?: SharedChallengeClient;
+}) {
   const [challenge, setChallenge] = useState<z.infer<typeof ChallengeSchema> | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [name, setName] = useState("");
@@ -59,13 +67,15 @@ export function SharedChallengeView({ slug, client }: { slug: string; client?: S
     let active = true;
     async function load() {
       try {
-        const resolvedClient = client ?? (getSupabaseBrowserClient() as unknown as SharedChallengeClient);
+        const resolvedClient =
+          client ?? (getSupabaseBrowserClient() as unknown as SharedChallengeClient);
         const data = ChallengeSchema.parse(await loadSharedChallenge(resolvedClient, slug));
         if (!active) return;
         setChallenge(data);
         setMessage("");
       } catch (cause) {
-        if (active) setMessage(cause instanceof Error ? cause.message : t("shared.challengeUnavailable"));
+        if (active)
+          setMessage(cause instanceof Error ? cause.message : t("shared.challengeUnavailable"));
       }
     }
     void load();
@@ -79,8 +89,13 @@ export function SharedChallengeView({ slug, client }: { slug: string; client?: S
     setSubmitting(true);
     setMessage("");
     try {
-      const resolvedClient = client ?? (getSupabaseBrowserClient() as unknown as SharedChallengeClient);
-      setResult(ResultSchema.parse(await submitSharedChallenge(resolvedClient, challenge.slug, answers, name)));
+      const resolvedClient =
+        client ?? (getSupabaseBrowserClient() as unknown as SharedChallengeClient);
+      setResult(
+        ResultSchema.parse(
+          await submitSharedChallenge(resolvedClient, challenge.slug, answers, name),
+        ),
+      );
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : t("shared.submitFailed"));
     } finally {
@@ -89,8 +104,42 @@ export function SharedChallengeView({ slug, client }: { slug: string; client?: S
   }
 
   if (!challenge) {
-    return <main className="shared-challenge-page"><p role="status">{message}</p></main>;
+    return (
+      <main className="shared-challenge-page">
+        <p role="status">{message}</p>
+      </main>
+    );
   }
+
+  const questionById = new Map(challenge.quiz.questions.map((question) => [question.id, question]));
+
+  /** What a taker chose, read back as the option text rather than the bare letter. */
+  const answerGiven = (id: string) => {
+    const given = answers[id]?.trim();
+    if (!given) return t("shared.noAnswerGiven");
+    const question = questionById.get(id);
+    if (question?.type !== "multiple_choice") return given;
+    const option = question.options.find((choice) => choice.id === given);
+    return option ? `${option.id.toUpperCase()}. ${option.text}` : given;
+  };
+
+  /**
+   * The grader returns `correctOptionId` for multiple choice and `referenceAnswer` for
+   * everything else. Only the latter was ever rendered, so a shared quiz told an anonymous
+   * taker they were wrong without ever telling them which option was right.
+   */
+  const correctAnswer = (item: z.infer<typeof ResultSchema>["results"][number]) => {
+    if (item.referenceAnswer) return item.referenceAnswer;
+    if (!item.correctOptionId) return null;
+    const question = questionById.get(item.id);
+    const option =
+      question?.type === "multiple_choice"
+        ? question.options.find((choice) => choice.id === item.correctOptionId)
+        : undefined;
+    return option
+      ? `${option.id.toUpperCase()}. ${option.text}`
+      : item.correctOptionId.toUpperCase();
+  };
 
   return (
     <main className="shared-challenge-page">
@@ -99,7 +148,8 @@ export function SharedChallengeView({ slug, client }: { slug: string; client?: S
       <p className="muted-copy">{challenge.summary}</p>
       <p className="shared-challenge-note">{t("shared.challengeNote")}</p>
       <div className="shared-link-actions">
-        <a className="text-button framed-button" href={`/login?returnTo=${encodeURIComponent(`/challenge/${challenge.slug}`)}`}>
+        {/* See shared-review-view: sign-in from a shared link goes to the dashboard. */}
+        <a className="text-button framed-button" href="/login">
           {t("shared.signIn")}
         </a>
         <a className="primary-button" href="#shared-quiz">
@@ -110,7 +160,12 @@ export function SharedChallengeView({ slug, client }: { slug: string; client?: S
         <>
           <label className="shared-name">
             {t("shared.displayName")}
-            <input value={name} maxLength={80} onChange={(event) => setName(event.target.value)} placeholder={t("shared.anonymous")} />
+            <input
+              value={name}
+              maxLength={80}
+              onChange={(event) => setName(event.target.value)}
+              placeholder={t("shared.anonymous")}
+            />
           </label>
           <div className="shared-question-list" id="shared-quiz">
             {challenge.quiz.questions.map((question, index) => (
@@ -129,7 +184,8 @@ export function SharedChallengeView({ slug, client }: { slug: string; client?: S
                         className={`answer-option ${answers[question.id] === option.id ? "is-selected" : ""}`}
                         onClick={() => setAnswers((old) => ({ ...old, [question.id]: option.id }))}
                       >
-                        <span className="option-letter">{option.id.toUpperCase()}</span><span>{option.text}</span>
+                        <span className="option-letter">{option.id.toUpperCase()}</span>
+                        <span>{option.text}</span>
                       </button>
                     ))}
                   </div>
@@ -138,7 +194,9 @@ export function SharedChallengeView({ slug, client }: { slug: string; client?: S
                     className="written-answer"
                     aria-label={t("shared.answerForAria", { number: index + 1 })}
                     value={answers[question.id] || ""}
-                    onChange={(event) => setAnswers((old) => ({ ...old, [question.id]: event.target.value }))}
+                    onChange={(event) =>
+                      setAnswers((old) => ({ ...old, [question.id]: event.target.value }))
+                    }
                     rows={question.type === "fill_blank" ? 3 : 6}
                   />
                 )}
@@ -148,7 +206,11 @@ export function SharedChallengeView({ slug, client }: { slug: string; client?: S
           <button className="primary-button" disabled={submitting} onClick={() => void submit()}>
             {submitting ? t("shared.submitting") : t("shared.submitChallenge")}
           </button>
-          {message ? <p className="share-status" role="status">{message}</p> : null}
+          {message ? (
+            <p className="share-status" role="status">
+              {message}
+            </p>
+          ) : null}
         </>
       ) : (
         <section className="shared-results">
@@ -157,21 +219,35 @@ export function SharedChallengeView({ slug, client }: { slug: string; client?: S
               ? t("shared.answersSubmitted")
               : t("shared.score", { score: Math.round(result.score * 100) })}
           </h2>
-          {result.results.map((item) => (
-            <article key={item.id} className="shared-result-item">
-              <strong>
-                {item.status === "correct"
-                  ? t("shared.correct")
-                  : item.status === "self_review"
-                    ? t("shared.selfReview")
-                    : t("shared.reviewThis")}
-              </strong>
-              <p>{item.feedback}</p>
-              {item.referenceAnswer ? (
-                <p>{t("shared.referenceAnswer", { answer: item.referenceAnswer })}</p>
-              ) : null}
-            </article>
-          ))}
+          {result.results.map((item, index) => {
+            const answer = correctAnswer(item);
+            return (
+              <article key={item.id} className="shared-result-item">
+                <span className="question-kicker">
+                  {t("shared.questionKicker")} {String(index + 1).padStart(2, "0")}
+                </span>
+                {/* Without the prompt the result list is a column of verdicts with nothing to
+                    attach them to, since the questions are replaced by this section. */}
+                <h3>{questionById.get(item.id)?.prompt}</h3>
+                <strong>
+                  {item.status === "correct"
+                    ? t("shared.correct")
+                    : item.status === "self_review"
+                      ? t("shared.selfReview")
+                      : t("shared.reviewThis")}
+                </strong>
+                <p>{t("shared.yourAnswer", { answer: answerGiven(item.id) })}</p>
+                {answer ? (
+                  <p>
+                    {item.status === "self_review"
+                      ? t("shared.referenceAnswer", { answer })
+                      : t("shared.correctAnswer", { answer })}
+                  </p>
+                ) : null}
+                <p>{item.feedback}</p>
+              </article>
+            );
+          })}
         </section>
       )}
     </main>

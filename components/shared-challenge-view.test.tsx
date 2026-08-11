@@ -1,9 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
 import { SharedChallengeView } from "./shared-challenge-view";
 import type { SharedChallengeClient } from "@/lib/shared-challenge-client";
 
-function createClient(): SharedChallengeClient {
+function createClient(attempt?: unknown): SharedChallengeClient {
   return {
     rpc: vi.fn().mockImplementation((name: string) => {
       if (name === "get_shared_challenge") {
@@ -32,7 +32,7 @@ function createClient(): SharedChallengeClient {
         });
       }
       return Promise.resolve({
-        data: {
+        data: attempt ?? {
           score: 1,
           objectiveCount: 1,
           results: [{ id: "q1", status: "correct", score: 1, feedback: "B is right." }],
@@ -43,14 +43,13 @@ function createClient(): SharedChallengeClient {
   };
 }
 
+afterEach(() => cleanup());
+
 it("lets a visitor take a shared quiz without exposing the answer before submission", async () => {
   render(<SharedChallengeView slug="share-123" client={createClient()} />);
 
   expect(await screen.findByRole("heading", { name: "Probability challenge" })).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
-    "href",
-    "/login?returnTo=%2Fchallenge%2Fshare-123",
-  );
+  expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
   expect(screen.getByRole("link", { name: "Use this quiz" })).toHaveAttribute(
     "href",
     "#shared-quiz",
@@ -61,4 +60,42 @@ it("lets a visitor take a shared quiz without exposing the answer before submiss
 
   expect(await screen.findByText("B is right.")).toBeInTheDocument();
   expect(screen.getByText("Score: 100%")).toBeInTheDocument();
+});
+
+it("tells a signed-out taker which option was correct after a wrong answer", async () => {
+  // The grader has always returned `correctOptionId`, but the results list only rendered
+  // `referenceAnswer` — which multiple choice does not carry — so a wrong answer produced a
+  // verdict and an explanation with the actual answer nowhere on the page.
+  const client = createClient({
+    score: 0,
+    objectiveCount: 1,
+    results: [
+      { id: "q1", status: "incorrect", score: 0, correctOptionId: "b", feedback: "B is right." },
+    ],
+  });
+  render(<SharedChallengeView slug="share-123" client={client} />);
+
+  expect(await screen.findByRole("heading", { name: "Probability challenge" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "C" }));
+  fireEvent.click(screen.getByRole("button", { name: "Submit challenge" }));
+
+  expect(await screen.findByText("Correct answer: B. B")).toBeInTheDocument();
+  expect(screen.getByText("Your answer: C. C")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Choose B." })).toBeInTheDocument();
+});
+
+it("marks an unanswered question as blank rather than showing an empty answer", async () => {
+  const client = createClient({
+    score: 0,
+    objectiveCount: 1,
+    results: [
+      { id: "q1", status: "incorrect", score: 0, correctOptionId: "b", feedback: "B is right." },
+    ],
+  });
+  render(<SharedChallengeView slug="share-123" client={client} />);
+
+  expect(await screen.findByRole("heading", { name: "Probability challenge" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Submit challenge" }));
+
+  expect(await screen.findByText("Your answer: left blank")).toBeInTheDocument();
 });

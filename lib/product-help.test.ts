@@ -43,7 +43,7 @@ describe("product help contract", () => {
    */
   it("describes the shipped features a learner is most likely to ask about", () => {
     const instructions = buildProductHelpInstructions();
-    expect(instructions).toContain("25MB");
+    expect(instructions).toContain("up to 5 PDFs at once");
     expect(instructions).toMatch(/1, 2, 4, 7, 15, and 30 days/);
     expect(instructions).toMatch(/course folders/i);
     expect(instructions).toMatch(/every multiple-choice option carries its own note/i);

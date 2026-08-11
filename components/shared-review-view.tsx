@@ -90,10 +90,10 @@ export function SharedReviewView({ slug, client }: { slug: string; client?: Shar
       <p className="muted-copy">{t("shared.reviewNote")}</p>
       <p className="shared-challenge-note">{t("shared.reviewPrivacy")}</p>
       <div className="shared-link-actions">
-        <a
-          className="text-button framed-button"
-          href={`/login?returnTo=${encodeURIComponent(`/review/${review.slug}`)}`}
-        >
+        {/* Signing in from a shared link lands on the dashboard, not back here: the visitor
+            came for someone else's review, and returning them to a read-only page made
+            authentication look like it had done nothing. */}
+        <a className="text-button framed-button" href="/login">
           {t("shared.signIn")}
         </a>
         <a className="primary-button" href="#review-topics">

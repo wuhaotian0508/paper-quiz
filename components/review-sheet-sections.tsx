@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { useLocale } from "@/hooks/use-locale";
 import {
   orderedReviewSections,
@@ -34,6 +36,7 @@ export function ReviewSheetSections({
   onPreviewSlide?: (slide: SectionSlide) => void;
 }) {
   const { t } = useLocale();
+  const [expandedSlides, setExpandedSlides] = useState<Set<string>>(() => new Set());
   if (!sheet.sections?.length) return null;
 
   const full = sheet as ExamReviewSheet;
@@ -52,28 +55,56 @@ export function ReviewSheetSections({
   const slideOf = (section: ExamReviewSection) =>
     section.sourceNote ? slideFor?.(section.sourceNote) : undefined;
 
-  const slideFigure = (section: ExamReviewSection, slide: SectionSlide) => (
-    <figure className="review-section-slide">
-      <button
-        className="review-topic-preview"
-        disabled={!onPreviewSlide}
-        aria-label={t("review.enlargeSlideAria", {
-          page: slide.pageNumber,
-          heading: section.heading,
-        })}
-        onClick={() => onPreviewSlide?.(slide)}
-      >
-        {/* Slides are data URLs, from IndexedDB or a share payload; not optimizable. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={slide.imageUrl}
-          alt={t("review.slideAlt", { page: slide.pageNumber, heading: section.heading })}
-          loading="lazy"
-        />
-      </button>
-      <figcaption>{t("review.pageLabel", { page: slide.pageNumber })}</figcaption>
-    </figure>
-  );
+  const slideFigure = (section: ExamReviewSection, slide: SectionSlide) => {
+    const slideId = `review-slide-${section.kind}`;
+    const isExpanded = expandedSlides.has(section.kind);
+
+    return (
+      <figure className="review-section-slide">
+        <button
+          className="review-slide-toggle"
+          type="button"
+          aria-controls={slideId}
+          aria-expanded={isExpanded}
+          onClick={() =>
+            setExpandedSlides((current) => {
+              const next = new Set(current);
+              if (next.has(section.kind)) next.delete(section.kind);
+              else next.add(section.kind);
+              return next;
+            })
+          }
+        >
+          {isExpanded
+            ? t("review.hideSlide", { page: slide.pageNumber })
+            : t("review.showSlide", { page: slide.pageNumber })}
+        </button>
+        {isExpanded ? (
+          <div id={slideId}>
+            <button
+              className="review-topic-preview"
+              type="button"
+              disabled={!onPreviewSlide}
+              aria-label={t("review.enlargeSlideAria", {
+                page: slide.pageNumber,
+                heading: section.heading,
+              })}
+              onClick={() => onPreviewSlide?.(slide)}
+            >
+              {/* Slides are data URLs, from IndexedDB or a share payload; not optimizable. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={slide.imageUrl}
+                alt={t("review.slideAlt", { page: slide.pageNumber, heading: section.heading })}
+                loading="lazy"
+              />
+            </button>
+            <figcaption>{t("review.pageLabel", { page: slide.pageNumber })}</figcaption>
+          </div>
+        ) : null}
+      </figure>
+    );
+  };
 
   const body = (section: ExamReviewSection, number: number) => (
     <>

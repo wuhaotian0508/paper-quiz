@@ -24,7 +24,7 @@ function displayName(id: string, recorded: string) {
 }
 
 /**
- * Collects everything belonging to each uploaded PDF or recording.
+ * Collects everything belonging to each uploaded PDF.
  *
  * Questions are deduped by content because the same material re-quizzed will produce
  * overlapping questions, and because `question.id` restarts at q1 in every quiz.

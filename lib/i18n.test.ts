@@ -71,15 +71,15 @@ describe("generation language", () => {
   it("carries the locale into the quiz prompt", () => {
     const settings = { questions: [], difficulty: "mixed" as const };
     expect(buildQuizInstructions({ ...settings, locale: "zh" })).toContain(
-      "Write every user-visible field in Simplified Chinese",
+      "The default output language is Simplified Chinese",
     );
-    expect(buildQuizInstructions(settings)).toContain("Write every user-visible field in English");
+    expect(buildQuizInstructions(settings)).toContain("The default output language is English");
   });
 
   it("carries the locale into the review-sheet prompt", () => {
     expect(buildExamReviewInstructions("zh")).toContain(
-      "Write every user-visible field in Simplified Chinese",
+      "The output language for this request is Simplified Chinese",
     );
-    expect(buildExamReviewInstructions()).toContain("Write every user-visible field in English");
+    expect(buildExamReviewInstructions()).toContain("The output language for this request is English");
   });
 });

@@ -292,6 +292,66 @@ describe("MaterialDetailView", () => {
     expect(screen.getByLabelText("Attach original PDF for source pages")).toBeInTheDocument();
   });
 
+  it("lets an empty library material attach its PDF and generate a review from it", async () => {
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn(() => "blob:lecture"),
+      revokeObjectURL: vi.fn(),
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            title: "Attached-PDF review",
+            topics: Array.from({ length: 4 }, (_, index) => ({
+              topic: `Topic ${index + 1}`,
+              keyIdeas: ["Use the attached PDF as the source."],
+              formulaOrProcedure: "",
+              commonConfusion: "Do not confuse the concepts.",
+              sourceNote: "Page 1",
+              relatedMistakeIds: [],
+              mistakeFocus: "",
+            })),
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
+      ),
+    );
+
+    render(
+      <MaterialDetailView
+        material={{
+          id: "empty-material",
+          name: "Lecture.pdf",
+          questions: [],
+          mistakes: [],
+          sessions: [],
+          lastPracticedAt: "",
+        }}
+        onBack={vi.fn()}
+        onPractice={vi.fn()}
+      />,
+    );
+
+    const generate = screen.getByRole("button", {
+      name: "Generate knowledge-point review sheet",
+    });
+    expect(generate).toBeDisabled();
+    expect(screen.getByText(/Attach the original PDF to create its review sheet/i)).toBeInTheDocument();
+
+    const file = new File(["PDF source"], "Lecture.pdf", { type: "application/pdf" });
+    fireEvent.change(screen.getByLabelText("Attach original PDF for source pages"), {
+      target: { files: [file] },
+    });
+
+    expect(generate).toBeEnabled();
+    fireEvent.click(generate);
+
+    expect(await screen.findByText("Attached-PDF review")).toBeInTheDocument();
+    const form = (vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as FormData;
+    expect(form.get("file")).toBe(file);
+  });
+
   it("keeps this PDF's saved mistakes visible when its old question list has expired", () => {
     render(
       <MaterialDetailView
@@ -633,6 +693,9 @@ describe("MaterialDetailView", () => {
 
     // Slides used to hang off `topics`, which the section layout always sets to null. Without
     // a per-section lookup the whole sheet renders with no previews at all.
+    expect(screen.queryByAltText("Source slide, page 2, for Heading 2")).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Show source page 2" }));
     const slide = await screen.findByAltText("Source slide, page 2, for Heading 2");
 
     // Each slide has to sit inside its own knowledge point, not in a separate strip, so the
@@ -641,6 +704,10 @@ describe("MaterialDetailView", () => {
     expect(section).toHaveTextContent("Heading 2");
     expect(section?.querySelector("figcaption")).toHaveTextContent("Page 2");
     expect(document.querySelector(".review-sheet-paired")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Hide source page 2" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
   });
 
   describe("practice share link", () => {

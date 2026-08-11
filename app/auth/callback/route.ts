@@ -13,10 +13,6 @@ function callbackErrorRedirect(request: NextRequest) {
   return NextResponse.redirect(new URL("/login?authError=callback", trustedOrigin(request)));
 }
 
-function safeReturnTo(value: string | null) {
-  return value && value.startsWith("/") && !value.startsWith("//") ? value : "/";
-}
-
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   if (!code) return callbackErrorRedirect(request);
@@ -29,7 +25,8 @@ export async function GET(request: NextRequest) {
     return callbackErrorRedirect(request);
   }
 
-  return NextResponse.redirect(
-    new URL(safeReturnTo(request.nextUrl.searchParams.get("returnTo")), trustedOrigin(request)),
-  );
+  // Always the dashboard. A `returnTo` used to carry the visitor back to the shared review or
+  // quiz they arrived from, which left them on a read-only page that looks identical signed in.
+  // Ignoring the parameter here also covers magic links already sent with one attached.
+  return NextResponse.redirect(new URL("/", trustedOrigin(request)));
 }
