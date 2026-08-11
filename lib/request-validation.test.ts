@@ -5,6 +5,8 @@ import {
   parseGenerationBrief,
   parseReviewMistakeContext,
   readBoundedText,
+  safeStorageSet,
+  STORAGE_WRITE_FAILED_EVENT,
   validatePdfFile,
 } from "./request-validation";
 
@@ -90,5 +92,37 @@ describe("request validation", () => {
       ok: false,
       error: "Review mistakes are invalid.",
     });
+  });
+});
+
+describe("safeStorageSet", () => {
+  const fullStorage = {
+    setItem: () => {
+      throw new DOMException("QuotaExceededError");
+    },
+  } as unknown as Storage;
+
+  it("announces a refused write, so a full quota cannot stop saving in silence", () => {
+    const heard: string[] = [];
+    const listen = (event: Event) => heard.push(String((event as CustomEvent).detail));
+    window.addEventListener(STORAGE_WRITE_FAILED_EVENT, listen);
+
+    const saved = safeStorageSet("paper-quiz-mistakes", "[]", fullStorage);
+
+    window.removeEventListener(STORAGE_WRITE_FAILED_EVENT, listen);
+    expect(saved).toBe(false);
+    expect(heard).toEqual(["paper-quiz-mistakes"]);
+  });
+
+  it("stays quiet when the write succeeds", () => {
+    const heard: string[] = [];
+    const listen = () => heard.push("failed");
+    window.addEventListener(STORAGE_WRITE_FAILED_EVENT, listen);
+
+    const saved = safeStorageSet("paper-quiz-mistakes", "[]", window.localStorage);
+
+    window.removeEventListener(STORAGE_WRITE_FAILED_EVENT, listen);
+    expect(saved).toBe(true);
+    expect(heard).toEqual([]);
   });
 });

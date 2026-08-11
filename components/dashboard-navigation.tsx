@@ -25,7 +25,7 @@ import {
   type StudyLibraryRecord,
 } from "@/lib/study-library";
 import { groupBySubject, MAX_SUBJECT_CHARS, UNASSIGNED_SUBJECT } from "@/lib/subject";
-import { safeStorageSet } from "@/lib/request-validation";
+import { safeStorageSet, STORAGE_WRITE_FAILED_EVENT } from "@/lib/request-validation";
 import { useLocale } from "@/hooks/use-locale";
 import { localeLabels, nextLocale, type MessageKey } from "@/lib/i18n";
 
@@ -75,6 +75,8 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
   /** Courses created by hand, including any still empty, and the new-course draft. */
   const [subjects, setSubjects] = useState<string[]>([]);
   const [newSubject, setNewSubject] = useState<string | null>(null);
+  /** Set once a browser refuses a write, and never cleared: nothing has been saved since. */
+  const [storageFull, setStorageFull] = useState(false);
   const { locale, setLocale, t } = useLocale();
 
   /**
@@ -199,6 +201,17 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
     };
   }, []);
 
+  /**
+   * The sidebar is the one surface mounted on every view, so the warning lives here rather
+   * than in the workspace, whose own error line is consumed by the current action and is
+   * gone the moment the learner navigates away.
+   */
+  useEffect(() => {
+    const warn = () => setStorageFull(true);
+    window.addEventListener(STORAGE_WRITE_FAILED_EVENT, warn);
+    return () => window.removeEventListener(STORAGE_WRITE_FAILED_EVENT, warn);
+  }, []);
+
   useEffect(() => {
     const savedTheme = window.localStorage.getItem(themeStorageKey);
     const systemTheme = window.matchMedia?.("(prefers-color-scheme: dark)").matches
@@ -227,6 +240,11 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
       <a className="brand-mark" href="#dashboard" onClick={() => setActiveId("dashboard")}>
         <span>*</span> {t("nav.brand")}
       </a>
+      {storageFull && (
+        <p className="sidebar-storage-warning" role="alert">
+          {t("storage.full")}
+        </p>
+      )}
       <nav className="sidebar-nav" aria-label={t("nav.mainNavigation")}>
         {navigationItems.map((item) => (
           <a

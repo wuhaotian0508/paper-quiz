@@ -481,6 +481,28 @@ h1 {
   font-size: 12px;
   line-height: 1.4;
 }
+/* This card kept the hard-coded tint the rest of the app moved onto tokens, so it stayed a
+   bright pink panel in dark mode. Same fix as the mistake list: name the themed pair. */
+:root[data-theme="dark"] .error-message {
+  color: var(--tint-coral-ink);
+  background: var(--tint-coral-bg);
+}
+/* Storage is full: nothing is being saved, so this stays put rather than fading like the
+   action errors above it. */
+.sidebar-storage-warning {
+  margin: 0 0 10px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  color: #a43d31;
+  background: #fff0ed;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+:root[data-theme="dark"] .sidebar-storage-warning {
+  color: var(--tint-coral-ink);
+  background: var(--tint-coral-bg);
+}
 .settings-block {
   padding: 22px 4px 10px;
 }
@@ -687,6 +709,18 @@ h1 {
 .transcript-card h1 {
   max-width: 680px;
   font-size: clamp(2rem, 5vw, 3.45rem);
+}
+.transcript-hint {
+  max-width: 620px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.paste-notes-button {
+  margin: 10px 4px 0;
+  justify-self: start;
+  font-size: 12px;
 }
 .transcript-field {
   display: grid;
@@ -3212,9 +3246,24 @@ h1 {
 .review-section-slide {
   margin: 14px 0 0;
 }
+.review-slide-toggle {
+  padding: 6px 10px;
+  border: 1px solid var(--surface-soft-line);
+  border-radius: 8px;
+  color: var(--mint-deep);
+  background: var(--surface-soft);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+.review-slide-toggle:hover {
+  border-color: var(--mint-deep);
+}
 .review-section-slide .review-topic-preview {
   display: block;
   width: 100%;
+  margin-top: 10px;
   cursor: zoom-in;
 }
 .review-section-slide .review-topic-preview:disabled {
@@ -4107,6 +4156,11 @@ h1 {
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) .progress-card {
     background: rgba(36, 41, 54, 0.84);
+  }
+  :root:not([data-theme]) .error-message,
+  :root:not([data-theme]) .sidebar-storage-warning {
+    color: var(--tint-coral-ink);
+    background: var(--tint-coral-bg);
   }
 }
 

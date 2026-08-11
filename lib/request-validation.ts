@@ -106,6 +106,15 @@ export async function boundedFileData(
   return Buffer.from(await file.arrayBuffer()).toString("base64");
 }
 
+/**
+ * Announced when a browser refuses a write, which in practice means the origin's storage
+ * quota is full. Every call site treated the `false` return as "nothing to do", so a full
+ * quota silently stopped saving history, the library and the mistake book while the UI
+ * carried on showing the in-memory copy. One listener on this event covers all of them, and
+ * any call site added later.
+ */
+export const STORAGE_WRITE_FAILED_EVENT = "paper-quiz-storage-write-failed";
+
 export function safeStorageSet(
   key: string,
   value: string,
@@ -115,6 +124,8 @@ export function safeStorageSet(
     storage.setItem(key, value);
     return true;
   } catch {
+    if (typeof window !== "undefined")
+      window.dispatchEvent(new CustomEvent(STORAGE_WRITE_FAILED_EVENT, { detail: key }));
     return false;
   }
 }

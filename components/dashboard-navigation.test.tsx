@@ -459,4 +459,17 @@ describe("creating a course from the sidebar", () => {
     expect(storedSubjects()).toEqual([]);
     expect(screen.queryByText("MATH 1A")).not.toBeInTheDocument();
   });
+
+  it("warns once storage refuses a write, because nothing is being saved any more", async () => {
+    render(<DashboardNavigation />);
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    fireEvent(
+      window,
+      new CustomEvent("paper-quiz-storage-write-failed", { detail: "paper-quiz-mistakes" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("This browser's storage is full");
+  });
 });
