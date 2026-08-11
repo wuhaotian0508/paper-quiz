@@ -3,16 +3,7 @@ import { upload } from "@vercel/blob/client";
 const DIRECT_UPLOAD_BYTES = 4 * 1024 * 1024;
 const BLOB_HOST_SUFFIX = ".blob.vercel-storage.com";
 
-export const STUDY_CONTENT_TYPES = [
-  "application/pdf",
-  "audio/mpeg",
-  "audio/mp4",
-  "audio/x-m4a",
-  "audio/wav",
-  "audio/x-wav",
-  "audio/webm",
-  "video/mp4",
-];
+export const STUDY_CONTENT_TYPES = ["application/pdf"];
 
 export function isTrustedStudyBlobUrl(value: unknown): value is string {
   if (typeof value !== "string") return false;
