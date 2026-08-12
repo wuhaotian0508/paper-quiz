@@ -21,6 +21,19 @@ async function* failed() {
   yield { type: "response.failed", response: { status: "failed" } };
 }
 
+async function* failedWithReason() {
+  yield {
+    type: "response.failed",
+    response: {
+      status: "failed",
+      error: {
+        code: "context_length_exceeded",
+        message: "Input tokens exceed the model's context length.",
+      },
+    },
+  };
+}
+
 describe("collectResponseText", () => {
   it("joins only output text delta events", async () => {
     await expect(collectResponseText(events())).resolves.toBe('{"title":"小测"}');
@@ -32,6 +45,7 @@ describe("collectResponse", () => {
     await expect(collectResponse(events())).resolves.toEqual({
       text: '{"title":"小测"}',
       stoppedEarlyBecause: null,
+      failureDetail: null,
       usage: null,
     });
   });
@@ -40,12 +54,25 @@ describe("collectResponse", () => {
     await expect(collectResponse(truncated())).resolves.toEqual({
       text: '{"title":"Half a qu',
       stoppedEarlyBecause: "max_output_tokens",
+      failureDetail: null,
       usage: null,
     });
   });
 
   it("surfaces a failed response", async () => {
     expect((await collectResponse(failed())).stoppedEarlyBecause).toBe("failed");
+  });
+
+  it("keeps the provider's reason instead of reducing it to the word failed", async () => {
+    const result = await collectResponse(failedWithReason());
+    expect(result.stoppedEarlyBecause).toBe("context_length_exceeded");
+    expect(result.failureDetail).toBe(
+      "context_length_exceeded: Input tokens exceed the model's context length.",
+    );
+  });
+
+  it("leaves no detail when the gateway reports a failure without one", async () => {
+    expect((await collectResponse(failed())).failureDetail).toBeNull();
   });
 });
 

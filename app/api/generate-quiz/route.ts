@@ -14,8 +14,10 @@ import { mergeUsage } from "@/lib/usage-meter";
 import { getQuizGenerationOptions } from "@/lib/quiz-generation";
 import { parseQuizOutput } from "@/lib/quiz-output";
 import { buildQuizInstructions, buildQuizPreferencePrompt } from "@/lib/quiz-prompt";
+import { parseLearnings } from "@/lib/generation-learnings";
 import { generateDistinctQuiz } from "@/lib/quiz-coverage";
 import { LearnerFacingError, learnerFacingMessage } from "@/lib/learner-error";
+import { describeModelFailure, readFailureText } from "@/lib/model-failure";
 import {
   MAX_TRANSCRIPT_CHARS,
   parseGenerationBrief,
@@ -51,6 +53,8 @@ export async function POST(request: Request) {
     const difficultyValue = String(form.get("difficulty") ?? "");
     const locale = readLocale(form.get("locale") === null ? null : String(form.get("locale")));
     const brief = parseGenerationBrief(form.get("brief"));
+    // Rule ids only. Whatever text these turn into is written here, not by the caller.
+    const learnings = parseLearnings(form.get("learnings"));
 
     if (!files.length && !transcript) {
       return jsonError("Please upload a PDF or provide a lecture transcript.", 400);
@@ -105,7 +109,7 @@ export async function POST(request: Request) {
     let totalUsage: ResponseUsage | null = null;
     const generateOnce = async (correction?: string) => {
       const instructions = [
-        buildQuizInstructions({ ...settings, locale }),
+        buildQuizInstructions({ ...settings, locale, learnings }),
         files.length
           ? `Use all selected PDFs as one study set. In every sourceNote, name the supporting source file and page or section when available. Selected files: ${sourceNames}.`
           : "The lecture transcript in the user input is the sole study material.",
@@ -135,15 +139,27 @@ export async function POST(request: Request) {
         ],
         text: { format: zodTextFormat(QuizSchema, "quiz") },
       });
-      const { text: outputText, stoppedEarlyBecause, usage } = await collectResponse(stream);
+      const {
+        text: outputText,
+        stoppedEarlyBecause,
+        failureDetail,
+        usage,
+      } = await collectResponse(stream);
       // Accumulated across attempts: a repeated-question retry is billed twice.
       totalUsage = mergeUsage(totalUsage, usage);
       if (stoppedEarlyBecause === "max_output_tokens")
         throw new LearnerFacingError(
           "The quiz was cut off before it finished. Ask for fewer questions and try again.",
         );
-      if (stoppedEarlyBecause)
-        throw new LearnerFacingError("Quiz generation stopped early. Please try again.");
+      if (stoppedEarlyBecause) {
+        console.error("Quiz generation stopped early", {
+          reason: stoppedEarlyBecause,
+          detail: failureDetail,
+        });
+        throw new LearnerFacingError(
+          describeModelFailure(failureDetail) ?? "Quiz generation stopped early. Please try again.",
+        );
+      }
       if (!outputText)
         throw new LearnerFacingError("AI did not return a usable quiz. Please try again.");
       const quiz = parseQuizOutput(
@@ -164,14 +180,15 @@ export async function POST(request: Request) {
       usage: totalUsage,
     });
   } catch (error) {
-    console.error(
-      "Quiz generation failed",
-      error instanceof Error ? error.message : "unknown error",
-    );
-    // A learner-facing message survives; anything else stays the generic sentence so a
-    // provider or parsing failure never leaks its internals into the response.
+    console.error("Quiz generation failed", readFailureText(error) || "unknown error");
+    // A learner-facing message survives; a refusal the learner can act on is translated into
+    // one; anything else stays the generic sentence so a provider or parsing failure never
+    // leaks its internals into the response.
     return jsonError(
-      learnerFacingMessage(error, "Quiz generation failed. Please try again later."),
+      learnerFacingMessage(
+        error,
+        describeModelFailure(error) ?? "Quiz generation failed. Please try again later.",
+      ),
       502,
     );
   } finally {

@@ -6,6 +6,7 @@ export type ResponseDeltaEvent = {
   delta?: string;
   response?: {
     status?: string | null;
+    error?: { code?: string | null; message?: string | null } | null;
     incomplete_details?: { reason?: string | null } | null;
     usage?: {
       input_tokens?: number | null;
@@ -23,6 +24,19 @@ export type CollectedResponse = {
    */
   stoppedEarlyBecause: string | null;
   /**
+   * The provider's own sentence about a failure, or null when it offered none.
+   *
+   * A `response.failed` event carries the reason the call died — "input tokens exceed the
+   * model's context length", "file exceeds the maximum of 100 pages" — and this used to be
+   * discarded at the point of arrival, leaving `"failed"` as the only trace. The route then
+   * logged its own generic message, so the one explanation of the failure existed nowhere:
+   * not in the response, and not in the server log either.
+   *
+   * Internal by default. Routes log it, and pass it to `describeModelFailure` to decide
+   * whether it names something the learner can act on.
+   */
+  failureDetail: string | null;
+  /**
    * What the call actually consumed, or null when the provider reported nothing.
    *
    * Read from the stream rather than estimated, because the usage meter shown to the
@@ -38,6 +52,7 @@ export async function collectResponse(
 ): Promise<CollectedResponse> {
   let text = "";
   let stoppedEarlyBecause: string | null = null;
+  let failureDetail: string | null = null;
   let usage: ResponseUsage | null = null;
   for await (const event of events) {
     if (event.type === "response.output_text.delta" && event.delta) {
@@ -47,7 +62,12 @@ export async function collectResponse(
       stoppedEarlyBecause = event.response?.incomplete_details?.reason || "incomplete";
     }
     if (event.type === "response.failed") {
-      stoppedEarlyBecause = "failed";
+      const failure = event.response?.error;
+      // The error code is a better reason than the bare word "failed", and the routes that
+      // already log `stoppedEarlyBecause` gain it without changing: every caller either
+      // compares against "max_output_tokens" or only tests the field for truth.
+      stoppedEarlyBecause = failure?.code || "failed";
+      failureDetail = [failure?.code, failure?.message].filter(Boolean).join(": ") || null;
     }
     // Reported on the terminal event. A cut-off response still consumed tokens, so usage is
     // taken from whichever terminal event arrives rather than only from a clean completion.
@@ -59,7 +79,7 @@ export async function collectResponse(
         usage = { inputTokens, outputTokens };
     }
   }
-  return { text, stoppedEarlyBecause, usage };
+  return { text, stoppedEarlyBecause, failureDetail, usage };
 }
 
 export async function collectResponseText(

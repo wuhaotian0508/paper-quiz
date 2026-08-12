@@ -1073,6 +1073,126 @@ h1 {
   padding: 9px 13px;
   font-size: 11px;
 }
+.question-report {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.question-report.is-open {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(251, 250, 246, 0.8);
+}
+.question-report-open {
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.question-report-open:hover {
+  color: var(--ink);
+}
+.question-report-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.question-report-reasons legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-weight: 700;
+  font-size: 12px;
+}
+.question-report-reasons label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.question-report-reasons label.is-selected {
+  border-color: var(--ink);
+  background: var(--yellow);
+}
+.question-report-note {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.question-report-note textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  resize: vertical;
+}
+.question-report-privacy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.question-report-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.question-report-actions .primary-button {
+  padding: 9px 13px;
+  font-size: 11px;
+}
+.question-report-done {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.question-report-done p {
+  margin: 0;
+}
+/* The check's answer, not an acknowledgement — so it reads at body size and the border
+   carries the verdict, coral when the question really was wrong. */
+.question-report-verdict {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--muted);
+  border-radius: 10px;
+  background: var(--paper-deep);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.question-report-done.is-confirmed .question-report-verdict {
+  border-left-color: var(--coral);
+  background: var(--tint-coral-bg);
+}
+.question-report-done.is-stands .question-report-verdict {
+  border-left-color: var(--mint-deep);
+}
 .quiz-actions {
   display: flex;
   justify-content: flex-end;
@@ -3784,6 +3904,16 @@ h1 {
   padding-top: 7px;
   border-top: 1px solid var(--line);
 }
+.usage-credit-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.usage-credit-row strong {
+  color: var(--ink);
+  font-size: 12px;
+}
 .usage-topup-options {
   display: flex;
   gap: 6px;
@@ -4151,6 +4281,259 @@ h1 {
    into a deep brown in this theme and swallowed the left half of the label. */
 :root[data-theme="dark"] .product-help-launcher {
   background: linear-gradient(135deg, #f2b968, #ffc783 50%, #f7a496);
+}
+
+/* Contacts and direct messages. Everything below is written in the theme variables, so the
+   dark theme needs no counterpart rules of its own. */
+.sidebar-nav-badge {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--coral);
+  color: var(--white);
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+.contacts-page {
+  width: 100%;
+  margin: 55px auto 90px;
+  animation: rise-in 0.45s ease both;
+}
+.contacts-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+.contacts-heading h1 {
+  margin: 6px 0 0;
+  font-size: clamp(2.2rem, 4vw, 3.2rem);
+}
+.contacts-error {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  color: var(--tint-coral-ink);
+  background: var(--tint-coral-bg);
+  font-size: 13px;
+}
+.contacts-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.7fr) minmax(0, 1.3fr);
+  gap: 18px;
+  align-items: start;
+}
+.contacts-sidebar,
+.contacts-thread {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--white);
+}
+.contacts-sidebar {
+  display: grid;
+  gap: 20px;
+}
+.contacts-invite {
+  display: grid;
+  gap: 8px;
+}
+.contacts-invite label,
+.contacts-requests h2,
+.contacts-list h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.contacts-invite input {
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+}
+.contacts-invite-status {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.contacts-requests {
+  display: grid;
+  gap: 8px;
+}
+.contacts-request-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--paper-deep);
+  font-size: 13px;
+}
+.contacts-request-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.contacts-request-actions button {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.contacts-list {
+  display: grid;
+  gap: 6px;
+}
+.contacts-list-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  padding: 10px 11px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.contacts-list-row:hover,
+.contacts-list-row[aria-current="true"] {
+  border-color: var(--line);
+  background: var(--paper-deep);
+}
+.contacts-list-name {
+  font-size: 13px;
+  font-weight: 700;
+}
+.contacts-list-preview {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 12px;
+  /* One line: the list is for finding a person, the thread is for reading what they said. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.contacts-unread-badge {
+  align-self: start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--coral);
+  color: var(--white);
+  font-size: 11px;
+  font-weight: 800;
+}
+.contacts-thread {
+  display: grid;
+  gap: 14px;
+  min-height: 420px;
+}
+.contacts-thread-empty {
+  align-self: center;
+  text-align: center;
+}
+.contacts-thread-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.contacts-thread-heading h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.contacts-messages {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.contacts-message-day {
+  display: grid;
+  gap: 8px;
+}
+.contacts-message-date {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+.contacts-message {
+  max-width: 78%;
+  padding: 9px 12px;
+  border-radius: 14px;
+  background: var(--paper-deep);
+}
+/* The learner's own messages sit right and tinted, so a thread is readable at a glance
+   without either side being labelled on every line. */
+.contacts-message.is-mine {
+  margin-left: auto;
+  background: var(--tint-blue-bg);
+}
+.contacts-message-author {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.contacts-message-time {
+  font-weight: 500;
+}
+.contacts-message-body {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.55;
+  /* Messages are typed, not generated: newlines and long unbroken strings both survive. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.contacts-composer {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+.contacts-composer textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+@media (max-width: 900px) {
+  .contacts-layout {
+    grid-template-columns: 1fr;
+  }
+  .contacts-thread {
+    min-height: 0;
+  }
 }
 
 @media (prefers-color-scheme: dark) {

@@ -1,8 +1,10 @@
 "use client";
 
 import type { GradeResult, Question, Quiz } from "@/lib/quiz";
+import type { PersistedSource } from "@/lib/study-history";
 import { downloadQuizPdf } from "@/lib/pdf-export";
 import { OptionAnalysis } from "@/components/option-analysis";
+import { QuestionReport } from "@/components/question-report";
 import { useLocale } from "@/hooks/use-locale";
 import type { MessageKey } from "@/lib/i18n";
 
@@ -32,6 +34,8 @@ export function QuizView({
   chatting,
   mistakeCount,
   hasSourceMaterial,
+  materialName,
+  source,
   analysingOptions,
   onAnswerChange,
   onChatInputChange,
@@ -54,6 +58,10 @@ export function QuizView({
   chatting: boolean;
   mistakeCount: number;
   hasSourceMaterial: boolean;
+  /** Named on a report so a bad question can be traced back to the file that produced it. */
+  materialName?: string;
+  /** Passed to a report so the complaint can be checked against the material, not just filed. */
+  source?: PersistedSource;
   /** A backfill is in flight for a question saved before per-option analysis existed. */
   analysingOptions?: boolean;
   onAnswerChange: (value: string) => void;
@@ -194,6 +202,14 @@ export function QuizView({
             </div>
           </div>
         )}
+        {/* Below the answer, not beside the prompt: a question usually only looks wrong once
+            the marked answer is on screen, and before that the control is a distraction. */}
+        <QuestionReport
+          question={current}
+          quizTitle={quiz.title}
+          materialName={materialName}
+          source={source}
+        />
       </div>
       <div className="quiz-actions">
         <button className="text-button" onClick={onExit}>

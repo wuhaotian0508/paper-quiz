@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { downloadMistakesPdf } from "@/lib/pdf-export";
 import type { MistakeBookEntry } from "@/lib/mistake-book";
 import { correctAnswerText } from "@/lib/quiz";
+import { QuestionReport } from "@/components/question-report";
 import { useLocale } from "@/hooks/use-locale";
 import type { MessageKey } from "@/lib/i18n";
 
@@ -150,6 +151,13 @@ export function MistakeBookView({ entries, onBack, onChange, onPractice, onRevie
                       <p>
                         <strong>{t("mistakes.source")}</strong> {entry.question.sourceNote}
                       </p>
+                      {/* A wrongly-marked question hurts most here, where the schedule keeps
+                          bringing it back. Reporting it is next to Remove for that reason. */}
+                      <QuestionReport
+                        question={entry.question}
+                        materialName={entry.source.materialName}
+                        source={entry.source}
+                      />
                     </div>
                   )}
                   <button

@@ -15,6 +15,7 @@ import {
   type UsageTotals,
 } from "@/lib/usage-meter";
 import { CREDIT_OPTIONS } from "@/lib/credit-options";
+import { formatCredit } from "@/lib/credit-ledger";
 
 type AuthSession = { user: { email?: string | null } } | null;
 type AuthResult = { error: { message: string } | null };
@@ -86,6 +87,17 @@ export function AuthMenu({
   /** The account row is a usage bar by default; identity and sign-out sit behind Settings. */
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [checkoutStatus, setCheckoutStatus] = useState("");
+  /** Null while unknown - a balance we could not read must not be drawn as "$0.00". */
+  const [creditCents, setCreditCents] = useState<number | null>(null);
+  /**
+   * Whether this page load is the return trip from a paid checkout. Read once, at the first
+   * render, because the effect below strips the parameter as soon as it has announced it.
+   */
+  const [returningFromCheckout] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("checkout") === "success",
+  );
 
   /**
    * Buying credit ahead of billing. Practice stays free and unlimited, so this is never a
@@ -104,6 +116,77 @@ export function AuthMenu({
       setCheckoutStatus(cause instanceof Error ? cause.message : t("usage.checkoutFailed"));
     }
   };
+
+  /**
+   * Says something when the learner comes back from Stripe.
+   *
+   * Before this, a payment ended on the home page with no acknowledgement at all, which
+   * reads as "did that work?". The parameter is stripped once announced so a later refresh
+   * does not re-announce a payment that has long since landed.
+   */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const outcome = params.get("checkout");
+    if (outcome !== "success" && outcome !== "cancelled") return;
+
+    setSettingsOpen(true);
+    setCheckoutStatus(
+      outcome === "success" ? t("usage.creditPending") : t("usage.checkoutCancelled"),
+    );
+    params.delete("checkout");
+    const query = params.toString();
+    window.history.replaceState({}, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+  }, [t]);
+
+  /**
+   * Reads the balance the webhook writes, retrying just after a checkout.
+   *
+   * Stripe redirects the browser back the moment the payment is taken, which can be a second
+   * or two before its webhook reaches us, so the first read after a purchase is not to be
+   * believed on its own. Everywhere else one read is enough.
+   */
+  useEffect(() => {
+    if (!userEmail) {
+      setCreditCents(null);
+      return;
+    }
+
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let attemptsLeft = returningFromCheckout ? 6 : 1;
+    let firstRead: number | null = null;
+
+    const read = async () => {
+      let cents: number;
+      try {
+        const response = await fetch("/api/credit");
+        if (!response.ok) throw new Error("unavailable");
+        const data = (await response.json()) as { balanceCents?: number };
+        cents = typeof data.balanceCents === "number" ? data.balanceCents : 0;
+      } catch {
+        // Left blank rather than shown as zero: a balance we cannot read looks, drawn as
+        // "$0.00", exactly like a payment that went missing.
+        if (active) setCreditCents(null);
+        return;
+      }
+
+      if (!active) return;
+      setCreditCents(cents);
+      if (firstRead === null) {
+        firstRead = cents;
+      } else if (cents > firstRead) {
+        setCheckoutStatus(t("usage.creditAdded", { amount: formatCredit(cents - firstRead) }));
+        return;
+      }
+      if (--attemptsLeft > 0) timer = setTimeout(() => void read(), 2000);
+    };
+
+    void read();
+    return () => {
+      active = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [returningFromCheckout, t, userEmail]);
 
   useEffect(() => {
     const syncUsage = () => setUsage(readUsage(window.localStorage.getItem(USAGE_METER_KEY)));
@@ -305,6 +388,12 @@ export function AuthMenu({
               <small className="usage-bar-note">{t("usage.notChargedShort")}</small>
             </div>
             <div className="usage-topup">
+              {creditCents === null ? null : (
+                <div className="usage-credit-row">
+                  <small>{t("usage.creditBalance")}</small>
+                  <strong>{formatCredit(creditCents)}</strong>
+                </div>
+              )}
               <small>{t("usage.addCredit")}</small>
               <div className="usage-topup-options">
                 {CREDIT_OPTIONS.map((option) => (

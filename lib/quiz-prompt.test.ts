@@ -52,6 +52,40 @@ describe("buildQuizInstructions", () => {
     expect(preferences).toContain("fixed question count or types");
   });
 
+  it("carries a confirmed fault from an earlier run into the next one", () => {
+    const instructions = buildQuizInstructions({
+      questions: [{ type: "multiple_choice", count: 5 }],
+      difficulty: "basic",
+      learnings: [{ rule: "verify_answer_key", scope: "LLM landscape slide" }],
+    });
+
+    expect(instructions).toContain("Faults confirmed against this material in earlier runs");
+    expect(instructions).toContain("Check each answer key against the material");
+    expect(instructions).toContain('It went wrong around "LLM landscape slide".');
+  });
+
+  it("says nothing extra when no fault has been confirmed", () => {
+    const instructions = buildQuizInstructions({
+      questions: [{ type: "multiple_choice", count: 5 }],
+      difficulty: "basic",
+    });
+
+    expect(instructions).not.toContain("Faults confirmed");
+    // The empty block must not leave a blank line between two instructions.
+    expect(instructions).not.toContain("\n\n");
+  });
+
+  it("keeps a lesson subordinate to the settings it could otherwise loosen", () => {
+    const instructions = buildQuizInstructions({
+      questions: [{ type: "multiple_choice", count: 5 }],
+      difficulty: "basic",
+      learnings: [{ rule: "stay_in_source", scope: "" }],
+    });
+
+    expect(instructions).toContain("This fixed question count and type mix cannot be changed");
+    expect(instructions).toContain("do not change the question count, types, or output language");
+  });
+
   it("lets an explicit Chinese preference override an English language default", () => {
     const instructions = buildQuizInstructions({
       questions: [{ type: "multiple_choice", count: 5 }],

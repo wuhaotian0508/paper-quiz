@@ -26,6 +26,9 @@ import {
 } from "@/lib/study-library";
 import { groupBySubject, MAX_SUBJECT_CHARS, UNASSIGNED_SUBJECT } from "@/lib/subject";
 import { safeStorageSet, STORAGE_WRITE_FAILED_EVENT } from "@/lib/request-validation";
+import { CONTACTS_UNREAD_EVENT, unreadTotal } from "@/lib/contacts";
+import { listContacts, type ContactsClient } from "@/lib/contacts-client";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useLocale } from "@/hooks/use-locale";
 import { localeLabels, nextLocale, type MessageKey } from "@/lib/i18n";
 
@@ -39,6 +42,7 @@ const navigationItems = [
   { id: "library", labelKey: "nav.library", icon: "L" },
   { id: "mistake-book", labelKey: "nav.mistakeBook", icon: "!" },
   { id: "progress", labelKey: "nav.calendar", icon: "C" },
+  { id: "contacts", labelKey: "nav.contacts", icon: "F" },
 ] as const satisfies readonly { id: string; labelKey: MessageKey; icon: string }[];
 
 type NavigationId = (typeof navigationItems)[number]["id"];
@@ -77,6 +81,8 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
   const [newSubject, setNewSubject] = useState<string | null>(null);
   /** Set once a browser refuses a write, and never cleared: nothing has been saved since. */
   const [storageFull, setStorageFull] = useState(false);
+  /** Unread direct messages, drawn on the Contacts entry. */
+  const [unread, setUnread] = useState(0);
   const { locale, setLocale, t } = useLocale();
 
   /**
@@ -212,6 +218,44 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
     return () => window.removeEventListener(STORAGE_WRITE_FAILED_EVENT, warn);
   }, []);
 
+  /**
+   * The unread badge: read on mount, again on every navigation, and updated the moment the
+   * contacts page announces a new total. Deliberately no timer — messages here are not
+   * realtime, and a sidebar polling in the background on every page would say otherwise.
+   */
+  useEffect(() => {
+    let client: ContactsClient;
+    try {
+      client = getSupabaseBrowserClient() as unknown as ContactsClient;
+    } catch {
+      // Supabase unconfigured: the rest of the sidebar still works, the badge never appears.
+      return;
+    }
+
+    let active = true;
+    const read = async () => {
+      try {
+        const list = await listContacts(client);
+        if (active) setUnread(unreadTotal(list.contacts));
+      } catch {
+        // Signed out, or offline. Leaving the last known count is better than flashing zero.
+      }
+    };
+    const announce = (event: Event) => {
+      const total = (event as CustomEvent<unknown>).detail;
+      if (typeof total === "number") setUnread(total);
+    };
+
+    void read();
+    window.addEventListener("hashchange", read);
+    window.addEventListener(CONTACTS_UNREAD_EVENT, announce);
+    return () => {
+      active = false;
+      window.removeEventListener("hashchange", read);
+      window.removeEventListener(CONTACTS_UNREAD_EVENT, announce);
+    };
+  }, []);
+
   useEffect(() => {
     const savedTheme = window.localStorage.getItem(themeStorageKey);
     const systemTheme = window.matchMedia?.("(prefers-color-scheme: dark)").matches
@@ -254,6 +298,14 @@ export function DashboardNavigation({ authError = false }: { authError?: boolean
             onClick={() => setActiveId(item.id)}
           >
             <span aria-hidden="true">{item.icon}</span> {t(item.labelKey)}
+            {item.id === "contacts" && unread ? (
+              <span
+                aria-label={t("nav.contactsUnread", { count: unread })}
+                className="sidebar-nav-badge"
+              >
+                {unread}
+              </span>
+            ) : null}
           </a>
         ))}
       </nav>

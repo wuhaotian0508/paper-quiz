@@ -75,10 +75,9 @@ describe("uploadSourceFiles", () => {
       .mockResolvedValueOnce({ id: "file-lecture1" })
       .mockResolvedValueOnce({ id: "file-lecture2" });
 
-    await expect(uploadSourceFiles({ files: { create } }, [pdf("lecture1.pdf"), pdf("lecture2.pdf")])).resolves.toEqual([
-      "file-lecture1",
-      "file-lecture2",
-    ]);
+    await expect(
+      uploadSourceFiles({ files: { create } }, [pdf("lecture1.pdf"), pdf("lecture2.pdf")]),
+    ).resolves.toEqual(["file-lecture1", "file-lecture2"]);
     expect(create).toHaveBeenCalledTimes(2);
     expect(create.mock.calls.map(([input]) => input.file.name)).toEqual([
       "lecture1.pdf",
@@ -115,6 +114,21 @@ describe("buildSourceFileParts", () => {
 
   it("returns no file parts for a transcript-only source", async () => {
     expect(await buildSourceFileParts({ fileId: null, file: null })).toEqual([]);
+  });
+
+  // Every route normalises a missing `fileIds` form field to `[]` and passes it alongside
+  // the single `fileId`. Read as "a list was supplied", that empty array dropped the only
+  // source a one-PDF session has, and grading and tutor chat ran with no material at all.
+  it("falls back to the single id when the list beside it is empty", async () => {
+    expect(await buildSourceFileParts({ fileId: "file-abc123", fileIds: [], files: [] })).toEqual([
+      { type: "input_file", file_id: "file-abc123" },
+    ]);
+  });
+
+  it("still inlines the single file when the list beside it is empty", async () => {
+    const parts = await buildSourceFileParts({ fileId: null, fileIds: [], file: pdf() });
+    expect(parts).toHaveLength(1);
+    expect(parts[0]).toMatchObject({ filename: "lecture.pdf" });
   });
 
   it("does not impose the former 20 MB limit when a provider id is unavailable", async () => {

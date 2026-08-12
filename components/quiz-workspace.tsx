@@ -31,6 +31,12 @@ import {
   type LearnerMemoryEntry,
 } from "@/lib/learner-memory";
 import {
+  GENERATION_LEARNINGS_KEY,
+  learningsFor,
+  readLearnings,
+  serializeLearnings,
+} from "@/lib/generation-learnings";
+import {
   addSession,
   boundSource,
   EMPTY_SOURCE,
@@ -62,6 +68,7 @@ import { ProgressDashboard } from "@/components/progress-dashboard";
 import { ReadOnlyReview } from "@/components/read-only-review";
 import { MistakeBookView } from "@/components/mistake-book-view";
 import { LibraryView } from "@/components/library-view";
+import { ContactsView } from "@/components/contacts-view";
 import { MaterialDetailView } from "@/components/material-detail-view";
 import { LoadingView } from "@/components/loading-view";
 import { ResultsView } from "@/components/results-view";
@@ -94,7 +101,8 @@ type View =
   | "material-detail"
   | "help"
   | "review-sheet"
-  | "transcript";
+  | "transcript"
+  | "contacts";
 
 export function QuizWorkspace() {
   const { locale, t } = useLocale();
@@ -151,6 +159,7 @@ export function QuizWorkspace() {
       if (window.location.hash === "#progress") setView("progress");
       if (window.location.hash === "#library") setView("library");
       if (window.location.hash === "#help") setView("help");
+      if (window.location.hash === "#contacts") setView("contacts");
       // Retired entries kept as redirects so existing links and bookmarks still land
       // somewhere sensible: Quiz Lab was the dashboard, and Review Sheets, History and
       // the older #materials all listed the same materials the library now owns.
@@ -383,6 +392,15 @@ export function QuizWorkspace() {
       form.set("count", String(total));
       form.set("locale", locale);
       if (brief.trim()) form.set("brief", brief.trim());
+      // What earlier reports on this same material proved the model gets wrong here. Rule
+      // ids and a scope label only: the server rebuilds the instruction from its own table.
+      const lessons = learningsFor(
+        readLearnings(window.localStorage.getItem(GENERATION_LEARNINGS_KEY)),
+        pastedNotes
+          ? materialFromNotes(pastedNotes, t("transcript.label")).materialName
+          : material.materialName,
+      );
+      if (lessons.length) form.set("learnings", serializeLearnings(lessons));
       const response = await postForm("/api/generate-quiz", form, {
         timeoutMs: QUIZ_TIMEOUT_MS,
         timeoutMessage: t("error.quizTimeout"),
@@ -730,6 +748,7 @@ export function QuizWorkspace() {
         onPractice={practiceMistakes}
       />
     );
+  if (view === "contacts") return <ContactsView />;
   if (view === "library")
     return (
       <LibraryView
@@ -797,6 +816,8 @@ export function QuizWorkspace() {
         chatting={chatting}
         mistakeCount={mistakes.length}
         hasSourceMaterial={sourceAvailable}
+        materialName={material.materialName}
+        source={source}
         analysingOptions={analysingOptionsFor === current.id}
         onAnswerChange={setAnswer}
         onChatInputChange={setChatInput}

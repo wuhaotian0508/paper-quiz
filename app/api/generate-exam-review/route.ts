@@ -12,6 +12,7 @@ import {
 import { parseExamReviewOutput } from "@/lib/exam-review-output";
 import { getOpenAIClientOptions, getOpenAIModel } from "@/lib/openai-config";
 import { collectResponse } from "@/lib/openai-stream";
+import { describeModelFailure, readFailureText } from "@/lib/model-failure";
 import {
   MAX_TRANSCRIPT_CHARS,
   MAX_QUESTION_CHARS,
@@ -174,11 +175,20 @@ export async function POST(request: Request) {
       });
 
     const firstStream = await createReviewStream();
-    let { text, stoppedEarlyBecause, usage } = await collectResponse(firstStream);
+    let { text, stoppedEarlyBecause, failureDetail, usage } = await collectResponse(firstStream);
     if (stoppedEarlyBecause === "max_output_tokens")
       return jsonError("The exam review was cut off before it finished. Please try again.", 502);
-    if (stoppedEarlyBecause || !text)
-      return jsonError("AI did not return a usable exam review. Please try again.", 502);
+    if (stoppedEarlyBecause || !text) {
+      console.error("Exam review stopped early", {
+        reason: stoppedEarlyBecause,
+        detail: failureDetail,
+      });
+      return jsonError(
+        describeModelFailure(failureDetail) ??
+          "AI did not return a usable exam review. Please try again.",
+        502,
+      );
+    }
 
     let review = parseExamReviewOutput(text);
     if (!reviewUsesResolvedOutputLanguage(review, languagePreference)) {
@@ -186,8 +196,17 @@ export async function POST(request: Request) {
       const corrective = await collectResponse(correctiveStream);
       if (corrective.stoppedEarlyBecause === "max_output_tokens")
         return jsonError("The exam review was cut off before it finished. Please try again.", 502);
-      if (corrective.stoppedEarlyBecause || !corrective.text)
-        return jsonError("AI did not return a usable exam review. Please try again.", 502);
+      if (corrective.stoppedEarlyBecause || !corrective.text) {
+        console.error("Exam review stopped early", {
+          reason: corrective.stoppedEarlyBecause,
+          detail: corrective.failureDetail,
+        });
+        return jsonError(
+          describeModelFailure(corrective.failureDetail) ??
+            "AI did not return a usable exam review. Please try again.",
+          502,
+        );
+      }
       text = corrective.text;
       usage = corrective.usage;
       review = parseExamReviewOutput(text);
@@ -215,10 +234,10 @@ export async function POST(request: Request) {
       usage,
     });
   } catch (error) {
-    console.error(
-      "Exam review generation failed",
-      error instanceof Error ? error.message : "unknown error",
+    console.error("Exam review generation failed", readFailureText(error) || "unknown error");
+    return jsonError(
+      describeModelFailure(error) ?? "Exam review generation failed. Please try again later.",
+      502,
     );
-    return jsonError("Exam review generation failed. Please try again later.", 502);
   }
 }

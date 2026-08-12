@@ -86,8 +86,12 @@ export async function buildSourceFileParts(source: {
   fileIds?: (string | null)[];
   files?: File[];
 }): Promise<FilePart[]> {
-  const files = source.files || (source.file ? [source.file] : []);
-  const ids = source.fileIds || (source.fileId ? [source.fileId] : []);
+  // Length, not presence: every route normalises its list field to `[]` when the form
+  // omitted it, and an empty array read as "a list was supplied" meant the single `fileId`
+  // beside it was skipped — which is the whole source for a one-PDF session, silently sent
+  // with no material at all.
+  const files = source.files?.length ? source.files : source.file ? [source.file] : [];
+  const ids = source.fileIds?.length ? source.fileIds : source.fileId ? [source.fileId] : [];
   const count = Math.max(files.length, ids.length);
   const parts: FilePart[] = [];
 
