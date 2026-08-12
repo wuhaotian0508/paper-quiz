@@ -686,6 +686,30 @@ export const en = {
   "contacts.privacyNote":
     "Messages stay between the two of you. Removing a contact deletes the conversation for both.",
 
+  // Nearby classmates
+  "nearby.heading": "Classmates nearby",
+  // Says plainly that opening the page is what starts it, since that is now what happens.
+  "nearby.note":
+    "This page shares where you are while it is open, so you can see who else is around. Others only ever see how far away you are, never where.",
+  "nearby.start": "Find classmates nearby",
+  "nearby.locating": "Finding you…",
+  "nearby.stop": "Stop sharing",
+  // The line that makes leaving this on by accident impossible.
+  "nearby.sharingFor": "Sharing — stops on its own in {hours} h {minutes} m",
+  "nearby.sharingSoon": "Sharing — stops on its own in {minutes} m",
+  "nearby.bandHere": "Right here",
+  "nearby.bandNearby": "A short walk away",
+  "nearby.bandCity": "Same city",
+  "nearby.empty": "Nobody else is sharing right now. Check back later.",
+  "nearby.add": "Add",
+  "nearby.addAria": "Ask {name} to be a contact",
+  "nearby.asked": "Asked",
+  "nearby.alreadyContact": "Already a contact",
+  "nearby.denied": "Your browser did not share your location, so nobody can be found.",
+  "nearby.unsupported": "This browser cannot report a location.",
+  "nearby.failed": "Your location could not be read. Try again.",
+  "nearby.listAria": "Classmates near you",
+
   // Page chrome
   "footer.mood": "Made for the night-before-the-exam mood.",
   "footer.privacy": "Study material is used only for this generation.",

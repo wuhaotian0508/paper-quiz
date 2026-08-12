@@ -4527,6 +4527,122 @@ h1 {
   resize: vertical;
 }
 
+/* Nearby classmates, inside the contacts sidebar. */
+.nearby-panel {
+  display: grid;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.nearby-panel h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.nearby-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.nearby-error {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: var(--tint-coral-ink);
+  background: var(--tint-coral-bg);
+  font-size: 12px;
+}
+.nearby-start {
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-deep);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.nearby-start:hover:not(:disabled) {
+  border-color: var(--mint-deep);
+}
+.nearby-start:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+/* Tinted rather than quiet: this line is the whole defence against leaving sharing on by
+   accident, so it has to read as a live state and not as a caption. */
+.nearby-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--mint);
+}
+.nearby-status-line {
+  color: var(--tint-mint-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+.nearby-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.nearby-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nearby-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1px 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--paper-deep);
+}
+.nearby-name {
+  font-size: 13px;
+  font-weight: 700;
+}
+.nearby-band {
+  grid-column: 1;
+  color: var(--muted);
+  font-size: 11px;
+}
+.nearby-state {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.nearby-add {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.nearby-add:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 @media (max-width: 900px) {
   .contacts-layout {
     grid-template-columns: 1fr;

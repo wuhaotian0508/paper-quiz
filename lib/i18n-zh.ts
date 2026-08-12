@@ -656,6 +656,30 @@ export const zh: Messages = {
   "contacts.sendFailed": "这条消息没有发出去。",
   "contacts.privacyNote": "消息只在你们两人之间。删除联系人会同时清空双方的对话。",
 
+  // 附近的同学
+  "nearby.heading": "附近的同学",
+  // 如实说明「打开就开始」，因为现在确实如此。
+  "nearby.note":
+    "打开这个页面就会共享你的位置，好让你看到谁在附近。别人只会看到你离得多远，永远看不到你在哪。",
+  "nearby.start": "找找附近的同学",
+  "nearby.locating": "正在定位……",
+  "nearby.stop": "停止共享",
+  // 这一行的存在就是为了让「忘了自己开着」不可能发生。
+  "nearby.sharingFor": "共享中 — {hours} 小时 {minutes} 分后自动关闭",
+  "nearby.sharingSoon": "共享中 — {minutes} 分钟后自动关闭",
+  "nearby.bandHere": "就在附近",
+  "nearby.bandNearby": "走几步就到",
+  "nearby.bandCity": "同城",
+  "nearby.empty": "现在还没有别人在共享位置，过会儿再来看看。",
+  "nearby.add": "添加",
+  "nearby.addAria": "邀请 {name} 成为联系人",
+  "nearby.asked": "已发出",
+  "nearby.alreadyContact": "已是联系人",
+  "nearby.denied": "浏览器没有提供你的位置，所以找不到任何人。",
+  "nearby.unsupported": "这个浏览器无法提供位置。",
+  "nearby.failed": "读取位置失败，请再试一次。",
+  "nearby.listAria": "你附近的同学",
+
   // 页面框架
   "footer.mood": "为考前一晚的你而做。",
   "footer.privacy": "学习材料仅用于本次生成。",

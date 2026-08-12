@@ -2,6 +2,7 @@
 
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { NearbyLearners } from "@/components/nearby-learners";
 import { useLocale } from "@/hooks/use-locale";
 import {
   contactName,
@@ -233,6 +234,10 @@ export function ContactsView({ client }: Props) {
               </small>
             ) : null}
           </form>
+
+          {/* Knowing an address is the other way in; this is the one for a classmate whose
+              address you do not have, because they are sitting two tables away. */}
+          <NearbyLearners client={contactsClient} onContactRequested={refresh} />
 
           {list.incoming.length ? (
             <section className="contacts-requests" aria-labelledby="contacts-incoming">
