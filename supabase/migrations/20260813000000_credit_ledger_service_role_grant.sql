@@ -1,0 +1,12 @@
+-- The ledger granted `select` to `authenticated` and nothing to anybody else, on the
+-- assumption that the service role needs no grant because it bypasses row level security.
+-- Bypassing RLS is not the same as holding table privileges: every write arrived as
+-- `service_role` and was refused with `42501 permission denied`, so no payment could ever
+-- have been recorded — the Stripe webhook only escaped notice because it was never configured
+-- far enough to reach the database.
+--
+-- Insert, because recording a payment is the whole job. Select, because a refund finds its
+-- payer by looking up the top-up it reverses (`payerOf` in the webhook route). Deliberately
+-- no update or delete: a ledger is corrected by adding an offsetting row, never by editing
+-- history, and a credential this powerful should not be able to rewrite one.
+grant select, insert on table public.paper_quiz_credit_entries to service_role;

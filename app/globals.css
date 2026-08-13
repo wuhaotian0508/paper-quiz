@@ -3932,6 +3932,66 @@ h1 {
 .usage-topup-options button:hover {
   background: rgba(255, 231, 164, 0.4);
 }
+.usage-topup-options button.is-chosen {
+  border-color: var(--coral-deep);
+  background: rgba(255, 231, 164, 0.55);
+}
+.usage-alipay-toggle {
+  padding: 5px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.usage-alipay-toggle:hover {
+  background: rgba(255, 231, 164, 0.4);
+}
+.usage-alipay {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.usage-alipay > small {
+  text-align: center;
+}
+.usage-alipay .usage-topup-options {
+  width: 100%;
+}
+.usage-alipay-amount {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  font-size: 11px;
+  color: var(--muted);
+}
+.usage-alipay-amount input {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+}
+.usage-alipay-qr {
+  width: 148px;
+  height: 148px;
+  border-radius: 8px;
+  background: #fff;
+}
+.usage-alipay-note {
+  color: var(--muted);
+  text-align: center;
+}
 .usage-topup-status {
   color: var(--coral-deep);
 }
@@ -4641,6 +4701,250 @@ h1 {
 .nearby-add:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+/* Course groups, below the nearby panel in the contacts sidebar. */
+.groups-panel {
+  display: grid;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.groups-panel h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.groups-panel h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.groups-note,
+.groups-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.groups-error {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: var(--tint-coral-ink);
+  background: var(--tint-coral-bg);
+  font-size: 12px;
+}
+.groups-new,
+.groups-invite-form {
+  display: grid;
+  gap: 6px;
+}
+.groups-new label,
+.groups-invite-form label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.groups-new-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+}
+.groups-new-row input {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+}
+.groups-new-row button,
+.groups-invite-actions button {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.groups-new-row button:disabled,
+.groups-invite-actions button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.groups-invite-status {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.groups-invites,
+.groups-list {
+  display: grid;
+  gap: 6px;
+}
+.groups-invite-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--tint-blue-bg);
+  font-size: 13px;
+}
+.groups-invite-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+.groups-invite-actions {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.groups-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  padding: 9px 11px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.groups-row:hover,
+.groups-row[aria-current="true"] {
+  border-color: var(--line);
+  background: var(--paper-deep);
+}
+.groups-row-name {
+  font-size: 13px;
+  font-weight: 700;
+}
+.groups-row-count {
+  color: var(--muted);
+  font-size: 11px;
+}
+.groups-row-preview {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.groups-room {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper-deep);
+}
+.groups-room-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.groups-room-heading h3 {
+  color: var(--ink);
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.groups-messages {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  max-height: 34vh;
+  overflow-y: auto;
+}
+.groups-day {
+  display: grid;
+  gap: 6px;
+}
+.groups-date {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+.groups-message {
+  position: relative;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--white);
+}
+.groups-message.is-mine {
+  background: var(--tint-blue-bg);
+}
+.groups-message-author {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+.groups-message-time {
+  font-weight: 500;
+}
+.groups-message-body {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* Quiet until wanted: reporting is rare, and a loud button on every line reads as an
+   accusation waiting to happen. */
+.groups-report {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 10px;
+  text-decoration: underline;
+  cursor: pointer;
+  opacity: 0;
+}
+.groups-message:hover .groups-report,
+.groups-report:focus-visible {
+  opacity: 1;
+}
+.groups-composer {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+.groups-composer textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  resize: vertical;
 }
 
 @media (max-width: 900px) {

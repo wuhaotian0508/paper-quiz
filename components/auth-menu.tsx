@@ -14,7 +14,7 @@ import {
   USAGE_METER_UPDATED_EVENT,
   type UsageTotals,
 } from "@/lib/usage-meter";
-import { CREDIT_OPTIONS } from "@/lib/credit-options";
+import { CREDIT_OPTIONS, MAX_RMB_TOPUP, rmbToCents } from "@/lib/credit-options";
 import { formatCredit } from "@/lib/credit-ledger";
 
 type AuthSession = { user: { email?: string | null } } | null;
@@ -98,6 +98,71 @@ export function AuthMenu({
       typeof window !== "undefined" &&
       new URLSearchParams(window.location.search).get("checkout") === "success",
   );
+
+  const [alipayOpen, setAlipayOpen] = useState(false);
+  const [alipayQr, setAlipayQr] = useState("");
+  /**
+   * The yuan figure the learner says they paid, as typed.
+   *
+   * Free entry rather than a fixed list, because the receive code carries no amount: whatever
+   * the panel offered, Alipay would still let them pay something else, and a ledger that could
+   * only record three figures would be wrong the first time somebody did. The presets are
+   * shortcuts into this field, not a menu it has to choose from.
+   */
+  const [alipayRmb, setAlipayRmb] = useState(String(CREDIT_OPTIONS[1].rmb));
+
+  /**
+   * Opens the Alipay receive code, fetching it the first time it is asked for.
+   *
+   * The code is a personal one, so paying it moves money without telling this app anything -
+   * see `app/api/alipay/route.ts`.
+   */
+  const openAlipay = async () => {
+    if (alipayOpen) {
+      setAlipayOpen(false);
+      return;
+    }
+
+    setAlipayOpen(true);
+    if (alipayQr) return;
+
+    setCheckoutStatus(t("usage.alipayLoading"));
+    try {
+      const response = await fetch("/api/alipay");
+      const data = (await response.json()) as { qrDataUrl?: string; error?: string };
+      if (!response.ok || !data.qrDataUrl) {
+        throw new Error(data.error || t("usage.alipayUnavailable"));
+      }
+      setAlipayQr(data.qrDataUrl);
+      setCheckoutStatus("");
+    } catch (cause) {
+      setAlipayOpen(false);
+      setCheckoutStatus(cause instanceof Error ? cause.message : t("usage.alipayUnavailable"));
+    }
+  };
+
+  /** Takes the learner's word that they paid, and writes the ledger row that follows from it. */
+  const confirmAlipay = async () => {
+    setCheckoutStatus(t("usage.alipayConfirming"));
+    try {
+      const body = new FormData();
+      body.set("rmb", alipayRmb);
+      const response = await fetch("/api/alipay", { method: "POST", body });
+      const data = (await response.json()) as {
+        creditedCents?: number;
+        balanceCents?: number;
+        error?: string;
+      };
+      if (!response.ok || typeof data.creditedCents !== "number") {
+        throw new Error(data.error || t("usage.alipayFailed"));
+      }
+      if (typeof data.balanceCents === "number") setCreditCents(data.balanceCents);
+      setAlipayOpen(false);
+      setCheckoutStatus(t("usage.creditAdded", { amount: formatCredit(data.creditedCents) }));
+    } catch (cause) {
+      setCheckoutStatus(cause instanceof Error ? cause.message : t("usage.alipayFailed"));
+    }
+  };
 
   /**
    * Buying credit ahead of billing. Practice stays free and unlimited, so this is never a
@@ -406,6 +471,62 @@ export function AuthMenu({
                   </button>
                 ))}
               </div>
+              {/* Alipay sits behind its own toggle rather than beside the amounts: it is a
+                  second way to pay, not a fourth amount, and folding it in read as one. */}
+              <button
+                type="button"
+                className="usage-alipay-toggle"
+                aria-expanded={alipayOpen}
+                onClick={() => void openAlipay()}
+              >
+                {alipayOpen ? t("usage.alipayHide") : t("usage.payWithAlipay")}
+              </button>
+              {alipayOpen && alipayQr ? (
+                <div className="usage-alipay">
+                  <small>{t("usage.alipayChooseAmount")}</small>
+                  {/* Shortcuts into the field below, not a menu: the code takes any amount,
+                      so the field is the real input and these only save some typing. */}
+                  <div className="usage-topup-options">
+                    {CREDIT_OPTIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        aria-pressed={alipayRmb === String(option.rmb)}
+                        className={alipayRmb === String(option.rmb) ? "is-chosen" : ""}
+                        onClick={() => setAlipayRmb(String(option.rmb))}
+                      >
+                        {option.rmbLabel}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="usage-alipay-amount" htmlFor="alipay-rmb">
+                    <span>{t("usage.alipayAmountLabel")}</span>
+                    <input
+                      id="alipay-rmb"
+                      type="number"
+                      inputMode="decimal"
+                      min={1}
+                      max={MAX_RMB_TOPUP}
+                      step="0.01"
+                      value={alipayRmb}
+                      onChange={(event) => setAlipayRmb(event.target.value)}
+                    />
+                  </label>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- a data URL has no
+                      remote source for the image loader to optimise. */}
+                  <img className="usage-alipay-qr" src={alipayQr} alt={t("usage.alipayQrAlt")} />
+                  <small>{t("usage.alipayScanHint", { amount: `¥${alipayRmb || "0"}` })}</small>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    disabled={!rmbToCents(alipayRmb)}
+                    onClick={() => void confirmAlipay()}
+                  >
+                    {t("usage.alipayConfirm", { amount: `¥${alipayRmb || "0"}` })}
+                  </button>
+                  <small className="usage-alipay-note">{t("usage.alipayDemoNote")}</small>
+                </div>
+              ) : null}
               {checkoutStatus ? (
                 <small role="status" className="usage-topup-status">
                   {checkoutStatus}
